@@ -1,0 +1,111 @@
+## Reference: https://github.com/helm/chart-releaser-action
+name: Release Charts
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'charts/**'
+      - '!charts/**/ci/**'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: github.repository == 'kubeadapt/kubeadapt-helm'
+    permissions:
+      contents: write  # for helm/chart-releaser-action to push chart release and create a release
+      packages: write  # to push OCI chart package to GitHub Registry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HELM_BOT_APP_ID }}
+          private-key: ${{ secrets.HELM_BOT_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "kubeadapt-helm-bot[bot]"
+          git config user.email "kubeadapt-helm-bot[bot]@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.13.3
+
+      - name: Add dependency repos
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add opencost https://opencost.github.io/opencost-helm-chart
+          helm repo update
+
+      # Import GPG private key for chart signing
+      - name: Prepare PGP key
+        run: |
+          echo "$PGP_PRIVATE_KEY" | gpg --batch --import
+          echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent reloadagent /bye
+          echo "$PGP_PASSPHRASE" | gpg --pinentry-mode loopback --passphrase-fd 0 --sign --clear > /dev/null
+
+          # Export the key to a keyring file for chart-releaser
+          gpg --export-secret-keys --armor 948AD9EDA6BD626E > $HOME/secring.gpg
+          echo "$PGP_PASSPHRASE" > $HOME/passphrase.txt
+
+          # Tell chart-releaser-action where to find the key and its passphrase
+          echo "CR_KEYRING=$HOME/secring.gpg" >> "$GITHUB_ENV"
+          echo "CR_PASSPHRASE_FILE=$HOME/passphrase.txt" >> "$GITHUB_ENV"
+        env:
+          PGP_PRIVATE_KEY: "${{ secrets.PGP_PRIVATE_KEY }}"
+          PGP_PASSPHRASE: "${{ secrets.PGP_PASSPHRASE }}"
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
+        with:
+          config: "./.github/configs/cr.yaml"
+        env:
+          CR_TOKEN: ${{ steps.app-token.outputs.token }}
+          CR_SKIP_EXISTING: true
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: kubeadapt-helm-bot[bot]
+          password: ${{ steps.app-token.outputs.token }}
+
+      - name: Push chart to GHCR
+        run: |
+          shopt -s nullglob
+          for pkg in .cr-release-packages/*.tgz; do
+            if [ -z "${pkg:-}" ]; then
+              break
+            fi
+            helm push "${pkg}" oci://ghcr.io/${{ github.repository }}
+          done
+
+      - name: Update compatibility matrix
+        if: success()
+        run: |
+          # Extract current chart version
+          CHART_VERSION=$(grep '^version:' charts/kubeadapt/Chart.yaml | awk '{print $2}')
+          APP_VERSION=$(grep '^appVersion:' charts/kubeadapt/Chart.yaml | awk '{print $2}' | tr -d '"')
+          
+          # Run update script
+          ./scripts/update-compatibility.sh \
+            --chart-version "${CHART_VERSION}" \
+            --app-version "${APP_VERSION}"
+          
+          # Commit and push changes
+          git add COMPATIBILITY.md
+          git commit -S -m "chore: update compatibility matrix for version ${CHART_VERSION}" || true
+          git push origin main

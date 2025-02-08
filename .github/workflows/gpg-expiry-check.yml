@@ -1,0 +1,44 @@
+name: GPG Key Expiry Check
+on:
+  schedule:
+    - cron: '0 0 1 * *' 
+
+jobs:
+  check-expiry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HELM_BOT_APP_ID }}
+          private-key: ${{ secrets.HELM_BOT_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Import public key
+        run: |
+          curl -fsSL https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc | gpg --import
+
+      - name: Check expiry
+        run: |
+          # Get expiry date
+          EXPIRY=$(gpg --list-keys --with-colons 948AD9EDA6BD626E | grep '^pub:' | cut -d: -f7)
+          
+          # Convert to timestamp
+          EXPIRY_TS=$(date -d "@$EXPIRY" +%s)
+          NOW_TS=$(date +%s)
+          YEAR_IN_SECONDS=$((365 * 24 * 60 * 60))
+          
+          # Check if expiry is within 1 year
+          if [ $(($EXPIRY_TS - $NOW_TS)) -lt $YEAR_IN_SECONDS ]; then
+            gh issue create \
+              --title "GPG Key Expiry Warning" \
+              --body "The GPG signing key (948AD9EDA6BD626E) will expire in less than 1 year. Please plan for key rotation." \
+              --label "security"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
