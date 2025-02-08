@@ -1,0 +1,43 @@
+{{- if .Values.coreapi.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubeadapt.name" . }}-coreapi
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: coreapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "kubeadapt.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: coreapi
+  template:
+    metadata:
+      labels:
+        {{- include "kubeadapt.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: coreapi
+    spec:
+      serviceAccountName: {{ include "kubeadapt.name" . }}-coreapi
+      containers:
+        - name: coreapi
+          image: "{{ .Values.coreapi.image.repository }}:{{ .Values.coreapi.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.coreapi.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.coreapi.service.port }}
+              protocol: TCP
+          env:
+            - name: CLUSTER_NAME
+              value: {{ include "kubeadapt.clusterName" . | quote }}
+            - name: CLUSTER_ID
+              value: {{ include "kubeadapt.clusterId" . | quote }}
+            - name: ENVIRONMENT
+              value: {{ include "kubeadapt.environment" . | quote }}
+            - name: REGION
+              value: {{ include "kubeadapt.region" . | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.coreapi.config.logLevel | default "info" | quote }}
+          resources:
+            {{- toYaml .Values.coreapi.resources | nindent 12 }}
+{{- end }} 

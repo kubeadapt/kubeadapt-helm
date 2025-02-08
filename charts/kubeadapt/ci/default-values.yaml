@@ -1,0 +1,145 @@
+# Default values for kubeadapt.
+global:
+  name: "kubeadapt"
+  nameOverride: ""
+  fullnameOverride: ""
+  # Cluster specific configuration for CI
+  clusterName: "ci-test-cluster"
+  clusterId: "ci-test-001"
+  environment: "ci"
+  region: "ci-region-1"
+
+agent:
+  enabled: false # TODO: Enable this when components images are accessible
+  image:
+    repository: ghcr.io/kubeadapt/agent
+    tag: ""  # Defaults to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+  rbac:
+    create: true
+  service:
+    type: ClusterIP
+    port: 8080
+    protocol: TCP
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  # Agent specific configuration
+  config:
+    token: "ci-test-token-123"
+    coreApiUrl: "http://kubeadapt-coreapi:8080"
+    logLevel: "debug"
+
+coreapi:
+  enabled: false # TODO: Enable this when components images are accessible
+  image:
+    repository: ghcr.io/kubeadapt/coreapi
+    tag: ""  # Defaults to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  config:
+    logLevel: "debug"
+
+# Dependencies configuration
+prometheus:
+  enabled: true
+  server:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 50Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    service:
+      type: ClusterIP
+      servicePort: 80
+    persistentVolume:
+      # Not required for CI env.
+      enabled: false
+      size: 8Gi
+    fullnameOverride: kubeadapt-prometheus-server
+  alertmanager:
+    enabled: false
+  prometheus-node-exporter:
+    enabled: false
+
+opencost:
+  restartJob:
+    enabled: true
+  opencost:
+    enabled: true
+    customPricing:
+      enabled: true
+      configmapName: custom-pricing-model
+      configPath: /tmp/custom-config
+      createConfigmap: true
+      provider: custom
+      costModel:
+        description: "Custom pricing for kind/local environment"
+        CPU: 0.031611 # Per CPU core per hour
+        spotCPU: 0.006655
+        RAM: 0.004237 # Per GB per hour
+        spotRAM: 0.000892
+        GPU: 0.95
+        storage: 0.00005479452054794521 # Per GB per hour
+        zoneNetworkEgress: 0.01
+        regionNetworkEgress: 0.01
+        internetNetworkEgress: 0.12
+    prometheus:
+      internal:
+        enabled: true
+        serviceName: kubeadapt-prometheus-server
+        namespaceName: "{{ .Release.Namespace }}"
+        port: 80
+      external:
+        enabled: false
+        url: ""
+    exporter:
+      defaultClusterId: default
+      resources:
+        requests:
+          cpu: '10m'
+          memory: '55Mi'
+        limits:
+          cpu: '999m'
+          memory: '1Gi'
+    ui:
+      enabled: true
+      resources:
+        requests:
+          cpu: '10m'
+          memory: '55Mi'
+        limits:
+          cpu: '999m'
+          memory: '1Gi'
+
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+    automountServiceAccountToken: true
+
+  rbac:
+    enabled: true

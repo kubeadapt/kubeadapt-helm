@@ -25,6 +25,14 @@ if [ -z "${CHART_VERSION:-}" ] || [ -z "${APP_VERSION:-}" ]; then
   exit 1
 fi
 
+# Check if Chart version has changed
+LAST_CHART_VERSION=$(git show HEAD:charts/kubeadapt/Chart.yaml | grep '^version:' | head -n 1 | awk '{print $2}' || echo "")
+
+if [ "${LAST_CHART_VERSION}" = "${CHART_VERSION}" ]; then
+  echo "No version change detected (${CHART_VERSION}). Skipping compatibility matrix update."
+  exit 0
+fi
+
 # Get component versions from Chart.yaml
 PROMETHEUS_VERSION=$(grep -A2 'name: prometheus' charts/kubeadapt/Chart.yaml | grep 'version:' | awk '{print $2}' | tr -d '"')
 OPENCOST_VERSION=$(grep -A2 'name: opencost' charts/kubeadapt/Chart.yaml | grep 'version:' | awk '{print $2}' | tr -d '"')

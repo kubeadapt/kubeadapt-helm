@@ -1,0 +1,289 @@
+# Global values for kubeadapt.
+global:
+  name: "kubeadapt"
+  nameOverride: ""
+  fullnameOverride: ""
+  # Cluster specific configuration
+  clusterName: ""
+  clusterId: ""
+  environment: "production"
+  region: ""
+
+agent:
+  enabled: true
+  image:
+    repository: ghcr.io/kubeadapt/agent
+    tag: ""  # Defaults to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+  rbac:
+    create: true
+  service:
+    type: ClusterIP
+    port: 8080
+    protocol: TCP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  # Agent specific configuration
+  config:
+    # Token for authenticating with cloud backend
+    token: ""
+    # CoreAPI service endpoint
+    coreApiUrl: "http://kubeadapt-coreapi:8080"
+    logLevel: "info"
+
+coreapi:
+  enabled: true
+  image:
+    repository: ghcr.io/kubeadapt/coreapi
+    tag: ""  # Defaults to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  # CoreAPI specific configuration
+  config:
+    logLevel: "info"
+
+config:
+  message: "Hello from KubeAdapt!"
+
+# Dependencies configuration
+prometheus:
+
+  enabled: true
+  server:
+    persistentVolume:
+      size: 100Gi # for 2 years and an eks cluster with 10-150 nodes
+      storageClass: gp2
+    service:
+      type: ClusterIP
+      servicePort: 80
+    fullnameOverride: kubeadapt-prometheus-server
+    retention: "730d"
+  alertmanager:
+    enabled: false
+  # -- Node Exporter Configuration:
+  # If you already have node-exporter running in your cluster (e.g., from kube-prometheus-stack),
+  # keep prometheus-node-exporter.enabled as false. Because we can read node exporter metrics from existing up and running prometheus node exporters.
+  # If you don't have any existing node-exporter, set prometheus-node-exporter.enabled to true.
+  prometheus-node-exporter:
+    enabled: false
+  serverFiles:
+    prometheus.yml:
+      scrape_configs:
+        # Prometheus's own metrics
+        - job_name: prometheus
+          static_configs:
+            - targets:
+              - localhost:9090
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              action: keep
+              regex: ^(prometheus_.*|up|time)$
+
+        # Metrics from kube-state-metrics (Cluster, Pod, ReplicaSet metrics)
+        - job_name: 'kubernetes-pods'
+          honor_labels: true
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port, __meta_kubernetes_pod_ip]
+              action: replace
+              regex: (\d+);((([0-9]+?)(\.|$)){4})
+              replacement: $2:$1
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_pod_label_(.+)
+            - source_labels: [__meta_kubernetes_namespace]
+              action: replace
+              target_label: namespace
+            - source_labels: [__meta_kubernetes_pod_name]
+              action: replace
+              target_label: pod
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              action: keep
+              regex: ^(kubecost_cluster_info|kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity_cpu_cores|kube_node_status_capacity_memory_bytes|kube_node_labels|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_restarts_total)$
+
+        # Metrics from kube-state-metrics that need slower scraping
+        - job_name: 'kubernetes-pods-slow'
+          honor_labels: true
+          scrape_interval: 5m
+          scrape_timeout: 30s
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape_slow]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port, __meta_kubernetes_pod_ip]
+              action: replace
+              regex: (\d+);((([0-9]+?)(\.|$)){4})
+              replacement: $2:$1
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_pod_label_(.+)
+            - source_labels: [__meta_kubernetes_namespace]
+              action: replace
+              target_label: namespace
+            - source_labels: [__meta_kubernetes_pod_name]
+              action: replace
+              target_label: pod
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              action: keep
+              regex: ^(kube_pod_status_phase)$
+
+        # Metrics from cAdvisor (Container and Network metrics)
+        - job_name: 'kubernetes-nodes-cadvisor'
+          scheme: https
+          tls_config:
+            ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          kubernetes_sd_configs:
+            - role: node
+          relabel_configs:
+            - target_label: __address__
+              replacement: kubernetes.default.svc:443
+            - source_labels: [__meta_kubernetes_node_name]
+              regex: (.+)
+              target_label: __metrics_path__
+              replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              action: keep
+              regex: ^(container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_network_receive_bytes_total|container_network_transmit_bytes_total)$
+
+        # Metrics from node-exporter (Node metrics)
+        - job_name: 'kubernetes-nodes'
+          scheme: https
+          tls_config:
+            ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          kubernetes_sd_configs:
+            - role: node
+          relabel_configs:
+            - target_label: __address__
+              replacement: kubernetes.default.svc:443
+            - source_labels: [__meta_kubernetes_node_name]
+              regex: (.+)
+              target_label: __metrics_path__
+              replacement: /api/v1/nodes/$1/proxy/metrics
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              action: keep
+              regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes)$
+
+        # Metrics from OpenCost (Cost metrics)
+        - job_name: 'kubernetes-service-endpoints'
+          honor_labels: true
+          kubernetes_sd_configs:
+            - role: endpoints
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+              action: replace
+              target_label: __address__
+              regex: (.+?)(?::\d+)?;(\d+)
+              replacement: $1:$2
+            - action: labelmap
+              regex: __meta_kubernetes_service_label_(.+)
+            - source_labels: [__meta_kubernetes_namespace]
+              action: replace
+              target_label: namespace
+            - source_labels: [__meta_kubernetes_service_name]
+              action: replace
+              target_label: service
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              action: keep
+              regex: ^(node_cpu_hourly_cost|node_ram_hourly_cost|node_gpu_hourly_cost|pv_hourly_cost)$
+
+opencost:
+  restartJob:
+    enabled: false
+  enabled: true
+  opencost:
+    prometheus:
+      internal:
+        enabled: true
+        serviceName: kubeadapt-prometheus-server
+        namespaceName: kubeadapt-test
+        port: 80
+      external:
+        enabled: false
+        url: ""
+    exporter:
+      defaultClusterId: default # This can be overridden by the user by setting the opencost.opencost.clusterId value
+      resources:
+        # These are the default values for the opencost exporter at 1.43.2
+        requests:
+          cpu: '10m'
+          memory: '55Mi'
+        limits:
+          cpu: '999m'
+          memory: '1Gi'
+    ui:
+      enabled: true
+      resources:
+        requests:
+          cpu: '10m'
+          memory: '55Mi'
+        limits:
+          cpu: '999m'
+          memory: '1Gi'
+    cloudCost:
+      enabled: true
+      refreshRateHours: 6
+      runWindowDays: 3
+    dataRetention:
+      dailyResolutionDays: 15
+    carbonCost:
+      # -- Enable carbon cost exposed in the API
+      enabled: false
+
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+    automountServiceAccountToken: true
+
+  rbac:
+    enabled: true
