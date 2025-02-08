@@ -101,10 +101,7 @@ To verify the signature of a chart, follow these steps:
 We have enabled the ability to privately report security issues through the 
 Security tab above.
 
-[Here are the details](https://docs.github.com/en/code-security/
-security-advisories/guidance-on-reporting-and-writing/
-privately-reporting-a-security-vulnerability#privately-reporting-a-security-
-vulnerability) on how to report a security vulnerability.
+[Here are the details](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability#privately-reporting-a-security-vulnerability) on how to report a security vulnerability.
 
 ### Chart Security
 

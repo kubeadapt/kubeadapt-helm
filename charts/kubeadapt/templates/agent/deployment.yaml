@@ -1,0 +1,50 @@
+{{- if .Values.agent.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubeadapt.name" . }}-agent
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "kubeadapt.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: agent
+  template:
+    metadata:
+      labels:
+        {{- include "kubeadapt.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: agent
+    spec:
+      serviceAccountName: {{ include "kubeadapt.name" . }}-agent
+      containers:
+        - name: agent
+          image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          ports:
+            - name: websocket
+              containerPort: {{ .Values.agent.service.port }}
+              protocol: {{ .Values.agent.service.protocol }}
+          env:
+            - name: CLUSTER_NAME
+              value: {{ include "kubeadapt.clusterName" . | quote }}
+            - name: CLUSTER_ID
+              value: {{ include "kubeadapt.clusterId" . | quote }}
+            - name: ENVIRONMENT
+              value: {{ include "kubeadapt.environment" . | quote }}
+            - name: REGION
+              value: {{ include "kubeadapt.region" . | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.agent.config.logLevel | default "info" | quote }}
+            - name: CORE_API_URL
+              value: {{ .Values.agent.config.coreApiUrl | quote }}
+            - name: AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubeadapt.name" . }}-agent
+                  key: token
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+{{- end }} 

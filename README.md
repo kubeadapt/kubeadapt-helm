@@ -47,9 +47,7 @@ All Helm charts in this repository are signed using GPG. The signing key details
 - Key ID: 948AD9EDA6BD626E
 - Fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
 
-### Verifying Chart Signatures
-
-For detailed verification instructions and troubleshooting, see our [Verification Guide](docs/security/verification-guide.md).
+For detailed verification instructions and troubleshooting, see our [Security Policy](SECURITY.md).
 
 
 ## Contributing
