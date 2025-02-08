@@ -1,0 +1,13 @@
+## Reference: https://github.com/helm/chart-releaser
+index-path: "./index.yaml"
+
+# PGP signing
+sign: true
+key: "Kubeadapt Helm Bot (Helm chart signing key) <authors@kubeadapt.io>"
+# keyring and passphrase-file are set via environment variables:
+# - CR_KEYRING: Path to the GPG keyring containing the signing key
+# - CR_PASSPHRASE_FILE: Path to file containing the key's passphrase
+
+# Enable automatic generation of release notes using GitHubs release notes generator.
+# see: https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+generate-release-notes: true

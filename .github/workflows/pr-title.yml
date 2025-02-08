@@ -1,0 +1,70 @@
+## Reference: https://github.com/amannn/action-semantic-pull-request
+name: "Lint PR"
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    permissions:
+      pull-requests: read  # for amannn/action-semantic-pull-request to analyze PRs
+      statuses: write  # for amannn/action-semantic-pull-request to mark status of analyzed PR
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HELM_BOT_APP_ID }}
+          private-key: ${{ secrets.HELM_BOT_PRIVATE_KEY }}
+
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        with:
+          # Configure which scopes are allowed (which part of the system is affected)
+          scopes: |
+            agent
+            coreapi
+            prometheus
+            opencost
+            chart
+            deps
+            github
+            docs
+            ci
+            security
+          # Configure that a scope must always be provided
+          requireScope: true
+          # Configure types that are allowed (what kind of change is this)
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          # Validate all commits in the PR
+          validateSingleCommit: true
+          # Require commit messages to match PR title format
+          validateSingleCommitMatchesPrTitle: true
+          # Require PR titles to follow the conventional commits spec exactly
+
+          # This might be useful if you want to validate PRs before they are ready for review
+          wip: false 
+          # Allow WIP PRs to be validated
+          validateSingleCommitMatchTitle: true

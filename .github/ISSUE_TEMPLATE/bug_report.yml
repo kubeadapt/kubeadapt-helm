@@ -1,0 +1,100 @@
+name: Bug Report
+description: Report a bug encountered while using KubeAdapt Helm chart
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+        Please make sure you have searched for similar issues before creating a new one.
+
+  - type: input
+    id: version
+    attributes:
+      label: Chart Version
+      description: What version of the KubeAdapt chart are you using?
+      placeholder: "e.g., 0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: components
+    attributes:
+      label: Affected Components
+      description: Which components are affected by this bug?
+      multiple: true
+      options:
+        - KubeAdapt Agent (templates/agent)
+        - KubeAdapt Core API (templates/coreapi)
+        - Prometheus (dependency chart)
+        - OpenCost (dependency chart)
+        - Chart Configuration
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        Please provide the following information:
+        * Kubernetes version
+        * Helm version
+        * Cloud provider (if applicable)
+        * Prometheus version (if enabled)
+        * OpenCost version (if enabled)
+      placeholder: |
+        Kubernetes: v1.25.0
+        Helm: v3.11.0
+        Cloud: AWS EKS
+        Prometheus: 27.3.0
+        OpenCost: 1.43.2
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Install chart with these values...
+        2. Configure...
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: values
+    attributes:
+      label: Values File
+      description: The values.yaml used (please remove sensitive information)
+      render: yaml
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Log Output
+      description: |
+        Please copy and paste any relevant log output. This could be from:
+        - Helm install/upgrade
+        - KubeAdapt Agent pods
+        - KubeAdapt Core API pods
+        - Prometheus/OpenCost (if relevant)
+      render: shell 

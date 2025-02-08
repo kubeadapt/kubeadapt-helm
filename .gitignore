@@ -1,0 +1,23 @@
+output
+.vscode
+.DS_Store
+.idea
+**/*.tgz
+**/charts/*/charts
+
+# Helm dependencies
+charts/*/requirements.lock
+charts/*/Chart.lock
+
+# Test outputs
+**/__snapshot__
+**/junit.xml
+**/coverage/
+
+# Temporary files
+*.swp
+*.swo
+*~
+*.tmp
+.env
+todo.md
