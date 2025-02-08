@@ -39,7 +39,7 @@ jobs:
           git config user.email "kubeadapt-helm-bot[bot]@users.noreply.github.com"
 
       - name: Install Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@v4
         with:
           version: v3.13.3
 
