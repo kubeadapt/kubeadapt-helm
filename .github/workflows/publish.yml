@@ -11,6 +11,9 @@ on:
 
 permissions:
   contents: read
+  packages: read
+  id-token: write # For signing
+  pages: write    # For gh-pages deployment
 
 jobs:
   release:
@@ -18,20 +21,14 @@ jobs:
     permissions:
       contents: write  # for helm/chart-releaser-action to push chart release and create a release
       packages: write  # to push OCI chart package to GitHub Registry
+      pages: write    # for gh-pages deployment
+      id-token: write # for signing
     runs-on: ubuntu-latest
     steps:
-      - name: Generate token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.HELM_BOT_APP_ID }}
-          private-key: ${{ secrets.HELM_BOT_PRIVATE_KEY }}
-
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
 
       - name: Configure Git
         run: |
@@ -52,16 +49,33 @@ jobs:
       # Import GPG private key for chart signing
       - name: Prepare PGP key
         run: |
-          echo "$PGP_PRIVATE_KEY" | gpg --batch --import
+          # Create .gnupg directory with correct permissions
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
           echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+
+          # Import the private key
+          echo "$PGP_PRIVATE_KEY" | gpg --batch --import
           gpg-connect-agent reloadagent /bye
-          echo "$PGP_PASSPHRASE" | gpg --pinentry-mode loopback --passphrase-fd 0 --sign --clear > /dev/null
 
-          # Export the key to a keyring file for chart-releaser
-          gpg --export-secret-keys --armor 948AD9EDA6BD626E > $HOME/secring.gpg
+          # Get the key ID from the imported key
+          KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2)
+          echo "Using key ID: $KEY_ID"
+
+          # Export the secret key in binary format
+          gpg --batch --pinentry-mode loopback --passphrase "$PGP_PASSPHRASE" \
+              --export-secret-keys "$KEY_ID" > $HOME/secring.gpg || {
+            echo "Failed to export secret key. Listing available keys:"
+            gpg --list-secret-keys --keyid-format LONG
+            exit 1
+          }
+
+          # Create passphrase file
           echo "$PGP_PASSPHRASE" > $HOME/passphrase.txt
+          chmod 600 $HOME/passphrase.txt
 
-          # Tell chart-releaser-action where to find the key and its passphrase
+          # Set environment variables for chart-releaser
           echo "CR_KEYRING=$HOME/secring.gpg" >> "$GITHUB_ENV"
           echo "CR_PASSPHRASE_FILE=$HOME/passphrase.txt" >> "$GITHUB_ENV"
         env:
@@ -73,15 +87,14 @@ jobs:
         with:
           config: "./.github/configs/cr.yaml"
         env:
-          CR_TOKEN: ${{ steps.app-token.outputs.token }}
-          CR_SKIP_EXISTING: true
+          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: kubeadapt-helm-bot[bot]
-          password: ${{ steps.app-token.outputs.token }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push chart to GHCR
         run: |

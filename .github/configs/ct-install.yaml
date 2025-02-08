@@ -6,10 +6,14 @@ target-branch: main
 chart-dirs:
   - charts
 chart-repos:
-  - dandydeveloper=https://dandydeveloper.github.io/charts/
-helm-extra-args: "--timeout 600s"  
+  - prometheus-community=https://prometheus-community.github.io/helm-charts
+  - opencost=https://opencost.github.io/opencost-helm-chart
+helm-extra-args: "--timeout 600s"
+# upgrade: true # TODO: Uncomment this when we have a proper upgrade path implemented
 validate-chart-schema: false
 validate-maintainers: true
 validate-yaml: true
 exclude-deprecated: true
 excluded-charts: []
+
+skip-clean-up: false # Add this line to prevent cleanup after installation so we can verify installation

@@ -1,0 +1,59 @@
+# {{ .name }}
+
+{{ template "chart.versionBadge" . }} {{ template "chart.typeBadge" . }} {{ template "chart.appVersionBadge" . }}
+
+{{ template "chart.description" . }}
+
+## Prerequisites
+
+- Kubernetes 1.24+
+- Helm 3.0.0+
+
+## Get Repo Info
+
+```console
+helm repo add kubeadapt https://kubeadapt.github.io/kubeadapt-helm
+helm repo update
+```
+
+## Installing the Chart
+
+To install the chart with the release name `my-release`:
+
+```console
+helm install my-release kubeadapt/{{ .name }}
+```
+
+## Uninstalling the Chart
+
+To uninstall/delete the `my-release` deployment:
+
+```console
+helm delete my-release
+```
+
+## Upgrading
+
+### To 1.0.0
+This is the first stable release of the chart.
+
+Breaking changes:
+* None
+
+### To 0.2.0
+Breaking changes:
+* Change 1
+* Change 2
+
+Required manual actions:
+```console
+# Example manual action if needed
+kubectl apply -f ...
+```
+
+### To 0.1.0
+Initial release of the chart.
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}
