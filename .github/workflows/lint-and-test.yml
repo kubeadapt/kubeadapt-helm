@@ -7,6 +7,7 @@ permissions:
 
 jobs:
   linter-artifacthub:
+    if: hasFiles('charts/**') != '' # Only run if charts directory exists and is not empty
     runs-on: ubuntu-latest
     container:
       image: public.ecr.aws/artifacthub/ah:v1.14.0
@@ -14,11 +15,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Verify directory structure
+        run: |
+          pwd
+          ls -la
+          ls -la charts || echo "Charts directory not found"
       - name: Run ah lint
         working-directory: ./charts
         run: ah lint
 
   chart-test:
+    if: hasFiles('charts/**') != '' # Only run if charts directory exists and is not empty
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
