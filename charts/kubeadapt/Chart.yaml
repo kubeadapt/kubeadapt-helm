@@ -1,0 +1,67 @@
+apiVersion: v2
+name: kubeadapt
+description: A Helm chart for Kubeadapt
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+# Dependencies
+dependencies:
+  - name: prometheus
+    version: "27.3.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: prometheus.enabled
+  - name: opencost
+    version: "1.43.2"
+    repository: "https://opencost.github.io/opencost-helm-chart"
+    condition: opencost.enabled
+
+maintainers:
+  - name: "ugurcancaykara"
+    email: "ugurcancaykaradev@gmail.com"
+  - name: "Kubeadapt"
+    email: "authors@kubeadapt.io"
+
+keywords:
+  - kubernetes
+  - resource optimization
+  - cost optimization
+  - monitoring
+  - cloud native
+  - multi-cloud
+
+# Additional metadata
+annotations:
+  artifacthub.io/signKey: |
+    fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
+    url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial release of Kubeadapt Helm chart
+    - kind: added
+      description: Integrated with Prometheus and OpenCost
+  artifacthub.io/containsSecurityUpdates: "false"
+  artifacthub.io/prerelease: "true"
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/recommendations: |
+    - url: https://artifacthub.io/packages/helm/prometheus-community/prometheus
+    - url: https://artifacthub.io/packages/helm/opencost/opencost
+  artifacthub.io/platforms: |
+    - eks
+  artifacthub.io/compatibility: |
+    kubernetes:
+      platforms:
+        eks:
+          versions: ["1.24.0-1.28.0"]
+          tested: false
+          requirements: ["IRSA", "EBS CSI"]
+    components:
+      prometheus: "27.3.0"
+      opencost: "1.43.2"
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/README.md
+    - name: Compatibility Matrix
+      url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/COMPATIBILITY.md
+    - name: Security Policy
+      url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/SECURITY.md

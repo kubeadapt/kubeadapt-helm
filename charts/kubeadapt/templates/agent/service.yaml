@@ -1,0 +1,19 @@
+{{- if .Values.agent.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kubeadapt.name" . }}-agent
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  type: {{ .Values.agent.service.type }}
+  ports:
+    - port: {{ .Values.agent.service.port }}
+      targetPort: websocket
+      protocol: {{ .Values.agent.service.protocol }}
+      name: websocket
+  selector:
+    {{- include "kubeadapt.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+{{- end }} 
