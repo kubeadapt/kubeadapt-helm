@@ -52,16 +52,33 @@ jobs:
       # Import GPG private key for chart signing
       - name: Prepare PGP key
         run: |
-          echo "$PGP_PRIVATE_KEY" | gpg --batch --import
+          # Create .gnupg directory with correct permissions
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
           echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+
+          # Import the private key
+          echo "$PGP_PRIVATE_KEY" | gpg --batch --import
           gpg-connect-agent reloadagent /bye
-          echo "$PGP_PASSPHRASE" | gpg --pinentry-mode loopback --passphrase-fd 0 --sign --clear > /dev/null
 
-          # Export the key to a keyring file for chart-releaser
-          gpg --export-secret-keys --armor 948AD9EDA6BD626E > $HOME/secring.gpg
+          # Get the key ID from the imported key
+          KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2)
+          echo "Using key ID: $KEY_ID"
+
+          # Export the secret key
+          gpg --batch --pinentry-mode loopback --passphrase "$PGP_PASSPHRASE" \
+              --export-secret-keys --armor "$KEY_ID" > $HOME/secring.gpg || {
+            echo "Failed to export secret key. Listing available keys:"
+            gpg --list-secret-keys --keyid-format LONG
+            exit 1
+          }
+
+          # Create passphrase file
           echo "$PGP_PASSPHRASE" > $HOME/passphrase.txt
+          chmod 600 $HOME/passphrase.txt
 
-          # Tell chart-releaser-action where to find the key and its passphrase
+          # Set environment variables for chart-releaser
           echo "CR_KEYRING=$HOME/secring.gpg" >> "$GITHUB_ENV"
           echo "CR_PASSPHRASE_FILE=$HOME/passphrase.txt" >> "$GITHUB_ENV"
         env:
