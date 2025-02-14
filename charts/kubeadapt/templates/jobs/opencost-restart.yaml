@@ -1,0 +1,108 @@
+{{- if .Values.opencost.restartJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ .Release.Name }}-opencost-restart"
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  template:
+    metadata:
+      name: "{{ .Release.Name }}-opencost-restart"
+      labels:
+        app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    spec:
+      serviceAccountName: {{ .Release.Name }}-opencost
+      initContainers:
+      - name: wait-prometheus
+        image: curlimages/curl:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        command:
+          - sh
+          - -c
+          - |
+            echo "Init container starting..."
+            echo "Checking Prometheus service..."
+            until curl -s http://kubeadapt-prometheus-server.{{ .Release.Namespace }}.svc.cluster.local:80/-/ready; do
+              echo "waiting for prometheus..."
+              sleep 2
+            done
+      containers:
+      - name: kubectl
+        image: bitnami/kubectl:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001 # bitnami/kubectl default user
+          runAsGroup: 1001
+          seccompProfile:
+            type: RuntimeDefault
+        command:
+          - sh
+          - -c
+          - |
+            # Restart OpenCost pod
+            kubectl rollout restart deployment/{{ .Release.Name }}-opencost -n {{ .Release.Namespace }}
+            
+            # Wait for OpenCost to be ready
+            kubectl rollout status deployment/{{ .Release.Name }}-opencost -n {{ .Release.Namespace }}
+      restartPolicy: OnFailure
+---
+# RBAC for the job
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "{{ .Release.Name }}-opencost-restarter"
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "patch", "list", "watch"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: "{{ .Release.Name }}-opencost-restarter"
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+subjects:
+- kind: ServiceAccount
+  name: {{ .Release.Name }}-opencost
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: "{{ .Release.Name }}-opencost-restarter"
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
