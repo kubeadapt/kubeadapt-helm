@@ -1,0 +1,5 @@
+# Artifact Hub repository metadata file
+repositoryID: 34d3937d-a75d-4cc2-8798-b3beda60e9b3
+owners:
+  - name: kubeadapt
+    email: authors@kubeadapt.io
