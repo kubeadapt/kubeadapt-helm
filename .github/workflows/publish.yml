@@ -51,8 +51,6 @@ jobs:
 
       # Import GPG private key for chart signing
       - name: Prepare PGP key
-        # Only run this step if we are on the main repository and main branch
-        if: github.repository == 'kubeadapt/kubeadapt-helm' && github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           # Create .gnupg directory with correct permissions
           mkdir -p ~/.gnupg
@@ -68,9 +66,9 @@ jobs:
           KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2)
           echo "Using key ID: $KEY_ID"
 
-          # Export the secret key
+          # Export the secret key in binary format
           gpg --batch --pinentry-mode loopback --passphrase "$PGP_PASSPHRASE" \
-              --export-secret-keys --armor "$KEY_ID" > $HOME/secring.gpg || {
+              --export-secret-keys "$KEY_ID" > $HOME/secring.gpg || {
             echo "Failed to export secret key. Listing available keys:"
             gpg --list-secret-keys --keyid-format LONG
             exit 1
