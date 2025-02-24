@@ -10,7 +10,7 @@ global:
   region: ""
 
 agent:
-  enabled: false
+  enabled: true
   image:
     repository: public.ecr.aws/e2b7n1b6/kubeadapt/agent
     tag: "latest" # Defaults to .Chart.AppVersion
@@ -47,7 +47,7 @@ agent:
     #   value: "custom_value"
 
 coreapi:
-  enabled: false
+  enabled: true
   image:
     repository: public.ecr.aws/e2b7n1b6/kubeadapt/kubeadapt-core
     tag: "latest" # Defaults to .Chart.AppVersion
@@ -192,25 +192,25 @@ prometheus:
   # adds additional scrape configs to prometheus.yml
   # must be a string so you have to add a | after extraScrapeConfigs:
   # example adds existing node-exporter scrape config, don't forget to adjust the namespace that you deployed the node-exporter to
-  extraScrapeConfigs: |
-    - job_name: "node-exporter"
-      kubernetes_sd_configs:
-        - role: endpoints
-          namespaces:
-            names:
-              - monitoring
-      relabel_configs:
-        - source_labels:
-            [__meta_kubernetes_service_label_app_kubernetes_io_name]
-          regex: prometheus-node-exporter
-          action: keep
-        - source_labels: [__meta_kubernetes_endpoint_port_name]
-          regex: http-metrics
-          action: keep
-      metric_relabel_configs:
-        - source_labels: [__name__]
-          action: keep
-          regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes)$
+  extraScrapeConfigs: ""
+  #   - job_name: "node-exporter"
+  #     kubernetes_sd_configs:
+  #       - role: endpoints
+  #         namespaces:
+  #           names:
+  #             - monitoring
+  #     relabel_configs:
+  #       - source_labels:
+  #           [__meta_kubernetes_service_label_app_kubernetes_io_name]
+  #         regex: prometheus-node-exporter
+  #         action: keep
+  #       - source_labels: [__meta_kubernetes_endpoint_port_name]
+  #         regex: http-metrics
+  #         action: keep
+  #     metric_relabel_configs:
+  #       - source_labels: [__name__]
+  #         action: keep
+  #         regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes)$
 
 opencost:
   restartJob:
