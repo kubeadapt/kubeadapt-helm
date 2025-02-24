@@ -104,4 +104,5 @@ This should only be used for development/testing. Production should always provi
 {{- define "kubeadapt.agentToken" -}}
 {{- $defaultToken := printf "%s-%s-token" .Release.Name .Release.Namespace -}}
 {{- default $defaultToken .Values.agent.config.token }}
-{{- end }} 
+{{- end }}
+
