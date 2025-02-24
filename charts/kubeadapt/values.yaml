@@ -3,17 +3,12 @@ global:
   name: "kubeadapt"
   nameOverride: ""
   fullnameOverride: ""
-  # Cluster specific configuration
-  clusterName: ""
-  clusterId: ""
-  environment: "production"
-  region: ""
 
 agent:
   enabled: true
   image:
     repository: public.ecr.aws/e2b7n1b6/kubeadapt/agent
-    tag: "latest" # Defaults to .Chart.AppVersion
+    tag: "3302e5a" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -50,7 +45,7 @@ coreapi:
   enabled: true
   image:
     repository: public.ecr.aws/e2b7n1b6/kubeadapt/kubeadapt-core
-    tag: "latest" # Defaults to .Chart.AppVersion
+    tag: "2e0d449" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -73,11 +68,6 @@ coreapi:
     host: "0.0.0.0"
     port: 8080
     prometheusUrl: "http://kubeadapt-prometheus-server.kubeadapt.svc:80"
-    prometheusTimeout: 30
-    metricsInterval: 1
-    metricsCacheSize: 1073741824  # 1GB in bytes
-    metricsCacheTTL: 2592000      # 30 days in seconds
-    recommendationRetentionDays: 30
     ignoredNamespaces:
       - "kube-system"
       - "kube-public"
@@ -94,7 +84,6 @@ coreapi:
       - "knative-serving-ingress"
       - "knative-serving-internal"
       - "knative-serving-external"
-    analyzerInterval: 300  # 5 minutes in seconds
   env: []
     # Additional environment variables
     # - name: CUSTOM_ENV
@@ -105,13 +94,13 @@ prometheus:
   enabled: true
   server:
     persistentVolume:
-      size: 100Gi # for 2 years and an eks cluster with 10-150 nodes
+      size: 50Gi # for 1 years and an eks cluster with 10-150 nodes
       storageClass: gp2
     service:
       type: ClusterIP
       servicePort: 80
     fullnameOverride: kubeadapt-prometheus-server
-    retention: "730d"
+    retention: "360d"
   alertmanager:
     enabled: false
   # -- Node Exporter Configuration:
@@ -119,7 +108,7 @@ prometheus:
   # keep prometheus-node-exporter.enabled as false. Because we can read node exporter metrics from existing up and running prometheus node exporters.
   # If you don't have any existing node-exporter, set prometheus-node-exporter.enabled to true.
   prometheus-node-exporter:
-    enabled: false
+    enabled: true
   # -- Kube State Metrics Configuration
   kube-state-metrics:
     enabled: true
@@ -193,6 +182,7 @@ prometheus:
   # must be a string so you have to add a | after extraScrapeConfigs:
   # example adds existing node-exporter scrape config, don't forget to adjust the namespace that you deployed the node-exporter to
   extraScrapeConfigs: ""
+  # extraScrapeConfigs: |
   #   - job_name: "node-exporter"
   #     kubernetes_sd_configs:
   #       - role: endpoints
