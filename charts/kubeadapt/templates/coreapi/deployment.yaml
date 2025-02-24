@@ -28,16 +28,31 @@ spec:
               containerPort: {{ .Values.coreapi.service.port }}
               protocol: TCP
           env:
-            - name: CLUSTER_NAME
-              value: {{ include "kubeadapt.clusterName" . | quote }}
-            - name: CLUSTER_ID
-              value: {{ include "kubeadapt.clusterId" . | quote }}
-            - name: ENVIRONMENT
-              value: {{ include "kubeadapt.environment" . | quote }}
-            - name: REGION
-              value: {{ include "kubeadapt.region" . | quote }}
-            - name: LOG_LEVEL
-              value: {{ .Values.coreapi.config.logLevel | default "info" | quote }}
+            - name: KUBEADAPT_HOST
+              value: {{ .Values.coreapi.config.host | quote }}
+            - name: KUBEADAPT_PORT
+              value: {{ .Values.coreapi.config.port | quote }}
+            - name: KUBEADAPT_LOG_LEVEL
+              value: {{ .Values.coreapi.config.logLevel | upper | quote }}
+            - name: KUBEADAPT_PROMETHEUS_URL
+              value: {{ .Values.coreapi.config.prometheusUrl | quote }}
+            - name: KUBEADAPT_PROMETHEUS_TIMEOUT
+              value: {{ .Values.coreapi.config.prometheusTimeout | quote }}
+            - name: KUBEADAPT_METRICS_INTERVAL
+              value: {{ .Values.coreapi.config.metricsInterval | quote }}
+            - name: KUBEADAPT_METRICS_CACHE_SIZE
+              value: {{ .Values.coreapi.config.metricsCacheSize | quote }}
+            - name: KUBEADAPT_METRICS_CACHE_TTL
+              value: {{ .Values.coreapi.config.metricsCacheTTL | quote }}
+            - name: KUBEADAPT_RECOMMENDATION_RETENTION_DAYS
+              value: {{ .Values.coreapi.config.recommendationRetentionDays | quote }}
+            - name: KUBEADAPT_IGNORED_NAMESPACES
+              value: {{ .Values.coreapi.config.ignoredNamespaces | join "," | quote }}
+            - name: KUBEADAPT_ANALYZER_INTERVAL
+              value: {{ .Values.coreapi.config.analyzerInterval | quote }}
+            {{- if .Values.coreapi.env }}
+            {{- toYaml .Values.coreapi.env | nindent 12 }}
+            {{- end }}
           resources:
             {{- toYaml .Values.coreapi.resources | nindent 12 }}
 {{- end }} 
