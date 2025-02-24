@@ -28,23 +28,20 @@ spec:
               containerPort: {{ .Values.agent.service.port }}
               protocol: {{ .Values.agent.service.protocol }}
           env:
-            - name: CLUSTER_NAME
-              value: {{ include "kubeadapt.clusterName" . | quote }}
-            - name: CLUSTER_ID
-              value: {{ include "kubeadapt.clusterId" . | quote }}
-            - name: ENVIRONMENT
-              value: {{ include "kubeadapt.environment" . | quote }}
-            - name: REGION
-              value: {{ include "kubeadapt.region" . | quote }}
             - name: LOG_LEVEL
               value: {{ .Values.agent.config.logLevel | default "info" | quote }}
-            - name: CORE_API_URL
+            - name: KUBEADAPT_COREAPI_URL
               value: {{ .Values.agent.config.coreApiUrl | quote }}
-            - name: AGENT_TOKEN
+            - name: KUBEADAPT_API_ENDPOINT
+              value: {{ .Values.agent.config.apiEndpoint | quote }}
+            - name: KUBEADAPT_AGENT_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ include "kubeadapt.name" . }}-agent
                   key: token
+            {{- if .Values.agent.env }}
+            {{- toYaml .Values.agent.env | nindent 12 }}
+            {{- end }}
           resources:
             {{- toYaml .Values.agent.resources | nindent 12 }}
 {{- end }} 
