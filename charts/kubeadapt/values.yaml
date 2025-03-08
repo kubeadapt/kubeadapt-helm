@@ -8,7 +8,7 @@ agent:
   enabled: true
   image:
     repository: public.ecr.aws/e2b7n1b6/kubeadapt/agent
-    tag: "8184147" # Defaults to .Chart.AppVersion
+    tag: "20af3d8" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
