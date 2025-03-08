@@ -8,7 +8,7 @@ agent:
   enabled: true
   image:
     repository: public.ecr.aws/e2b7n1b6/kubeadapt/agent
-    tag: "3302e5a" # Defaults to .Chart.AppVersion
+    tag: "8184147" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -34,7 +34,7 @@ agent:
     # CoreAPI service endpoint
     coreApiUrl: "http://kubeadapt-coreapi.kubeadapt.svc:8080"
     # WebSocket API endpoint for agent connection
-    apiEndpoint: "wss://app.kubeadapt.io/api/v1/ws/agent"
+    apiEndpoint: "wss://api.kubeadapt.io/api/v1/ws/agent"
     logLevel: "debug"
   env: []
     # Additional environment variables for the agent
@@ -45,12 +45,14 @@ coreapi:
   enabled: true
   image:
     repository: public.ecr.aws/e2b7n1b6/kubeadapt/kubeadapt-core
-    tag: "2e0d449" # Defaults to .Chart.AppVersion
+    tag: "e3bca2b" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
     annotations: {}
     name: ""
+  rbac:
+    create: true # Set to false if you want to manage RBAC permissions separately
   service:
     type: ClusterIP
     port: 8080
@@ -74,10 +76,10 @@ coreapi:
       - "kube-node-lease"
       - "opencost"
       - "kubeadapt"
+      - "monitoring"
       - "karpenter"
       - "amazon-cloudwatch"
       - "keda"
-      - "monitoring"
       - "istio-system"
       - "knative-serving"
       - "knative-eventing"
@@ -95,7 +97,7 @@ prometheus:
   server:
     persistentVolume:
       size: 50Gi # for 1 years and an eks cluster with 10-150 nodes
-      storageClass: gp2
+      storageClass: gp2 # for AWS, it can differ depending on your infrastructure setup (efs etc.)
     service:
       type: ClusterIP
       servicePort: 80
