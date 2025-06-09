@@ -28,6 +28,20 @@ spec:
               containerPort: {{ .Values.agent.service.port }}
               protocol: {{ .Values.agent.service.protocol }}
           env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: KUBEADAPT_VERSION
+              value: {{ .Chart.Version | quote }}
             - name: LOG_LEVEL
               value: {{ .Values.agent.config.logLevel | default "info" | quote }}
             - name: KUBEADAPT_COREAPI_URL
