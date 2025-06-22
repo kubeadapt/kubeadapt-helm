@@ -37,6 +37,71 @@ entries:
         url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
     apiVersion: v2
     appVersion: 0.1.0
+    created: "2025-06-22T09:16:56.860836533Z"
+    dependencies:
+    - condition: prometheus.enabled
+      name: prometheus
+      repository: https://prometheus-community.github.io/helm-charts
+      version: 27.3.0
+    - condition: opencost.enabled
+      name: opencost
+      repository: https://opencost.github.io/opencost-helm-chart
+      version: 1.43.2
+    description: A Helm chart for Kubeadapt
+    digest: ba32696eaaf03af397afd1b697d563b9b3225383f3d08c0971b48a0d194f60d3
+    keywords:
+    - kubernetes
+    - resource optimization
+    - cost optimization
+    - monitoring
+    - cloud native
+    - multi-cloud
+    maintainers:
+    - email: ugurcancaykaradev@gmail.com
+      name: ugurcancaykara
+    - email: authors@kubeadapt.io
+      name: Kubeadapt
+    name: kubeadapt
+    type: application
+    urls:
+    - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-0.5.0/kubeadapt-0.5.0.tgz
+    version: 0.5.0
+  - annotations:
+      artifacthub.io/changes: |
+        - kind: added
+          description: Initial release of Kubeadapt Helm chart
+        - kind: added
+          description: Integrated with Prometheus and OpenCost
+      artifacthub.io/compatibility: |
+        kubernetes:
+          platforms:
+            eks:
+              versions: ["1.24.0-1.28.0"]
+              tested: false
+              requirements: ["IRSA", "EBS CSI"]
+        components:
+          prometheus: "27.3.0"
+          opencost: "1.43.2"
+      artifacthub.io/containsSecurityUpdates: "false"
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: Documentation
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/README.md
+        - name: Compatibility Matrix
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/COMPATIBILITY.md
+        - name: Security Policy
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/SECURITY.md
+      artifacthub.io/platforms: |
+        - eks
+      artifacthub.io/prerelease: "true"
+      artifacthub.io/recommendations: |
+        - url: https://artifacthub.io/packages/helm/prometheus-community/prometheus
+        - url: https://artifacthub.io/packages/helm/opencost/opencost
+      artifacthub.io/signKey: |
+        fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
+        url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
+    apiVersion: v2
+    appVersion: 0.1.0
     created: "2025-06-09T22:19:29.499811066Z"
     dependencies:
     - condition: prometheus.enabled
@@ -586,4 +651,4 @@ entries:
     urls:
     - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-0.1.0/kubeadapt-0.1.0.tgz
     version: 0.1.0
-generated: "2025-06-09T22:19:29.499849928Z"
+generated: "2025-06-22T09:16:56.860876869Z"
