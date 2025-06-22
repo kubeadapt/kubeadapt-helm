@@ -45,7 +45,7 @@ coreapi:
   enabled: true
   image:
     repository: public.ecr.aws/e2b7n1b6/kubeadapt/kubeadapt-core
-    tag: "70b699d" # Defaults to .Chart.AppVersion
+    tag: "42bc8ed" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -58,11 +58,11 @@ coreapi:
     port: 8080
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 300m
+      cpu: 500m
       memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2048Mi
   # CoreAPI specific configuration
   config:
     logLevel: "info"
@@ -148,7 +148,7 @@ prometheus:
           metric_relabel_configs:
             - source_labels: [__name__]
               action: keep
-              regex: ^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity_cpu_cores|kube_node_status_capacity_memory_bytes|kube_node_labels|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes)$
+              regex: ^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity_cpu_cores|kube_node_status_capacity_memory_bytes|kube_node_labels|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes|kube_pod_container_status_waiting_reason)$
 
         # Metrics from cAdvisor (Container and Network metrics)
         - job_name: "kubernetes-nodes-cadvisor"
