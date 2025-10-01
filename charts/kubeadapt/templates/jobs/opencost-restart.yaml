@@ -48,7 +48,7 @@ spec:
             done
       containers:
       - name: kubectl
-        image: bitnami/kubectl:latest
+        image: registry.suse.com/suse/kubectl:latest
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
