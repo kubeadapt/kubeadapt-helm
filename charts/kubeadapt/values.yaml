@@ -45,7 +45,7 @@ coreapi:
   enabled: true
   image:
     repository: public.ecr.aws/e2b7n1b6/kubeadapt/kubeadapt-core
-    tag: "8ecf691" # Defaults to .Chart.AppVersion
+    tag: "7f06015" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
