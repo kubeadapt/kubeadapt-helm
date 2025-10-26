@@ -14,12 +14,9 @@ metadata:
   labels:
     {{- include "kubeadapt.labels" . | nindent 4 }}
     app.kubernetes.io/component: agent
-rules:
-  # Allow agent to access CoreAPI service
-  - apiGroups: [""]
-    resources: ["services"]
-    verbs: ["get"]
-    resourceNames: ["{{ include "kubeadapt.name" . }}-coreapi"]
+rules: []
+  # Agent connects directly to SaaS backend via WebSocket
+  # No cluster-internal service access required
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

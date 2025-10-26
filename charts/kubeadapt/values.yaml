@@ -5,7 +5,7 @@ global:
   fullnameOverride: ""
 
 agent:
-  enabled: true
+  enabled: false
   image:
     repository: public.ecr.aws/e2b7n1b6/kubeadapt/agent
     tag: "361f291" # Defaults to .Chart.AppVersion
@@ -31,8 +31,6 @@ agent:
   config:
     # Token for authenticating with cloud backend
     token: ""
-    # CoreAPI service endpoint
-    coreApiUrl: "http://kubeadapt-coreapi.kubeadapt.svc:8080"
     # WebSocket API endpoint for agent connection
     apiEndpoint: "wss://api.kubeadapt.io/api/v1/ws/agent"
     logLevel: "debug"
@@ -41,87 +39,111 @@ agent:
     # - name: CUSTOM_ENV
     #   value: "custom_value"
 
-coreapi:
-  enabled: true
-  image:
-    repository: public.ecr.aws/e2b7n1b6/kubeadapt/kubeadapt-core
-    tag: "42bc8ed" # Defaults to .Chart.AppVersion
-    pullPolicy: IfNotPresent
-  serviceAccount:
-    create: true
-    annotations: {}
-    name: ""
-  rbac:
-    create: true # Set to false if you want to manage RBAC permissions separately
-  service:
-    type: ClusterIP
-    port: 8080
-  resources:
-    requests:
-      cpu: 500m
-      memory: 512Mi
-    limits:
-      cpu: 2000m
-      memory: 2048Mi
-  # CoreAPI specific configuration
-  config:
-    logLevel: "info"
-    # Core API specific configuration
-    host: "0.0.0.0"
-    port: 8080
-    prometheusUrl: "http://kubeadapt-prometheus-server.kubeadapt.svc:80"
-    ignoredNamespaces:
-      - "kube-system"
-      - "kube-public"
-      - "kube-node-lease"
-      - "opencost"
-      - "kubeadapt"
-      - "monitoring"
-      - "karpenter"
-      - "amazon-cloudwatch"
-      - "keda"
-      - "istio-system"
-      - "knative-serving"
-      - "knative-eventing"
-      - "knative-serving-ingress"
-      - "knative-serving-internal"
-      - "knative-serving-external"
-  env: []
-    # Additional environment variables
-    # - name: CUSTOM_ENV
-    #   value: "custom_value"
-
 # Dependencies configuration
 prometheus:
   enabled: true
   server:
+    # Global scrape settings for rate() queries (cAdvisor, node-exporter)
+    # Tier 1 (15s): Counter metrics requiring rate([1m]) calculations - needs 3-4 data points
+    # Tier 2 (60s): Instant gauge queries - sync with agent 60s batch collection
+    global:
+      scrape_interval: 15s        # Default for rate queries (1m window → 4 data points)
+      scrape_timeout: 10s         # Query timeout (must be < scrape_interval)
+      evaluation_interval: 1m     # Rule evaluation frequency
     persistentVolume:
-      size: 50Gi # for 1 years and an eks cluster with 10-150 nodes
-      storageClass: gp2 # for AWS, it can differ depending on your infrastructure setup (efs etc.)
+      # Short-term buffer for agent collection (agent queries every 60s and sends to SaaS backend)
+      # 2h retention requires minimal storage - 5Gi provides safety margin
+      size: 5Gi
+      storageClass: gp2 # For AWS - adjust based on your infrastructure (efs, etc.)
     service:
       type: ClusterIP
       servicePort: 80
     fullnameOverride: kubeadapt-prometheus-server
-    retention: "360d"
+    # Data retention period - short-term buffer since agent forwards to SaaS backend
+    # 2h provides buffer for agent failures/network issues while keeping storage minimal
+    retention: "2h"
   alertmanager:
     enabled: false
-  # -- Node Exporter Configuration:
-  # If you already have node-exporter running in your cluster (e.g., from kube-prometheus-stack),
-  # keep prometheus-node-exporter.enabled as false. Because we can read node exporter metrics from existing up and running prometheus node exporters.
-  # If you don't have any existing node-exporter, set prometheus-node-exporter.enabled to true.
+  # -- Node Exporter Configuration Strategy:
+  #
+  # Option 1 (Default - Recommended):
+  #   - Keep prometheus-node-exporter.enabled: true
+  #   - Chart deploys DaemonSet automatically on all nodes
+  #   - No additional configuration needed - works out-of-box
+  #
+  # Option 2 (Using Existing Node-Exporter):
+  #   - Set prometheus-node-exporter.enabled: false
+  #   - Uncomment the example configuration in extraScrapeConfigs section below
+  #   - Update namespace to match your existing node-exporter deployment
+  #   - IMPORTANT: Existing node-exporter may not have prometheus.io annotations,
+  #     so auto-discovery won't work - explicit scrape config required
+  #
   prometheus-node-exporter:
     enabled: true
+
+    # Resource limits for node-exporter pods
+    resources:
+      requests:
+        cpu: 100m
+        memory: 30Mi
+      limits:
+        cpu: 200m
+        memory: 50Mi
+
+    # Use host network for accurate node metrics
+    hostNetwork: true
+    hostPID: true
+
+    # Allow deployment on all nodes including master/control-plane
+    tolerations:
+      - effect: NoSchedule
+        operator: Exists
+
+    # Security context
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
   # -- Kube State Metrics Configuration
   kube-state-metrics:
     enabled: true
+
+    # Resource limits for kube-state-metrics pods
+    resources:
+      requests:
+        cpu: 10m
+        memory: 55Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+    # Prometheus scrape annotations
     podAnnotations:
       prometheus.io/scrape: "true"
       prometheus.io/port: "8080"
+
+    # Enable only necessary collectors
+    collectors:
+      - configmaps
+      - cronjobs
+      - daemonsets
+      - deployments
+      - endpoints
+      - horizontalpodautoscalers
+      - jobs
+      - namespaces
+      - nodes
+      - persistentvolumeclaims
+      - persistentvolumes
+      - pods
+      - replicasets
+      - services
+      - statefulsets
   serverFiles:
     prometheus.yml:
       scrape_configs:
-        # Prometheus's own metrics
+        # Prometheus's own metrics (Tier 2: Instant Queries)
         - job_name: prometheus
+          scrape_interval: 60s      # Internal Prometheus metrics, instant queries only
           static_configs:
             - targets:
                 - localhost:9090
@@ -130,8 +152,9 @@ prometheus:
               action: keep
               regex: ^(prometheus_.*|up|time)$
 
-        # Kube State Metrics
+        # Kube State Metrics (Tier 2: Instant Queries)
         - job_name: kube-state-metrics
+          scrape_interval: 60s      # Instant queries only, no rate() - sync with agent 60s collection
           honor_labels: true
           kubernetes_sd_configs:
             - role: service
@@ -148,10 +171,12 @@ prometheus:
           metric_relabel_configs:
             - source_labels: [__name__]
               action: keep
-              regex: ^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity_cpu_cores|kube_node_status_capacity_memory_bytes|kube_node_labels|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes|kube_pod_container_status_waiting_reason)$
+              regex: ^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity_cpu_cores|kube_node_status_capacity_memory_bytes|kube_node_status_allocatable|kube_node_labels|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes|kube_pod_container_status_waiting_reason)$
 
-        # Metrics from cAdvisor (Container and Network metrics)
+        # Metrics from cAdvisor (Container and Network metrics) (Tier 1: Rate Queries)
+        # Uses global scrape_interval: 15s for rate([1m]) queries - requires 4 data points
         - job_name: "kubernetes-nodes-cadvisor"
+          scrape_timeout: 10s       # Timeout must be < scrape_interval
           scheme: https
           tls_config:
             ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
@@ -170,8 +195,10 @@ prometheus:
               action: keep
               regex: ^(container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_network_receive_bytes_total|container_network_transmit_bytes_total|machine_cpu_cores)$
 
-        # Metrics from OpenCost
+        # Metrics from OpenCost (Tier 3: Cost Metrics)
+        # Hourly cost metrics are gauge type (no rate()), updates once per hour
         - job_name: "opencost"
+          scrape_interval: 60s      # Cost metrics change infrequently, sync with agent batch
           honor_labels: true
           static_configs:
             - targets: ["kubeadapt-opencost.kubeadapt.svc:9003"]
@@ -180,29 +207,67 @@ prometheus:
               action: keep
               regex: ^(kubecost_cluster_info|node_cpu_hourly_cost|node_ram_hourly_cost|node_gpu_hourly_cost|pv_hourly_cost|kube_node_labels|kubecost_cluster_management_cost|kube_persistentvolumeclaim_info|kubecost_node_is_spot|kube_persistentvolumeclaim_resource_requests_storage_bytes)$
 
-  # adds additional scrape configs to prometheus.yml
-  # must be a string so you have to add a | after extraScrapeConfigs:
-  # example adds existing node-exporter scrape config, don't forget to adjust the namespace that you deployed the node-exporter to
-  extraScrapeConfigs: ""
-  # extraScrapeConfigs: |
-  #   - job_name: "node-exporter"
-  #     kubernetes_sd_configs:
-  #       - role: endpoints
-  #         namespaces:
-  #           names:
-  #             - monitoring
-  #     relabel_configs:
-  #       - source_labels:
-  #           [__meta_kubernetes_service_label_app_kubernetes_io_name]
-  #         regex: prometheus-node-exporter
-  #         action: keep
-  #       - source_labels: [__meta_kubernetes_endpoint_port_name]
-  #         regex: http-metrics
-  #         action: keep
-  #     metric_relabel_configs:
-  #       - source_labels: [__name__]
-  #         action: keep
-  #         regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes)$
+  # Adds additional scrape configs to prometheus.yml
+  # Must be a string so you have to add a | after extraScrapeConfigs:
+  #
+  # NOTE: Even though prometheus-node-exporter.enabled=true, we define explicit
+  # scrape config to guarantee 15s interval for rate([1m]) queries.
+  # Built-in auto-discovery doesn't guarantee scrape interval control.
+  #
+  extraScrapeConfigs: |
+    # Node-Exporter (Chart-deployed, controlled discovery with 15s interval)
+    # CRITICAL: Explicit config required to guarantee 15s interval for rate([1m])
+    # Auto-discovery alone uses chart defaults (typically 1m) which breaks rate() queries
+    - job_name: "node-exporter"
+      scrape_interval: 15s      # ← GUARANTEED 15s for rate([1m]) compatibility (requires 4+ data points)
+      kubernetes_sd_configs:
+        - role: endpoints
+          namespaces:
+            names:
+              - kubeadapt      # ← Chart deploys node-exporter here
+      relabel_configs:
+        # Keep only prometheus-node-exporter service endpoints
+        - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_name]
+          regex: prometheus-node-exporter
+          action: keep
+        # Keep only the metrics port
+        - source_labels: [__meta_kubernetes_endpoint_port_name]
+          regex: metrics
+          action: keep
+        # Add node label from endpoint address
+        - source_labels: [__meta_kubernetes_endpoint_address_target_name]
+          target_label: node
+      metric_relabel_configs:
+        # Filter: Keep only required node metrics (5 metrics total)
+        - source_labels: [__name__]
+          action: keep
+          regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes)$
+
+    # ============================================================
+    # DCGM Exporter for GPU Metrics (Optional - Requires GPU Operator)
+    # ============================================================
+    # Uncomment this section ONLY if gpu-operator.enabled=true
+    # IMPORTANT: This requires NVIDIA GPU Operator to be deployed.
+    # Without GPU operator, this scrape job will show "no endpoints found".
+    # ============================================================
+    #
+    # - job_name: "dcgm-exporter"
+    #   kubernetes_sd_configs:
+    #     - role: pod
+    #       namespaces:
+    #         names:
+    #           - kubeadapt
+    #   relabel_configs:
+    #     - source_labels: [__meta_kubernetes_pod_label_app]
+    #       action: keep
+    #       regex: dcgm-exporter
+    #     - source_labels: [__meta_kubernetes_pod_container_port_name]
+    #       action: keep
+    #       regex: metrics
+    #   metric_relabel_configs:
+    #     - source_labels: [__name__]
+    #       action: keep
+    #       regex: ^(DCGM_FI_DEV_GPU_UTIL|DCGM_FI_DEV_MEM_COPY_UTIL|DCGM_FI_DEV_POWER_USAGE)$
 
 opencost:
   restartJob:
@@ -259,3 +324,77 @@ opencost:
 
   rbac:
     enabled: true
+
+
+# NVIDIA GPU Operator configuration for cost optimization
+gpu-operator:
+  enabled: false
+  operator:
+    defaultRuntime: containerd
+    cleanupCRD: false
+    upgradeCRD: true
+    imagePullSecrets:
+    - nvcr-cred
+
+  # DCGM Exporter configuration for GPU metrics collection
+  dcgmExporter:
+    enabled: true
+    repository: nvcr.io/nvidia/k8s
+    image: dcgm-exporter
+    version: 4.3.1-4.4.0-ubuntu22.04
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets:
+    - nvcr-cred
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "50m"
+      limits:
+        memory: "512Mi"
+        cpu: "250m"
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      additionalLabels:
+        prometheus: kube-prometheus
+
+  # Device Plugin for GPU resource management
+  devicePlugin:
+    enabled: true
+    repository: nvcr.io/nvidia
+    image: k8s-device-plugin
+    version: v0.17.3
+    imagePullSecrets:
+    - nvcr-cred
+
+  # GPU Feature Discovery (fixed image)
+  gfd:
+    enabled: true
+    # repository: nvcr.io/nvidia/k8s
+    repository: docker.io/nvidia
+    image: gpu-feature-discovery
+    version: v0.6.0
+    imagePullSecrets: []
+    # - nvcr-cred
+
+  # MIG Manager (disabled for simplicity)
+  migManager:
+    enabled: false
+
+  # Container Toolkit (AL2-compatible tag)
+  toolkit:
+    enabled: true
+    repository: nvcr.io/nvidia/k8s
+    image: container-toolkit
+    # version: v1.17.8-amzn2
+    imagePullSecrets:
+    - nvcr-cred
+
+  # Driver installation
+  driver:
+    enabled: true
+    repository: nvcr.io/nvidia
+    image: driver
+    version: "580.65.06"
+    imagePullSecrets:
+    - nvcr-cred

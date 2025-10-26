@@ -34,31 +34,8 @@ agent:
       memory: 128Mi
   # Agent specific configuration
   config:
-    token: "ci-test-token-123"
-    coreApiUrl: "http://kubeadapt-coreapi:8080"
-    logLevel: "debug"
-
-coreapi:
-  enabled: false # TODO: Enable this when components images are accessible
-  image:
-    repository: ghcr.io/kubeadapt/coreapi
-    tag: ""  # Defaults to .Chart.AppVersion
-    pullPolicy: IfNotPresent
-  serviceAccount:
-    create: true
-    annotations: {}
-    name: ""
-  service:
-    type: ClusterIP
-    port: 8080
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-  config:
+    token: ""
+    apiEndpoint: ""
     logLevel: "debug"
 
 # Dependencies configuration

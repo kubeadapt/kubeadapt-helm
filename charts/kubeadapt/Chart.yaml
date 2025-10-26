@@ -8,13 +8,17 @@ appVersion: "0.1.0"
 # Dependencies
 dependencies:
   - name: prometheus
-    version: "27.3.0"
+    version: "27.42.0"
     repository: "https://prometheus-community.github.io/helm-charts"
     condition: prometheus.enabled
   - name: opencost
     version: "1.43.2"
     repository: "https://opencost.github.io/opencost-helm-chart"
     condition: opencost.enabled
+  - name: gpu-operator
+    version: "v25.3.2"
+    repository: "https://helm.ngc.nvidia.com/nvidia"
+    condition: gpu-operator.enabled
 
 maintainers:
   - name: "ugurcancaykara"
