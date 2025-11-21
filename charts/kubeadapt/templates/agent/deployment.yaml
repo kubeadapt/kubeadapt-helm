@@ -27,7 +27,11 @@ spec:
             - name: websocket
               containerPort: {{ .Values.agent.service.port }}
               protocol: {{ .Values.agent.service.protocol }}
+            - name: metrics
+              containerPort: {{ .Values.agent.config.metricsPort }}
+              protocol: TCP
           env:
+            # Kubernetes metadata (injected via Downward API)
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -40,12 +44,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-            - name: KUBEADAPT_VERSION
-              value: {{ .Chart.Version | quote }}
-            - name: LOG_LEVEL
-              value: {{ .Values.agent.config.logLevel | default "info" | quote }}
-            - name: KUBEADAPT_COREAPI_URL
-              value: {{ .Values.agent.config.coreApiUrl | quote }}
+
+            # Backend API Configuration
+            - name: KUBEADAPT_BACKEND_API_ENDPOINT
+              value: {{ .Values.agent.config.backendApiEndpoint | quote }}
             - name: KUBEADAPT_API_ENDPOINT
               value: {{ .Values.agent.config.apiEndpoint | quote }}
             - name: KUBEADAPT_AGENT_TOKEN
@@ -53,7 +55,65 @@ spec:
                 secretKeyRef:
                   name: {{ include "kubeadapt.name" . }}-agent
                   key: token
+
+            # Prometheus Configuration
+            - name: KUBEADAPT_PROMETHEUS_URL
+              value: {{ .Values.agent.config.prometheusUrl | quote }}
+            - name: KUBEADAPT_PROMETHEUS_TIMEOUT
+              value: {{ .Values.agent.config.prometheusTimeout | quote }}
+            - name: KUBEADAPT_QUERY_CONCURRENCY
+              value: {{ .Values.agent.config.queryConcurrency | quote }}
+
+            # Collection Settings
+            - name: KUBEADAPT_COLLECTION_INTERVAL
+              value: {{ .Values.agent.config.collectionInterval | quote }}
+
+            # Compression Settings
+            - name: KUBEADAPT_COMPRESSION_ENABLED
+              value: {{ .Values.agent.config.compressionEnabled | quote }}
+            - name: KUBEADAPT_COMPRESSION_LEVEL
+              value: {{ .Values.agent.config.compressionLevel | quote }}
+
+            # HTTP Client Settings
+            - name: KUBEADAPT_HTTP_TIMEOUT
+              value: {{ .Values.agent.config.httpTimeout | quote }}
+            - name: KUBEADAPT_HTTP_MAX_RETRIES
+              value: {{ .Values.agent.config.httpMaxRetries | quote }}
+            - name: KUBEADAPT_HTTP_RETRY_DELAY
+              value: {{ .Values.agent.config.httpRetryDelay | quote }}
+            - name: KUBEADAPT_HTTP_MAX_RETRY_DELAY
+              value: {{ .Values.agent.config.httpMaxRetryDelay | quote }}
+            - name: KUBEADAPT_HTTP_BACKOFF_FACTOR
+              value: {{ .Values.agent.config.httpBackoffFactor | quote }}
+
+            # Observability & Debugging
+            - name: LOG_LEVEL
+              value: {{ .Values.agent.config.logLevel | quote }}
+            - name: DEBUG
+              value: {{ .Values.agent.config.debug | quote }}
+            - name: KUBEADAPT_METRICS_PORT
+              value: {{ .Values.agent.config.metricsPort | quote }}
+            - name: KUBEADAPT_WRITE_JSON_DEBUG
+              value: {{ .Values.agent.config.writeJsonDebug | quote }}
+
+            # Feature Flags
+            - name: KUBEADAPT_GPU_ENABLED
+              value: {{ .Values.agent.config.gpuEnabled | quote }}
+            - name: KUBEADAPT_E2E_MODE
+              value: {{ .Values.agent.config.e2eMode | quote }}
+
+            # Runtime Performance Tuning
+            - name: GOMAXPROCS
+              value: {{ .Values.agent.config.goMaxProcs | quote }}
+            - name: GOMEMLIMIT
+              value: {{ .Values.agent.config.goMemLimit | quote }}
+
+            # Chart Version
+            - name: KUBEADAPT_VERSION
+              value: {{ .Chart.Version | quote }}
+
             {{- if .Values.agent.env }}
+            # Additional custom environment variables
             {{- toYaml .Values.agent.env | nindent 12 }}
             {{- end }}
           resources:

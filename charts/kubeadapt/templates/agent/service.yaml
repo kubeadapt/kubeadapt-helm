@@ -13,6 +13,10 @@ spec:
       targetPort: websocket
       protocol: {{ .Values.agent.service.protocol }}
       name: websocket
+    - port: {{ .Values.agent.config.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
   selector:
     {{- include "kubeadapt.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: agent

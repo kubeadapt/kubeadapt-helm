@@ -1,4 +1,4 @@
-# {{ .name }}
+# {{ .Name }}
 
 {{ template "chart.versionBadge" . }} {{ template "chart.typeBadge" . }} {{ template "chart.appVersionBadge" . }}
 
@@ -21,7 +21,7 @@ helm repo update
 To install the chart with the release name `my-release`:
 
 ```console
-helm install my-release kubeadapt/{{ .name }}
+helm install my-release kubeadapt/{{ .Name }}
 ```
 
 ## Uninstalling the Chart
@@ -31,28 +31,6 @@ To uninstall/delete the `my-release` deployment:
 ```console
 helm delete my-release
 ```
-
-## Upgrading
-
-### To 1.0.0
-This is the first stable release of the chart.
-
-Breaking changes:
-* None
-
-### To 0.2.0
-Breaking changes:
-* Change 1
-* Change 2
-
-Required manual actions:
-```console
-# Example manual action if needed
-kubectl apply -f ...
-```
-
-### To 0.1.0
-Initial release of the chart.
 
 {{ template "chart.requirementsSection" . }}
 
