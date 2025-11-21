@@ -24,7 +24,7 @@ While the chart is primarily maintained by the KubeAdapt team, we review pull re
 
 we lint the title of your pull request to ensure it follows the [conventional commits](https://www.conventionalcommits.org/) specification. this is done using github actions and the [action-semantic-pull-request](https://github.com/kubeadapt/kubeadapt-helm/blob/main/.github/workflows/pr-title.yml) workflow.
 
-The scope of the change must be included in the title. The scope should be the name of the component you are changing. For example, if you are changing the `kubeadapt-coreapi`, the title of your pull request should be `fix(kubeadapt-coreapi): Fix typo in deployment.yaml`.
+The scope of the change must be included in the title. The scope should be the name of the component you are changing. For example, if you are changing the `agent`, the title of your pull request should be `fix(agent): Fix typo in deployment.yaml`.
 
 ## Documentation
 
