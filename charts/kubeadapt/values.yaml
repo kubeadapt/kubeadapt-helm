@@ -7,7 +7,8 @@ global:
 agent:
   enabled: true
   image:
-    repository: public.ecr.aws/e2b7n1b6/kubeadapt/agent
+    # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
+    repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
     tag: "a2c889f" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
