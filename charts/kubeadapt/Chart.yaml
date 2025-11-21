@@ -2,7 +2,11 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
+<<<<<<< Updated upstream
 version: 0.5.3
+=======
+version: 0.6.0
+>>>>>>> Stashed changes
 appVersion: "0.1.0"
 
 # Dependencies
@@ -12,9 +16,16 @@ dependencies:
     repository: "https://prometheus-community.github.io/helm-charts"
     condition: prometheus.enabled
   - name: opencost
-    version: "1.43.2"
+    version: "2.4.0"
     repository: "https://opencost.github.io/opencost-helm-chart"
     condition: opencost.enabled
+<<<<<<< Updated upstream
+=======
+  - name: gpu-operator
+    version: "v25.10.0"
+    repository: "https://helm.ngc.nvidia.com/nvidia"
+    condition: gpu-operator.enabled
+>>>>>>> Stashed changes
 
 maintainers:
   - name: "ugurcancaykara"
@@ -56,8 +67,8 @@ annotations:
           tested: false
           requirements: ["IRSA", "EBS CSI"]
     components:
-      prometheus: "27.3.0"
-      opencost: "1.43.2"
+      prometheus: "27.42.0"
+      opencost: "2.4.0"
   artifacthub.io/links: |
     - name: Documentation
       url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/README.md

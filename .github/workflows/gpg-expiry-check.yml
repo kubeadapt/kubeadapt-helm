@@ -1,7 +1,11 @@
 name: GPG Key Expiry Check
 on:
   schedule:
-    - cron: '0 0 1 * *' 
+    - cron: '0 0 1 * *'
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   check-expiry:
