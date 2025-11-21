@@ -25,16 +25,15 @@ chart_yaml_path="charts/${chart}/Chart.yaml"
 # This way we can drop prefixes like "kubeadapt/..." , "prometheus-community/..." , "opencost/..."
 dependency_name="${dependency_name##*/}"
 
-# For core components (agent/coreapi), determine version bump type based on semver change
-if [[ "${dependency_name}" =~ "agent" ]] || [[ "${dependency_name}" =~ "coreapi" ]]; then
-  # Get current versions from values.yaml
+# For core components (agent), determine version bump type based on semver change
+if [[ "${dependency_name}" =~ "agent" ]]; then
+  # Get current version from values.yaml
   agent_version=$(grep "tag:" "charts/${chart}/values.yaml" | grep "agent" | awk '{print $2}')
-  coreapi_version=$(grep "tag:" "charts/${chart}/values.yaml" | grep "coreapi" | awk '{print $2}')
-  
-  # Determine the highest version change type among components
+
+  # Determine the version change type
   highest_type="patch"
-  
-  for current_version in "${agent_version}" "${coreapi_version}"; do
+
+  for current_version in "${agent_version}"; do
     # Extract major.minor.patch
     current_major=$(echo "${current_version}" | cut -d. -f1)
     current_minor=$(echo "${current_version}" | cut -d. -f2)

@@ -27,7 +27,7 @@
       "customType": "regex",
       "fileMatch": ["charts/.+/values\\.yaml$"],
       "matchStrings": [
-        "repository:\\s+(?<depName>ghcr\\.io/kubeadapt/(?:agent|coreapi))\\s+tag:\\s+(?<currentValue>\\S+)"
+        "repository:\\s+(?<depName>ghcr\\.io/kubeadapt/agent)\\s+tag:\\s+(?<currentValue>\\S+)"
       ],
       "datasourceTemplate": "docker",
       "registryUrlTemplate": "https://ghcr.io"
@@ -37,8 +37,7 @@
     {
       "groupName": "kubeadapt-components",
       "matchPackagePatterns": [
-        "ghcr.io/kubeadapt/agent",
-        "ghcr.io/kubeadapt/coreapi"
+        "ghcr.io/kubeadapt/agent"
       ],
       "labels": ["kubeadapt-components"],
       "reviewers": ["ugurcancaykara"],
