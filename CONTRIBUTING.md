@@ -60,7 +60,7 @@ Any breaking changes to a chart (backwards incompatible) require:
 
 ### New Application Versions
 
-Helm charts are intended to be created for all non-patch releases of KubeAdapt components (Agent and Core API). External dependencies (Prometheus and OpenCost) will use versions that have been tested with the corresponding release.
+Helm charts are intended to be created for all non-patch releases of KubeAdapt Agent. External dependencies (Prometheus and OpenCost) will use versions that have been tested with the corresponding release.
 
 When updating application versions ensure you make the following changes:
 * `values.yaml`: Bump all instances of the container image versions

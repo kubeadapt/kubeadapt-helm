@@ -2,8 +2,7 @@
 
 This repository contains the Helm charts for deploying KubeAdapt components:
 - KubeAdapt Agent: Kubernetes agent for collecting metrics and managing cluster resources
-- KubeAdapt Core API: Backend service for processing metrics and managing agents
-- Prometheus: For storing metrics 
+- Prometheus: For storing metrics
 - OpenCost: For cost analysis
 
 ## Platform Support
@@ -11,11 +10,15 @@ This repository contains the Helm charts for deploying KubeAdapt components:
 | Platform | Status | Notes |
 |----------|---------|---------|
 | Kind     | ✓ Tested | Recommended for local development |
-| Amazon EKS | Supported | Support coming soon |
-| Azure AKS | Not Supported | On product roadmap |
-| Google GKE | Not Supported | On product roadmap |
+| Amazon EKS | ✓ Supported | Full support |
+| Azure AKS | ✓ Supported | Full support |
+| Google GKE | ✓ Supported | Full support |
 
 For detailed compatibility information and platform-specific requirements, please see our [Compatibility Matrix](COMPATIBILITY.md).
+
+**Minimum Requirements:**
+- Kubernetes 1.24+
+- Helm 3.0+
 
 ## Usage
 
