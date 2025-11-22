@@ -9,11 +9,11 @@ jobs:
   linter-artifacthub:
     runs-on: ubuntu-latest
     container:
-      image: public.ecr.aws/artifacthub/ah:v1.14.0
+      image: public.ecr.aws/artifacthub/ah:v1.22.0@sha256:ffdb21cf1bbcea79c10a5f702eace08f841ff635e96c849594c338a048652b6b
       options: --user 1001
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Check charts directory
         id: check-charts
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           fetch-depth: 0
 
