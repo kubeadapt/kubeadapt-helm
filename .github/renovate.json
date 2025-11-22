@@ -13,6 +13,9 @@
   "prConcurrentLimit": 3,
   "prCreation": "not-pending",
   "prHourlyLimit": 2,
+  "allowedPostUpgradeCommands": [
+    "^./scripts/renovate-bump-version\\.sh -c .+ -d .+ -v .+ -t .+$"
+  ],
   "packageRules": [
     {
       "description": "Automerge patch updates for Helm charts",
