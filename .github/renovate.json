@@ -102,6 +102,7 @@
   "commitMessagePrefix": "chore(deps):",
   "commitMessageAction": "update",
   "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "({{updateType}})",
   "vulnerabilityAlerts": {
     "labels": ["security"],
     "assignees": ["ugurcancaykara"]

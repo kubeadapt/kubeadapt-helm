@@ -69,7 +69,7 @@ helm delete my-release
 | agent.enabled | bool | `true` |  |
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
-| agent.image.repository | string | `"public.ecr.aws/e2b7n1b6/kubeadapt/agent"` |  |
+| agent.image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent"` |  |
 | agent.image.tag | string | `"a2c889f"` |  |
 | agent.rbac.create | bool | `true` |  |
 | agent.resources.limits.cpu | string | `"500m"` |  |

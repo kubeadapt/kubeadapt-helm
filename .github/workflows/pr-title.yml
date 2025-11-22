@@ -65,5 +65,3 @@ jobs:
 
           # This might be useful if you want to validate PRs before they are ready for review
           wip: false 
-          # Allow WIP PRs to be validated
-          validateSingleCommitMatchTitle: true
