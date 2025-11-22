@@ -15,9 +15,6 @@
   "prConcurrentLimit": 3,
   "prCreation": "not-pending",
   "prHourlyLimit": 2,
-  "allowedCommands": [
-    "^./scripts/renovate-bump-version\\.sh -c .+ -d .+ -v .+ -t .+$"
-  ],
   "packageRules": [
     {
       "description": "Automerge patch updates for Helm charts",
@@ -55,20 +52,8 @@
         "prometheus"
       ],
       "groupName": "Prometheus chart",
-      "labels": [
-        "prometheus",
-        "dependencies"
-      ],
-      "commitMessageExtra": "({{updateType}})",
-      "postUpgradeTasks": {
-        "commands": [
-          "./scripts/renovate-bump-version.sh -c kubeadapt -d prometheus -v {{{newVersion}}} -t {{{updateType}}}"
-        ],
-        "fileFilters": [
-          "charts/*/Chart.yaml"
-        ],
-        "executionMode": "update"
-      }
+      "labels": ["prometheus", "dependencies", "helm-dependency"],
+      "commitMessageExtra": "({{updateType}})"
     },
     {
       "description": "Group OpenCost chart updates",
@@ -79,20 +64,8 @@
         "opencost"
       ],
       "groupName": "OpenCost chart",
-      "labels": [
-        "opencost",
-        "dependencies"
-      ],
-      "commitMessageExtra": "({{updateType}})",
-      "postUpgradeTasks": {
-        "commands": [
-          "./scripts/renovate-bump-version.sh -c kubeadapt -d opencost -v {{{newVersion}}} -t {{{updateType}}}"
-        ],
-        "fileFilters": [
-          "charts/*/Chart.yaml"
-        ],
-        "executionMode": "update"
-      }
+      "labels": ["opencost", "dependencies", "helm-dependency"],
+      "commitMessageExtra": "({{updateType}})"
     },
     {
       "description": "Group GPU Operator chart updates",
@@ -103,20 +76,8 @@
         "gpu-operator"
       ],
       "groupName": "GPU Operator chart",
-      "labels": [
-        "gpu-operator",
-        "dependencies"
-      ],
-      "commitMessageExtra": "({{updateType}})",
-      "postUpgradeTasks": {
-        "commands": [
-          "./scripts/renovate-bump-version.sh -c kubeadapt -d gpu-operator -v {{{newVersion}}} -t {{{updateType}}}"
-        ],
-        "fileFilters": [
-          "charts/*/Chart.yaml"
-        ],
-        "executionMode": "update"
-      }
+      "labels": ["gpu-operator", "dependencies", "helm-dependency"],
+      "commitMessageExtra": "({{updateType}})"
     },
     {
       "description": "Group GitHub Actions updates",
