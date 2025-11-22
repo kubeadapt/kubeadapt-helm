@@ -13,7 +13,7 @@
   "prConcurrentLimit": 3,
   "prCreation": "not-pending",
   "prHourlyLimit": 2,
-  "allowedPostUpgradeCommands": [
+  "allowedCommands": [
     "^./scripts/renovate-bump-version\\.sh -c .+ -d .+ -v .+ -t .+$"
   ],
   "packageRules": [
@@ -83,7 +83,8 @@
       "groupName": "GitHub Actions",
       "labels": ["github-actions", "dependencies"],
       "commitMessageTopic": "{{groupName}}",
-      "commitMessageExtra": "({{updateType}})",
+      "separateMajorMinor": false,
+      "separateMultipleMajor": false,
       "automerge": true,
       "minimumReleaseAge": "7 days"
     },
@@ -98,7 +99,8 @@
       "groupName": "Docker images",
       "labels": ["docker", "dependencies"],
       "commitMessageTopic": "{{groupName}}",
-      "commitMessageExtra": "({{updateType}})"
+      "separateMajorMinor": false,
+      "separateMultipleMajor": false
     }
   ],
   "helm-values": {
