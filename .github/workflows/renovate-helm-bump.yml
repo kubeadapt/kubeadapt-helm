@@ -38,11 +38,14 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          # Extract dependency name and version from Chart.yaml changes
-          git diff "origin/$BASE_REF" -- charts/kubeadapt/Chart.yaml > /tmp/chart.diff
+          # Extract dependency name and version from Chart.yaml changes with context
+          git diff -U5 "origin/$BASE_REF" -- charts/kubeadapt/Chart.yaml > /tmp/chart.diff
 
-          # Get changed dependency name and new version
-          DEPENDENCY=$(grep -E '^\+.*name:' /tmp/chart.diff | sed 's/^+.*name: //' | tr -d '"' | head -1)
+          # Find the dependency name from the context before the changed version line
+          # Look for the pattern: name followed by version change
+          DEPENDENCY=$(awk '/^[- ].*- name:/ {name=$NF; gsub(/"/, "", name)} /^\+.*version:/ && name {print name; exit}' /tmp/chart.diff)
+
+          # Get the new version
           NEW_VERSION=$(grep -E '^\+.*version:' /tmp/chart.diff | sed 's/^+.*version: //' | tr -d '"' | head -1)
 
           # Extract update type from PR title (major/minor/patch)
@@ -53,6 +56,7 @@ jobs:
             echo "DEPENDENCY=$DEPENDENCY"
             echo "NEW_VERSION=$NEW_VERSION"
             echo "UPDATE_TYPE=$UPDATE_TYPE"
+            cat /tmp/chart.diff
             exit 1
           fi
 
