@@ -48,7 +48,7 @@ trap 'rm -f ${TMP_FILE}' EXIT
 
   # Update version matrix
   cat << EOF
-| KubeAdapt Version | Agent Version | Core API Version | Prometheus Version | OpenCost Version |
+| Kubeadapt Version | Agent Version | Core API Version | Prometheus Version | OpenCost Version |
 |-------------------|---------------|------------------|-------------------|------------------|
 | ${APP_VERSION}    | ${APP_VERSION} | ${APP_VERSION}  | ${PROMETHEUS_VERSION} | ${OPENCOST_VERSION} |
 EOF
@@ -59,7 +59,7 @@ EOF
     grep -A 100 "^## Historical Compatibility" COMPATIBILITY.md | tail -n +2
   else
     echo -e "\n## Historical Compatibility"
-    echo "| Date | KubeAdapt | Agent | Core API | Prometheus | OpenCost |"
+    echo "| Date | Kubeadapt | Agent | Core API | Prometheus | OpenCost |"
     echo "|------|-----------|--------|-----------|------------|-----------|"
     echo "| $(date +%Y-%m-%d) | ${APP_VERSION} | ${APP_VERSION} | ${APP_VERSION} | ${PROMETHEUS_VERSION} | ${OPENCOST_VERSION} |"
   fi

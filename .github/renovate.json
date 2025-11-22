@@ -1,0 +1,155 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":dependencyDashboard",
+    "group:monorepos",
+    "group:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "timezone": "Europe/Istanbul",
+  "prConcurrentLimit": 3,
+  "prCreation": "not-pending",
+  "prHourlyLimit": 2,
+  "packageRules": [
+    {
+      "description": "Automerge patch updates for Helm charts",
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Require manual approval for minor/major Helm chart updates",
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "helm-update",
+        "dependencies"
+      ]
+    },
+    {
+      "description": "Group Prometheus chart updates",
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchPackageNames": [
+        "prometheus"
+      ],
+      "groupName": "Prometheus chart",
+      "labels": ["prometheus", "dependencies", "helm-dependency"],
+      "commitMessageExtra": "({{updateType}})"
+    },
+    {
+      "description": "Group OpenCost chart updates",
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchPackageNames": [
+        "opencost"
+      ],
+      "groupName": "OpenCost chart",
+      "labels": ["opencost", "dependencies", "helm-dependency"],
+      "commitMessageExtra": "({{updateType}})"
+    },
+    {
+      "description": "Group GPU Operator chart updates",
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchPackageNames": [
+        "gpu-operator"
+      ],
+      "groupName": "GPU Operator chart",
+      "labels": ["gpu-operator", "dependencies", "helm-dependency"],
+      "commitMessageExtra": "({{updateType}})"
+    },
+    {
+      "description": "Group GitHub Actions updates",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions",
+      "labels": [
+        "github-actions",
+        "dependencies"
+      ],
+      "commitMessageTopic": "{{groupName}}",
+      "separateMajorMinor": false,
+      "separateMultipleMajor": false,
+      "automerge": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Pin GitHub Actions to commit SHA for security",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "pinDigests": true
+    },
+    {
+      "description": "Group Docker image updates in workflows",
+      "matchManagers": [
+        "docker-compose",
+        "dockerfile"
+      ],
+      "groupName": "Docker images",
+      "labels": [
+        "docker",
+        "dependencies"
+      ],
+      "commitMessageTopic": "{{groupName}}",
+      "separateMajorMinor": false,
+      "separateMultipleMajor": false
+    }
+  ],
+  "helm-values": {
+    "managerFilePatterns": [
+      "/(^|/)values\\.yaml$/"
+    ]
+  },
+  "rangeStrategy": "bump",
+  "labels": [
+    "renovate",
+    "dependencies"
+  ],
+  "commitMessagePrefix": "chore(deps):",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "vulnerabilityAlerts": {
+    "labels": [
+      "security"
+    ],
+    "assignees": [
+      "ugurcancaykara"
+    ]
+  },
+  "ignoreDeps": [],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^charts/.+/values\\.yaml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+tag:\\s*['\"]?(?<currentValue>[^'\"\\s]+)['\"]?"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ]
+}

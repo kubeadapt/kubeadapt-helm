@@ -1,5 +1,5 @@
 name: Feature Request
-description: Suggest an enhancement for KubeAdapt Helm chart
+description: Suggest an enhancement for Kubeadapt Helm chart
 labels: ["enhancement"]
 body:
   - type: markdown
@@ -15,8 +15,7 @@ body:
       description: Which component would this feature enhance?
       multiple: true
       options:
-        - KubeAdapt Agent Deployment
-        - KubeAdapt Core API Deployment
+        - Kubeadapt Agent Deployment
         - Prometheus Integration
         - OpenCost Integration
         - Chart Configuration

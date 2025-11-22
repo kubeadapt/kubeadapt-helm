@@ -14,7 +14,7 @@ jobs:
       pull-requests: write  # for actions/stale to close stale PRs
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/stale@5bef64f19d7facfb25b37b414482c7164d639639 # v9.1.0
+    - uses: actions/stale@5f858e3efba33a5ca4407a664cc011ad407f2008 # v10.1.0
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         # Number of days of inactivity before an issue becomes stale
@@ -29,12 +29,12 @@ jobs:
           This issue has been automatically marked as stale because it has not had
           recent activity in the last 14 days. It will be closed in 7 days if no 
           further activity occurs. If this issue is still relevant, please add a comment
-          to keep it open. Thank you for your contributions to KubeAdapt.
+          to keep it open. Thank you for your contributions to Kubeadapt.
         stale-pr-message: >
           This pull request has been automatically marked as stale because it has not had
           recent activity in the last 14 days. It will be closed in 7 days if no
           further activity occurs. If this PR is still relevant, please update it or
-          add a comment to keep it open. Thank you for your contributions to KubeAdapt.
+          add a comment to keep it open. Thank you for your contributions to Kubeadapt.
         # Labels to use when marking as stale
         stale-issue-label: 'no-issue-activity'
         stale-pr-label: 'no-pr-activity'

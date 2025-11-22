@@ -2,7 +2,7 @@
 
 ## Overview
 
-This Code of Conduct outlines our expectations for participants within the KubeAdapt Helm chart community, as well as steps to report unacceptable behavior. We are committed to providing a welcoming and inspiring environment for all users and contributors, while recognizing this is a Helm chart for a commercial product.
+This Code of Conduct outlines our expectations for participants within the Kubeadapt Helm chart community, as well as steps to report unacceptable behavior. We are committed to providing a welcoming and inspiring environment for all users and contributors, while recognizing this is a Helm chart for a commercial product.
 
 ## Our Standards
 

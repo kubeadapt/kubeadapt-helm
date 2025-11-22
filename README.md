@@ -1,9 +1,8 @@
-# KubeAdapt Helm Charts
+# Kubeadapt Helm Charts
 
-This repository contains the Helm charts for deploying KubeAdapt components:
-- KubeAdapt Agent: Kubernetes agent for collecting metrics and managing cluster resources
-- KubeAdapt Core API: Backend service for processing metrics and managing agents
-- Prometheus: For storing metrics 
+This repository contains the Helm charts for deploying Kubeadapt components:
+- Kubeadapt Agent: Kubernetes agent for collecting metrics and managing cluster resources
+- Prometheus: For storing metrics
 - OpenCost: For cost analysis
 
 ## Platform Support
@@ -11,11 +10,15 @@ This repository contains the Helm charts for deploying KubeAdapt components:
 | Platform | Status | Notes |
 |----------|---------|---------|
 | Kind     | ✓ Tested | Recommended for local development |
-| Amazon EKS | Supported | Support coming soon |
-| Azure AKS | Not Supported | On product roadmap |
-| Google GKE | Not Supported | On product roadmap |
+| Amazon EKS | ✓ Supported | Full support |
+| Azure AKS | ✓ Supported | Full support |
+| Google GKE | ✓ Supported | Full support |
 
 For detailed compatibility information and platform-specific requirements, please see our [Compatibility Matrix](COMPATIBILITY.md).
+
+**Minimum Requirements:**
+- Kubernetes 1.24+
+- Helm 3.0+
 
 ## Usage
 
@@ -25,13 +28,13 @@ Please refer to Helm's [documentation](https://helm.sh/docs/) to get started.
 ## Installation
 
 ```bash
-# Add the KubeAdapt repository
+# Add the Kubeadapt repository
 helm repo add kubeadapt https://kubeadapt.github.io/kubeadapt-helm
 
 # Update your helm repositories
 helm repo update
 
-# Install the KubeAdapt chart
+# Install the Kubeadapt chart
 helm install kubeadapt kubeadapt/kubeadapt
 ```
 

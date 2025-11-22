@@ -1,0 +1,131 @@
+name: Renovate Helm Chart Version Bump
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'charts/**/Chart.yaml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-chart-version:
+    # Only run on Renovate PRs with helm-dependency label
+    if: |
+      github.actor == 'renovate[bot]' &&
+      contains(github.event.pull_request.labels.*.name, 'helm-dependency')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HELM_BOT_APP_ID }}
+          private-key: ${{ secrets.HELM_BOT_PRIVATE_KEY }}
+
+      - name: Checkout PR branch
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Extract dependency info from PR
+        id: extract
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # Extract dependency name and version from Chart.yaml changes with context
+          git diff -U5 "origin/$BASE_REF" -- charts/kubeadapt/Chart.yaml > /tmp/chart.diff
+
+          # Find all dependencies that were updated (could be multiple)
+          # Extract pairs of (name, version) from the diff
+          DEPENDENCIES=$(awk '
+            /^[- ].*- name:/ {name=$NF; gsub(/"/, "", name)}
+            /^\+.*version:/ && name {
+              version=$NF; gsub(/"/, "", version)
+              print name ":" version
+              name=""
+            }
+          ' /tmp/chart.diff)
+
+          # Get the first dependency (primary change)
+          DEPENDENCY=$(echo "$DEPENDENCIES" | head -1 | cut -d: -f1)
+          NEW_VERSION=$(echo "$DEPENDENCIES" | head -1 | cut -d: -f2)
+
+          # Count how many dependencies changed
+          DEP_COUNT=$(echo "$DEPENDENCIES" | wc -l | tr -d ' ')
+
+          # Extract update type from PR title (major/minor/patch)
+          UPDATE_TYPE=$(echo "$PR_TITLE" | grep -oE '\((major|minor|patch)\)' | tr -d '()')
+
+          if [ -z "$DEPENDENCY" ] || [ -z "$NEW_VERSION" ] || [ -z "$UPDATE_TYPE" ]; then
+            echo "Failed to extract dependency info"
+            echo "DEPENDENCY=$DEPENDENCY"
+            echo "NEW_VERSION=$NEW_VERSION"
+            echo "UPDATE_TYPE=$UPDATE_TYPE"
+            echo "DEPENDENCIES=$DEPENDENCIES"
+            cat /tmp/chart.diff
+            exit 1
+          fi
+
+          echo "dependency=$DEPENDENCY" >> $GITHUB_OUTPUT
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "type=$UPDATE_TYPE" >> $GITHUB_OUTPUT
+          echo "all_dependencies<<EOF" >> $GITHUB_OUTPUT
+          echo "$DEPENDENCIES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "dep_count=$DEP_COUNT" >> $GITHUB_OUTPUT
+
+          # Log info
+          echo "Found $DEP_COUNT dependency update(s):"
+          echo "$DEPENDENCIES"
+
+      - name: Run version bump script
+        env:
+          DEPENDENCY: ${{ steps.extract.outputs.dependency }}
+          VERSION: ${{ steps.extract.outputs.version }}
+          TYPE: ${{ steps.extract.outputs.type }}
+          ALL_DEPS: ${{ steps.extract.outputs.all_dependencies }}
+        run: |
+          # Pass all dependencies if multiple were updated
+          if [ "${{ steps.extract.outputs.dep_count }}" -gt 1 ]; then
+            ./scripts/renovate-bump-version.sh \
+              -c kubeadapt \
+              -d "$DEPENDENCY" \
+              -v "$VERSION" \
+              -t "$TYPE" \
+              -a "$ALL_DEPS"
+          else
+            ./scripts/renovate-bump-version.sh \
+              -c kubeadapt \
+              -d "$DEPENDENCY" \
+              -v "$VERSION" \
+              -t "$TYPE"
+          fi
+
+      - name: Run helm-docs to update README
+        run: |
+          ./scripts/helm-docs.sh
+
+      - name: Check if files were modified
+        id: check-changes
+        run: |
+          if git diff --quiet charts/kubeadapt/Chart.yaml charts/kubeadapt/README.md; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          git config user.name "renovate[bot]"
+          git config user.email "29139614+renovate[bot]@users.noreply.github.com"
+
+          git add charts/kubeadapt/Chart.yaml charts/kubeadapt/README.md
+          git commit --amend --no-edit
+          git push --force-with-lease

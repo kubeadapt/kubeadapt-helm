@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 0.6.0](https://img.shields.io/badge/Version-0.6.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.7.0](https://img.shields.io/badge/Version-0.7.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -38,7 +38,7 @@ helm delete my-release
 |------------|------|---------|
 | https://helm.ngc.nvidia.com/nvidia | gpu-operator | v25.10.0 |
 | https://opencost.github.io/opencost-helm-chart | opencost | 2.4.0 |
-| https://prometheus-community.github.io/helm-charts | prometheus | 27.42.0 |
+| https://prometheus-community.github.io/helm-charts | prometheus | 27.46.0 |
 
 ## Values
 
@@ -69,7 +69,7 @@ helm delete my-release
 | agent.enabled | bool | `true` |  |
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
-| agent.image.repository | string | `"public.ecr.aws/e2b7n1b6/kubeadapt/agent"` |  |
+| agent.image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent"` |  |
 | agent.image.tag | string | `"a2c889f"` |  |
 | agent.rbac.create | bool | `true` |  |
 | agent.resources.limits.cpu | string | `"500m"` |  |
