@@ -1,7 +1,7 @@
-# KubeAdapt Helm Charts
+# Kubeadapt Helm Charts
 
-This repository contains the Helm charts for deploying KubeAdapt components:
-- KubeAdapt Agent: Kubernetes agent for collecting metrics and managing cluster resources
+This repository contains the Helm charts for deploying Kubeadapt components:
+- Kubeadapt Agent: Kubernetes agent for collecting metrics and managing cluster resources
 - Prometheus: For storing metrics
 - OpenCost: For cost analysis
 
@@ -28,13 +28,13 @@ Please refer to Helm's [documentation](https://helm.sh/docs/) to get started.
 ## Installation
 
 ```bash
-# Add the KubeAdapt repository
+# Add the Kubeadapt repository
 helm repo add kubeadapt https://kubeadapt.github.io/kubeadapt-helm
 
 # Update your helm repositories
 helm repo update
 
-# Install the KubeAdapt chart
+# Install the Kubeadapt chart
 helm install kubeadapt kubeadapt/kubeadapt
 ```
 

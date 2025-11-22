@@ -9,7 +9,7 @@ Each Helm chart currently supports the designated application version in the Cha
 
 ## Reporting a Vulnerability
 
-We take the security of KubeAdapt and its ecosystem seriously. If you believe you have found a security vulnerability, please report it by opening a security advisory:
+We take the security of Kubeadapt and its ecosystem seriously. If you believe you have found a security vulnerability, please report it by opening a security advisory:
 
 1. Go to the Security tab of this repository
 2. Click on "Report a vulnerability"
@@ -105,7 +105,7 @@ Security tab above.
 
 ### Chart Security
 
-When using KubeAdapt Helm charts, we recommend following these security best practices:
+When using Kubeadapt Helm charts, we recommend following these security best practices:
 
 1. Always verify chart signatures before installation
 2. Use specific versions rather than floating tags

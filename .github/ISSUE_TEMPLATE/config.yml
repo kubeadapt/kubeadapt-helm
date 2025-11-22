@@ -3,7 +3,7 @@ blank_issues_enabled: false
 contact_links:
   - name: Ask a Question
     url: https://github.com/kubeadapt/kubeadapt-helm/discussions/new
-    about: Have a question about using KubeAdapt Helm charts? Start a discussion in our community.
+    about: Have a question about using Kubeadapt Helm charts? Start a discussion in our community.
   - name: Documentation
     url: https://github.com/kubeadapt/kubeadapt-helm/tree/main/docs
     about: Check our documentation first - your question might already be answered.

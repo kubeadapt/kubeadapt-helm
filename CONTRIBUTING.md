@@ -1,6 +1,6 @@
-# Contributing to KubeAdapt Helm Chart
+# Contributing to Kubeadapt Helm Chart
 
-This repository contains the Helm chart for deploying Kubeadapt. The chart is maintained by the KubeAdapt team and this guide outlines how users can report issues, suggest improvements, and interact with the project.
+This repository contains the Helm chart for deploying Kubeadapt. The chart is maintained by the Kubeadapt team and this guide outlines how users can report issues, suggest improvements, and interact with the project.
 
 ## Issue Reporting
 
@@ -14,7 +14,7 @@ For product-related features or bugs, please contact authors@kubeadapt.io.
 
 ## Pull Requests
 
-While the chart is primarily maintained by the KubeAdapt team, we review pull requests for:
+While the chart is primarily maintained by the Kubeadapt team, we review pull requests for:
 * Documentation improvements
 * Dependency version updates
 * Bug fixes in chart templates
@@ -60,11 +60,11 @@ Any breaking changes to a chart (backwards incompatible) require:
 
 ### New Application Versions
 
-Helm charts are intended to be created for all non-patch releases of KubeAdapt Agent. External dependencies (Prometheus and OpenCost) will use versions that have been tested with the corresponding release.
+Helm charts are intended to be created for all non-patch releases of Kubeadapt Agent. External dependencies (Prometheus and OpenCost) will use versions that have been tested with the corresponding release.
 
 When updating application versions ensure you make the following changes:
 * `values.yaml`: Bump all instances of the container image versions
-* `Chart.yaml`: Ensure `appVersion` matches the KubeAdapt release version and bump chart `version`
+* `Chart.yaml`: Ensure `appVersion` matches the Kubeadapt release version and bump chart `version`
 
 Please ensure chart version changes adhere to semantic versioning standards:
 * Major: Large chart rewrites, major non-backwards compatible or destructive changes

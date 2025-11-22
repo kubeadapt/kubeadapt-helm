@@ -1,4 +1,4 @@
-# KubeAdapt Compatibility Matrix
+# Kubeadapt Compatibility Matrix
 
 ## Current Release
 Version: 0.5.0
@@ -7,14 +7,14 @@ Status: Production Ready
 ### Core Components
 | Component          | Version | Status     | Notes |
 |-------------------|---------|------------|-------|
-| KubeAdapt         | 0.6.0   | Stable     | Core platform version |
+| Kubeadapt         | 0.6.0   | Stable     | Core platform version |
 | ├─ Agent          | 1.0.0   | Stable     | Cluster metrics collector |
 | Prometheus        | 27.42.0 | Stable     | Metrics storage |
 | OpenCost          | 2.4.0   | Stable     | Cost analysis |
 | GPU Operator      | v25.10.0| Optional   | NVIDIA GPU support |
 
 ### Version Compatibility Matrix
-| KubeAdapt Chart | Agent Version | Prometheus Version | OpenCost Version | GPU Operator Version |
+| Kubeadapt Chart | Agent Version | Prometheus Version | OpenCost Version | GPU Operator Version |
 |-----------------|---------------|-------------------|------------------|---------------------|
 | 0.6.0          | 1.0.0         | 27.42.0           | 2.4.0            | v25.10.0           |
 
