@@ -9,7 +9,7 @@ This repository contains the Helm charts for deploying Kubeadapt components:
 
 | Platform | Status | Notes |
 |----------|---------|---------|
-| Kind     | ✓ Tested | Recommended for local development |
+| On-Premise | ✓ Tested | Recommended for development and testing |
 | Amazon EKS | ✓ Supported | Full support |
 | Azure AKS | ✓ Supported | Full support |
 | Google GKE | ✓ Supported | Full support |

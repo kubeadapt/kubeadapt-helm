@@ -1,22 +1,6 @@
 # Kubeadapt Compatibility Matrix
 
-## Current Release
-Version: 0.5.0
-Status: Production Ready
-
-### Core Components
-| Component          | Version | Status     | Notes |
-|-------------------|---------|------------|-------|
-| Kubeadapt         | 0.6.0   | Stable     | Core platform version |
-| ├─ Agent          | 1.0.0   | Stable     | Cluster metrics collector |
-| Prometheus        | 27.42.0 | Stable     | Metrics storage |
-| OpenCost          | 2.4.0   | Stable     | Cost analysis |
-| GPU Operator      | v25.10.0| Optional   | NVIDIA GPU support |
-
-### Version Compatibility Matrix
-| Kubeadapt Chart | Agent Version | Prometheus Version | OpenCost Version | GPU Operator Version |
-|-----------------|---------------|-------------------|------------------|---------------------|
-| 0.6.0          | 1.0.0         | 27.42.0           | 2.4.0            | v25.10.0           |
+> **Note**: This repository is a monorepo containing multiple Helm charts. For specific component versions and dependencies, please refer to each chart's README.md in the `charts/` directory.
 
 ## Platform Support
 
@@ -27,38 +11,30 @@ Status: Production Ready
 | Amazon EKS | ✓ Supported | 1.24 - 1.34 | ✓ Yes | Full support with IRSA |
 | Azure AKS | ✓ Supported | 1.24 - 1.34 | ✓ Yes | Full support with Managed Identity |
 | Google GKE | ✓ Supported | 1.24 - 1.34 | ✓ Yes | Full support with Workload Identity |
-| Kind (Local) | ✓ Supported | 1.24 - 1.34 | ✓ Yes | Recommended for development |
+| On-Premise | ✓ Supported | 1.24 - 1.34 | ✓ Yes | Recommended for development and testing |
 
 ### Platform-Specific Requirements
 
 #### Amazon EKS
 - **IRSA (IAM Roles for Service Accounts)**: Recommended for OpenCost integration
-- **EBS CSI Driver**: Required if using Prometheus persistent volumes
-- **Storage Classes**: gp2, gp3 supported
 
 #### Azure AKS
 - **Managed Identity**: Recommended for OpenCost integration
-- **Azure Disk CSI**: Required if using Prometheus persistent volumes
-- **Storage Classes**: managed-premium, managed-standard supported
 
 #### Google GKE
 - **Workload Identity**: Recommended for OpenCost integration
-- **Compute Engine Persistent Disk CSI**: Required if using Prometheus persistent volumes
-- **Storage Classes**: standard, standard-rwo, premium-rwo supported
 
-#### Kind (Local Development)
-- **Storage**: Uses local-path provisioner by default
-- **Resource Requirements**: 4 CPU / 8GB RAM minimum
-- **Limitations**: No cloud provider integrations (OpenCost will use list pricing)
+#### On-Premise
+- **Limitations**: Cloud cost integration requires manual configuration (OpenCost will use list pricing by default)
 
 ## Feature Support Matrix
 
-| Feature | EKS | AKS | GKE | Kind |
-|---------|-----|-----|-----|------|
+| Feature | EKS | AKS | GKE | On-Premise |
+|---------|-----|-----|-----|------------|
 | Basic Metrics Collection | ✓ | ✓ | ✓ | ✓ |
 | Cloud Cost Integration (OpenCost) | ✓ | ✓ | ✓ | Partial* |
 | GPU Monitoring | ✓ | ✓ | ✓ | ✓** |
-| Persistent Storage | ✓ | ✓ | ✓ | ✓ |
+| Persistent Storage | ✓ | ✓ | ✓ | ✓*** |
 | Workload Identity | ✓ (IRSA) | ✓ (Managed ID) | ✓ (WI) | ✗ |
 | Multi-Cluster Support | ✓ | ✓ | ✓ | ✓ |
 
