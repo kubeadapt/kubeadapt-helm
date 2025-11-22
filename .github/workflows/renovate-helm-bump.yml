@@ -76,10 +76,14 @@ jobs:
             -v "$VERSION" \
             -t "$TYPE"
 
-      - name: Check if Chart.yaml was modified
+      - name: Run helm-docs to update README
+        run: |
+          ./scripts/helm-docs.sh
+
+      - name: Check if files were modified
         id: check-changes
         run: |
-          if git diff --quiet charts/kubeadapt/Chart.yaml; then
+          if git diff --quiet charts/kubeadapt/Chart.yaml charts/kubeadapt/README.md; then
             echo "changed=false" >> $GITHUB_OUTPUT
           else
             echo "changed=true" >> $GITHUB_OUTPUT
@@ -91,6 +95,6 @@ jobs:
           git config user.name "renovate[bot]"
           git config user.email "29139614+renovate[bot]@users.noreply.github.com"
 
-          git add charts/kubeadapt/Chart.yaml
+          git add charts/kubeadapt/Chart.yaml charts/kubeadapt/README.md
           git commit --amend --no-edit
           git push --force-with-lease

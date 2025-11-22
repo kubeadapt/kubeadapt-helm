@@ -79,14 +79,36 @@ case ${type} in
     ;;
 esac
 
-# Update chart version
-sed -i "s/^version:.*/version: ${major}.${minor}.${patch}/g" "${chart_yaml_path}"
+# Update chart version (compatible with both macOS and Linux)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  sed -i '' "s/^version:.*/version: ${major}.${minor}.${patch}/g" "${chart_yaml_path}"
+else
+  sed -i "s/^version:.*/version: ${major}.${minor}.${patch}/g" "${chart_yaml_path}"
+fi
 
-# Add a changelog entry
-sed -i -e '/^  artifacthub.io\/changes: |/,$ d' "${chart_yaml_path}"
-{
-  echo "  artifacthub.io/changes: |"
-  echo "    - kind: changed"
-  echo "      description: Update ${dependency_name} to ${new_version}"
-} >> "${chart_yaml_path}"
+# Update changelog entry (only the artifacthub.io/changes block)
+# This uses awk to replace only the changes block while preserving other annotations
+awk -v dep="${dependency_name}" -v ver="${new_version}" '
+  BEGIN { in_changes=0; skip=0 }
+  /^  artifacthub.io\/changes: \|/ {
+    print
+    print "    - kind: changed"
+    print "      description: Update " dep " to " ver
+    in_changes=1
+    skip=1
+    next
+  }
+  /^  artifacthub.io\// && in_changes {
+    in_changes=0
+    skip=0
+  }
+  !skip || /^  artifacthub.io\// {
+    if (/^  artifacthub.io\//) in_changes=0
+    if (!in_changes || /^  artifacthub.io\//) {
+      print
+      skip=0
+    }
+  }
+' "${chart_yaml_path}" > "${chart_yaml_path}.tmp" && mv "${chart_yaml_path}.tmp" "${chart_yaml_path}"
+
 cat "${chart_yaml_path}"
