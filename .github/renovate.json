@@ -8,7 +8,9 @@
     "group:recommended",
     "helpers:pinGitHubActionDigests"
   ],
-  "schedule": ["before 6am on monday"],
+  "schedule": [
+    "before 6am on monday"
+  ],
   "timezone": "Europe/Istanbul",
   "prConcurrentLimit": 3,
   "prCreation": "not-pending",
@@ -19,69 +21,113 @@
   "packageRules": [
     {
       "description": "Automerge patch updates for Helm charts",
-      "matchManagers": ["helmv3"],
-      "matchUpdateTypes": ["patch"],
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "pr",
       "minimumReleaseAge": "3 days"
     },
     {
       "description": "Require manual approval for minor/major Helm chart updates",
-      "matchManagers": ["helmv3"],
-      "matchUpdateTypes": ["minor", "major"],
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
       "automerge": false,
-      "labels": ["helm-update", "dependencies"]
+      "labels": [
+        "helm-update",
+        "dependencies"
+      ]
     },
     {
       "description": "Group Prometheus chart updates",
-      "matchManagers": ["helmv3"],
-      "matchPackageNames": ["prometheus"],
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchPackageNames": [
+        "prometheus"
+      ],
       "groupName": "Prometheus chart",
-      "labels": ["prometheus", "dependencies"],
+      "labels": [
+        "prometheus",
+        "dependencies"
+      ],
       "commitMessageExtra": "({{updateType}})",
       "postUpgradeTasks": {
         "commands": [
           "./scripts/renovate-bump-version.sh -c kubeadapt -d prometheus -v {{{newVersion}}} -t {{{updateType}}}"
         ],
-        "fileFilters": ["charts/*/Chart.yaml"],
+        "fileFilters": [
+          "charts/*/Chart.yaml"
+        ],
         "executionMode": "update"
       }
     },
     {
       "description": "Group OpenCost chart updates",
-      "matchManagers": ["helmv3"],
-      "matchPackageNames": ["opencost"],
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchPackageNames": [
+        "opencost"
+      ],
       "groupName": "OpenCost chart",
-      "labels": ["opencost", "dependencies"],
+      "labels": [
+        "opencost",
+        "dependencies"
+      ],
       "commitMessageExtra": "({{updateType}})",
       "postUpgradeTasks": {
         "commands": [
           "./scripts/renovate-bump-version.sh -c kubeadapt -d opencost -v {{{newVersion}}} -t {{{updateType}}}"
         ],
-        "fileFilters": ["charts/*/Chart.yaml"],
+        "fileFilters": [
+          "charts/*/Chart.yaml"
+        ],
         "executionMode": "update"
       }
     },
     {
       "description": "Group GPU Operator chart updates",
-      "matchManagers": ["helmv3"],
-      "matchPackageNames": ["gpu-operator"],
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchPackageNames": [
+        "gpu-operator"
+      ],
       "groupName": "GPU Operator chart",
-      "labels": ["gpu-operator", "dependencies"],
+      "labels": [
+        "gpu-operator",
+        "dependencies"
+      ],
       "commitMessageExtra": "({{updateType}})",
       "postUpgradeTasks": {
         "commands": [
           "./scripts/renovate-bump-version.sh -c kubeadapt -d gpu-operator -v {{{newVersion}}} -t {{{updateType}}}"
         ],
-        "fileFilters": ["charts/*/Chart.yaml"],
+        "fileFilters": [
+          "charts/*/Chart.yaml"
+        ],
         "executionMode": "update"
       }
     },
     {
       "description": "Group GitHub Actions updates",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "GitHub Actions",
-      "labels": ["github-actions", "dependencies"],
+      "labels": [
+        "github-actions",
+        "dependencies"
+      ],
       "commitMessageTopic": "{{groupName}}",
       "separateMajorMinor": false,
       "separateMultipleMajor": false,
@@ -90,36 +136,55 @@
     },
     {
       "description": "Pin GitHub Actions to commit SHA for security",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "pinDigests": true
     },
     {
       "description": "Group Docker image updates in workflows",
-      "matchManagers": ["docker-compose", "dockerfile"],
+      "matchManagers": [
+        "docker-compose",
+        "dockerfile"
+      ],
       "groupName": "Docker images",
-      "labels": ["docker", "dependencies"],
+      "labels": [
+        "docker",
+        "dependencies"
+      ],
       "commitMessageTopic": "{{groupName}}",
       "separateMajorMinor": false,
       "separateMultipleMajor": false
     }
   ],
   "helm-values": {
-    "fileMatch": ["(^|/)values\\.yaml$"]
+    "managerFilePatterns": [
+      "/(^|/)values\\.yaml$/"
+    ]
   },
   "rangeStrategy": "bump",
-  "labels": ["renovate", "dependencies"],
+  "labels": [
+    "renovate",
+    "dependencies"
+  ],
   "commitMessagePrefix": "chore(deps):",
   "commitMessageAction": "update",
   "commitMessageTopic": "{{depName}}",
   "vulnerabilityAlerts": {
-    "labels": ["security"],
-    "assignees": ["ugurcancaykara"]
+    "labels": [
+      "security"
+    ],
+    "assignees": [
+      "ugurcancaykara"
+    ]
   },
   "ignoreDeps": [],
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["^charts/.+/values\\.yaml$"],
+      "managerFilePatterns": [
+        "/^charts/.+/values\\.yaml$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+tag:\\s*['\"]?(?<currentValue>[^'\"\\s]+)['\"]?"
       ],
