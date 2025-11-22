@@ -82,6 +82,7 @@
       "matchManagers": ["github-actions"],
       "groupName": "GitHub Actions",
       "labels": ["github-actions", "dependencies"],
+      "commitMessageExtra": "({{updateType}})",
       "automerge": true,
       "minimumReleaseAge": "7 days"
     },
@@ -94,7 +95,8 @@
       "description": "Group Docker image updates in workflows",
       "matchManagers": ["docker-compose", "dockerfile"],
       "groupName": "Docker images",
-      "labels": ["docker", "dependencies"]
+      "labels": ["docker", "dependencies"],
+      "commitMessageExtra": "({{updateType}})"
     }
   ],
   "helm-values": {
