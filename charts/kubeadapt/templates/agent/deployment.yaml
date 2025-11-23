@@ -48,8 +48,6 @@ spec:
             # Backend API Configuration
             - name: KUBEADAPT_BACKEND_API_ENDPOINT
               value: {{ .Values.agent.config.backendApiEndpoint | quote }}
-            - name: KUBEADAPT_API_ENDPOINT
-              value: {{ .Values.agent.config.apiEndpoint | quote }}
             - name: KUBEADAPT_AGENT_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -74,23 +72,12 @@ spec:
             - name: KUBEADAPT_COMPRESSION_LEVEL
               value: {{ .Values.agent.config.compressionLevel | quote }}
 
-            # HTTP Client Settings
-            - name: KUBEADAPT_HTTP_TIMEOUT
-              value: {{ .Values.agent.config.httpTimeout | quote }}
-            - name: KUBEADAPT_HTTP_MAX_RETRIES
-              value: {{ .Values.agent.config.httpMaxRetries | quote }}
-            - name: KUBEADAPT_HTTP_RETRY_DELAY
-              value: {{ .Values.agent.config.httpRetryDelay | quote }}
-            - name: KUBEADAPT_HTTP_MAX_RETRY_DELAY
-              value: {{ .Values.agent.config.httpMaxRetryDelay | quote }}
-            - name: KUBEADAPT_HTTP_BACKOFF_FACTOR
-              value: {{ .Values.agent.config.httpBackoffFactor | quote }}
+            # HTTP Client Settings (hardcoded in agent - not configurable)
+            # HTTPTimeout: 10s, HTTPMaxRetries: 1, HTTPRetryDelay: 1s
 
             # Observability & Debugging
             - name: LOG_LEVEL
               value: {{ .Values.agent.config.logLevel | quote }}
-            - name: DEBUG
-              value: {{ .Values.agent.config.debug | quote }}
             - name: KUBEADAPT_METRICS_PORT
               value: {{ .Values.agent.config.metricsPort | quote }}
             - name: KUBEADAPT_WRITE_JSON_DEBUG
@@ -99,6 +86,8 @@ spec:
             # Feature Flags
             - name: KUBEADAPT_GPU_ENABLED
               value: {{ .Values.agent.config.gpuEnabled | quote }}
+            - name: KUBEADAPT_NETWORK_COST_ENABLED
+              value: {{ .Values.agent.config.networkCostEnabled | quote }}
             - name: KUBEADAPT_E2E_MODE
               value: {{ .Values.agent.config.e2eMode | quote }}
 
@@ -107,10 +96,6 @@ spec:
               value: {{ .Values.agent.config.goMaxProcs | quote }}
             - name: GOMEMLIMIT
               value: {{ .Values.agent.config.goMemLimit | quote }}
-
-            # Chart Version
-            - name: KUBEADAPT_VERSION
-              value: {{ .Chart.Version | quote }}
 
             {{- if .Values.agent.env }}
             # Additional custom environment variables

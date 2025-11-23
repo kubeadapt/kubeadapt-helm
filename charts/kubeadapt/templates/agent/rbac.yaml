@@ -8,16 +8,45 @@ metadata:
     app.kubernetes.io/component: agent
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   name: {{ include "kubeadapt.name" . }}-agent
   labels:
     {{- include "kubeadapt.labels" . | nindent 4 }}
     app.kubernetes.io/component: agent
-rules: []
+rules:
+  # Core resources
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - namespaces
+      - pods
+      - persistentvolumes
+    verbs: ["get", "list"]
+
+  # Apps resources
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+    verbs: ["get", "list"]
+
+  # Autoscaling resources
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["get", "list"]
+
+  # Policy resources
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   name: {{ include "kubeadapt.name" . }}-agent
   labels:
@@ -25,7 +54,7 @@ metadata:
     app.kubernetes.io/component: agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
+  kind: ClusterRole
   name: {{ include "kubeadapt.name" . }}-agent
 subjects:
   - kind: ServiceAccount
