@@ -5,7 +5,7 @@ global:
   fullnameOverride: ""
 
 agent:
-  enabled: true
+  enabled: false
   image:
     # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
     repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
@@ -45,11 +45,6 @@ agent:
     # This is the primary endpoint where agent sends collected metrics data
     # Example: "https://api.kubeadapt.io/api/v1/metrics/ingest"
     backendApiEndpoint: ""
-
-    # WebSocket API endpoint for real-time agent connection (optional)
-    # Used for bidirectional communication with backend (commands, live updates)
-    # Example: "wss://api.kubeadapt.io/api/v1/ws/agent"
-    apiEndpoint: "wss://api.kubeadapt.io/api/v1/ws/agent"
 
     # ============================================================
     # Prometheus Configuration
@@ -95,37 +90,19 @@ agent:
     # ============================================================
     # HTTP Client Settings
     # ============================================================
-    # HTTP request timeout for backend API calls
-    # Format: duration string (e.g., "30s", "1m")
-    httpTimeout: "30s"
-
-    # Maximum number of retry attempts for failed HTTP requests
-    # 0 = no retries, 3 = up to 3 retries (4 total attempts)
-    httpMaxRetries: 3
-
-    # Initial delay before first retry
-    # Format: duration string (e.g., "1s", "2s")
-    httpRetryDelay: "1s"
-
-    # Maximum delay between retries (exponential backoff cap)
-    # Format: duration string (e.g., "10s", "30s")
-    httpMaxRetryDelay: "10s"
-
-    # Exponential backoff multiplier for retry delays
-    # Each retry delay = previous_delay * backoff_factor
-    # Example: 1s → 2s → 4s → 8s (factor=2.0)
-    httpBackoffFactor: 2.0
+    # HTTP retry settings are hardcoded in the agent for safety:
+    # - HTTPTimeout: 10s (per request)
+    # - HTTPMaxRetries: 1 (2 total attempts)
+    # - HTTPRetryDelay: 1s (fixed, no exponential backoff)
+    # These values are intentionally not configurable to prevent timeout issues
 
     # ============================================================
     # Observability & Debugging
     # ============================================================
     # Log level for agent
     # Options: "debug", "info", "warn", "error"
+    # Default: "info"
     logLevel: "info"
-
-    # Enable debug mode (verbose logging)
-    # Sets DEBUG environment variable
-    debug: false
 
     # Metrics server port for agent's own Prometheus metrics
     # Exposes agent health, collection stats, and performance metrics
@@ -144,6 +121,12 @@ agent:
     # Requires DCGM exporter to be running in cluster (gpu-operator)
     # Collects: GPU utilization, memory usage, power consumption
     gpuEnabled: false
+
+    # Enable network cost metrics collection (eBPF agent)
+    # Requires kubeadapt eBPF agent to be deployed as DaemonSet
+    # Collects: Pod-to-pod egress traffic (bytes, packets) for network cost calculation
+    # Set to true only if you have deployed the eBPF agent
+    networkCostEnabled: false
 
     # Enable E2E testing mode
     # Skips backend operations, used for integration testing only
@@ -183,10 +166,11 @@ prometheus:
   enabled: true
   server:
     persistentVolume:
-      # Short-term buffer for agent collection (agent queries every 60s and sends to SaaS backend)
-      # 2h retention with storage I/O metrics - 20Gi provides safety margin
+      # Optional: Enable persistent storage for Prometheus (default: emptyDir)
+      # With 30m retention, emptyDir is sufficient
+      enabled: false
       size: 20Gi
-      storageClass: gp2 # For AWS - adjust based on your infrastructure (efs, etc.)
+      # storageClass: gp2 # For AWS - adjust based on your infrastructure -> https://kubeadapt.io/docs/v1/getting-started/quick-start/#configuration-options
     service:
       type: ClusterIP
       servicePort: 80
@@ -237,10 +221,11 @@ prometheus:
           metric_relabel_configs:
             - source_labels: [__name__]
               action: keep
-              regex: ^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity_cpu_cores|kube_node_status_capacity_memory_bytes|kube_node_status_allocatable|kube_node_labels|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes|kube_pod_container_status_waiting_reason|kube_replicaset_status_ready_replicas|kube_replicaset_spec_replicas|kube_replicaset_created|kube_pod_container_state_started)$
+              regex: ^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity_cpu_cores|kube_node_status_capacity_memory_bytes|kube_node_status_allocatable|kube_node_labels|kube_node_status_condition|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_terminated_reason|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_status_replicas_ready|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_status_replicas_ready|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes|kube_pod_container_status_waiting_reason|kube_replicaset_status_ready_replicas|kube_replicaset_spec_replicas|kube_replicaset_created|kube_pod_container_state_started)$
 
         # Metrics from cAdvisor (Container and Network metrics)
         - job_name: "kubernetes-nodes-cadvisor"
+          scrape_interval: 15s # Required for rate([1m]) queries to work (needs 4+ data points)
           scheme: https
           tls_config:
             ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
@@ -257,7 +242,7 @@ prometheus:
           metric_relabel_configs:
             - source_labels: [__name__]
               action: keep
-              regex: ^(container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_network_receive_bytes_total|container_network_transmit_bytes_total|machine_cpu_cores|container_fs_usage_bytes|container_fs_limit_bytes|container_fs_reads_total|container_fs_writes_total|container_fs_reads_bytes_total|container_fs_writes_bytes_total|container_fs_io_time_seconds_total|container_fs_io_current)$
+              regex: ^(container_cpu_usage_seconds_total|container_cpu_cfs_periods_total|container_cpu_cfs_throttled_periods_total|container_cpu_cfs_throttled_seconds_total|container_memory_working_set_bytes|container_network_receive_bytes_total|container_network_transmit_bytes_total|machine_cpu_cores|container_fs_reads_total|container_fs_writes_total|container_fs_reads_bytes_total|container_fs_writes_bytes_total)$
 
         # Metrics from OpenCost
         - job_name: "opencost"
@@ -300,10 +285,43 @@ prometheus:
         - source_labels: [__meta_kubernetes_endpoint_address_target_name]
           target_label: node
       metric_relabel_configs:
-        # Filter: Keep only required node metrics (8 metrics total: 5 existing + 3 storage I/O)
+        # Filter: Keep only required node metrics (7 metrics total)
         - source_labels: [__name__]
           action: keep
-          regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes|node_filesystem_free_bytes|node_disk_io_time_seconds_total|node_disk_io_now)$
+          regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes|node_disk_io_time_seconds_total|node_disk_io_now)$
+
+    # ============================================================
+    # KubeAdapt Agent Internal Metrics
+    # ============================================================
+    # Scrapes agent's own observability metrics for monitoring performance,
+    # errors, and operational health.
+    - job_name: "kubeadapt-agent"
+      kubernetes_sd_configs:
+        - role: service
+          namespaces:
+            names:
+              - kubeadapt
+      relabel_configs:
+        # Keep only services with agent component label
+        - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_component]
+          regex: agent
+          action: keep
+        # Keep only the metrics port
+        - source_labels: [__meta_kubernetes_endpoint_port_name]
+          regex: metrics
+          action: keep
+        # Add agent pod name as label
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: agent_pod
+      metric_relabel_configs:
+        # Filter: Keep only agent internal metrics (11 metrics total)
+        # Collection metrics (4): collection_duration, collection_total, data_points, collection_errors
+        # Prometheus query metrics (3): query_duration, query_errors, queries_total
+        # Backend metrics (2): backend_post_duration, backend_post_errors
+        # Compression metrics (2): compression_ratio, compression_duration
+        - source_labels: [__name__]
+          action: keep
+          regex: ^(kubeadapt_agent_collection_duration_seconds|kubeadapt_agent_collection_total|kubeadapt_agent_data_points_total|kubeadapt_agent_collection_errors_total|kubeadapt_agent_prometheus_query_duration_seconds|kubeadapt_agent_prometheus_query_errors_total|kubeadapt_agent_prometheus_queries_total|kubeadapt_agent_backend_post_duration_seconds|kubeadapt_agent_backend_post_errors_total|kubeadapt_agent_compression_ratio|kubeadapt_agent_compression_duration_seconds)$
 
     # ============================================================
     # DCGM Exporter for GPU Metrics (Optional - Requires GPU Operator)
@@ -335,7 +353,67 @@ prometheus:
     #   metric_relabel_configs:
     #     - source_labels: [__name__]
     #       action: keep
-    #       regex: ^(DCGM_FI_DEV_GPU_UTIL|DCGM_FI_DEV_MEM_COPY_UTIL|DCGM_FI_DEV_POWER_USAGE)$
+    #       regex: ^(DCGM_FI_DEV_GPU_UTIL|DCGM_FI_DEV_FB_USED)$
+
+    # ============================================================
+    # eBPF Network Cost Tracking (Optional - Requires eBPF Agent)
+    # ============================================================
+    # Uncomment this section to enable pod-to-pod network traffic monitoring
+    #
+    # REQUIREMENTS:
+    # - Linux kernel >= 5.8 (required for TC eBPF support)
+    # - eBPF agent deployed as DaemonSet (see ebpf-agent chart)
+    #
+    # WHAT IT TRACKS:
+    # - Pod-to-pod network traffic (bytes and packets)
+    # - Protocol-level metrics (TCP/UDP)
+    #
+    # METRICS EXPOSED:
+    # - kubeadapt_connection_traffic_bytes_total: Cumulative bytes between pod IPs
+    # - kubeadapt_connection_traffic_packets_total: Cumulative packets between pod IPs
+    # - Labels: src_ip, dst_ip, protocol, daemonset_pod_uid, daemonset_node_name
+    #
+    # Backend enriches raw IP metrics with K8s metadata (pod names, namespaces, services)
+    # and calculates network costs based on corresponding cloud provider pricing
+    # ============================================================
+    #
+    # - job_name: "kubeadapt-ebpf-agent"
+    #   kubernetes_sd_configs:
+    #     - role: pod
+    #       namespaces:
+    #         names:
+    #           - kubeadapt
+    #   relabel_configs:
+    #     # Keep only eBPF agent pods
+    #     - source_labels: [__meta_kubernetes_pod_label_app]
+    #       action: keep
+    #       regex: kubeadapt-ebpf-agent
+    #     # Keep only the metrics port
+    #     - source_labels: [__meta_kubernetes_pod_container_port_name]
+    #       action: keep
+    #       regex: metrics
+    #     # Add node label from pod's node
+    #     - source_labels: [__meta_kubernetes_pod_node_name]
+    #       target_label: node
+    #   metric_relabel_configs:
+    #     # Filter: Keep network traffic AND internal observability metrics
+    #     # Network traffic (2 metrics):
+    #     #   - kubeadapt_connection_traffic_bytes_total
+    #     #   - kubeadapt_connection_traffic_packets_total
+    #     # Internal observability (10 metrics):
+    #     #   - kubeadapt_bpf_load_status (BPF load success/failure)
+    #     #   - kubeadapt_bpf_load_attempts_total (BPF load attempts)
+    #     #   - kubeadapt_bpf_load_duration_seconds (BPF load time)
+    #     #   - kubeadapt_active_connections (active connection count)
+    #     #   - kubeadapt_connection_tracking_info (tracking metadata)
+    #     #   - kubeadapt_bpf_map_utilization_percent (map usage %)
+    #     #   - kubeadapt_overflow_flows_total (overflow events)
+    #     #   - kubeadapt_ip_pairs_batch_size (batch size)
+    #     #   - kubeadapt_ebpf_collection_duration_seconds (collection time histogram)
+    #     #   - kubeadapt_collector_errors_total (error counter)
+    #     - source_labels: [__name__]
+    #       action: keep
+    #       regex: ^(kubeadapt_connection_traffic_bytes_total|kubeadapt_connection_traffic_packets_total|kubeadapt_bpf_load_status|kubeadapt_bpf_load_attempts_total|kubeadapt_bpf_load_duration_seconds|kubeadapt_active_connections|kubeadapt_connection_tracking_info|kubeadapt_bpf_map_utilization_percent|kubeadapt_overflow_flows_total|kubeadapt_ip_pairs_batch_size|kubeadapt_ebpf_collection_duration_seconds|kubeadapt_collector_errors_total)$
 
 opencost:
   # ============================================================
@@ -806,7 +884,6 @@ opencost:
       # -- Enable carbon cost exposed in the API
       enabled: false
 
-
 # NVIDIA GPU Operator configuration for cost optimization
 gpu-operator:
   enabled: false
@@ -815,7 +892,7 @@ gpu-operator:
     cleanupCRD: false
     upgradeCRD: true
     imagePullSecrets:
-    - nvcr-cred
+      - nvcr-cred
 
   # DCGM Exporter configuration for GPU metrics collection
   dcgmExporter:
@@ -825,7 +902,7 @@ gpu-operator:
     version: 4.3.1-4.4.0-ubuntu22.04
     imagePullPolicy: IfNotPresent
     imagePullSecrets:
-    - nvcr-cred
+      - nvcr-cred
     resources:
       requests:
         memory: "128Mi"
@@ -846,7 +923,7 @@ gpu-operator:
     image: k8s-device-plugin
     version: v0.17.3
     imagePullSecrets:
-    - nvcr-cred
+      - nvcr-cred
 
   # GPU Feature Discovery (fixed image)
   gfd:
@@ -869,7 +946,7 @@ gpu-operator:
     image: container-toolkit
     # version: v1.17.8-amzn2
     imagePullSecrets:
-    - nvcr-cred
+      - nvcr-cred
 
   # Driver installation
   driver:
@@ -878,4 +955,4 @@ gpu-operator:
     image: driver
     version: "580.65.06"
     imagePullSecrets:
-    - nvcr-cred
+      - nvcr-cred
