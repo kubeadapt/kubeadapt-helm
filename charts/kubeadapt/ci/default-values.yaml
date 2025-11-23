@@ -10,10 +10,10 @@ global:
   region: "ci-region-1"
 
 agent:
-  enabled: false # TODO: Enable this when components images are accessible
+  enabled: false
   image:
     repository: ghcr.io/kubeadapt/agent
-    tag: ""  # Defaults to .Chart.AppVersion
+    tag: "" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -34,8 +34,37 @@ agent:
       memory: 128Mi
   # Agent specific configuration
   config:
+    # Authentication & Backend
     token: "ci-test-token-123"
+    backendApiEndpoint: ""
+
+    # Prometheus Configuration
+    prometheusUrl: "http://kubeadapt-prometheus-server.kubeadapt.svc:80"
+    prometheusTimeout: "30s"
+    queryConcurrency: 10
+
+    # Collection Settings
+    collectionInterval: "60s"
+
+    # Data Compression
+    compressionEnabled: true
+    compressionLevel: 3
+
+    # Observability & Debugging
     logLevel: "debug"
+    metricsPort: 8080
+    writeJsonDebug: false
+
+    # Feature Flags
+    gpuEnabled: false
+    networkCostEnabled: false
+    e2eMode: true
+
+    goMaxProcs: 2
+    goMemLimit: "128MiB"
+
+  # Additional Environment Variables
+  env: []
 
 # Dependencies configuration
 prometheus:
@@ -96,20 +125,20 @@ opencost:
       defaultClusterId: default
       resources:
         requests:
-          cpu: '10m'
-          memory: '55Mi'
+          cpu: "10m"
+          memory: "55Mi"
         limits:
-          cpu: '999m'
-          memory: '1Gi'
+          cpu: "999m"
+          memory: "1Gi"
     ui:
-      enabled: true
+      enabled: false
       resources:
         requests:
-          cpu: '10m'
-          memory: '55Mi'
+          cpu: "10m"
+          memory: "55Mi"
         limits:
-          cpu: '999m'
-          memory: '1Gi'
+          cpu: "999m"
+          memory: "1Gi"
 
   serviceAccount:
     create: true
