@@ -7,11 +7,13 @@ on:
       - 'charts/**/Chart.yaml'
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   bump-chart-version:
+    permissions:
+      contents: write  # Required to push version bump commits
+      pull-requests: write  # Required to update PR
     # Only run on Renovate PRs with helm-dependency label
     if: |
       github.actor == 'renovate[bot]' &&
