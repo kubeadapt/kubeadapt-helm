@@ -72,7 +72,7 @@ helm verify path/to/chart.tgz
 - [Platform Compatibility Matrix](https://github.com/kubeadapt/kubeadapt-helm/blob/main/COMPATIBILITY.md)
 
 **Community:**
-- [ArtifactHub](https://artifacthub.io/packages/search?org=kubeadapt) - Browse and discover charts
+- [ArtifactHub](https://artifacthub.io/packages/helm/kubeadapt/kubeadapt) - Browse and discover charts
 - [GitHub Issues](https://github.com/kubeadapt/kubeadapt-helm/issues) - Report bugs or request features
 
 **Contributing:**
