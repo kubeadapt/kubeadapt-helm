@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 0.8.0](https://img.shields.io/badge/Version-0.8.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.9.0](https://img.shields.io/badge/Version-0.9.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -64,7 +64,7 @@ helm delete my-release
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent"` |  |
-| agent.image.tag | string | `"a2c889f"` |  |
+| agent.image.tag | string | `"baf98d1"` |  |
 | agent.rbac.create | bool | `true` |  |
 | agent.resources.limits.cpu | string | `"500m"` |  |
 | agent.resources.limits.memory | string | `"256Mi"` |  |
