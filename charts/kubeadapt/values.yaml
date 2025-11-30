@@ -5,11 +5,11 @@ global:
   fullnameOverride: ""
 
 agent:
-  enabled: false
+  enabled: true
   image:
     # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
     repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
-    tag: "baf98d1" # Defaults to .Chart.AppVersion
+    tag: "v1.0.0" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -36,9 +36,7 @@ agent:
     # ============================================================
     # Authentication & Backend Configuration
     # ============================================================
-    # Agent authentication token (JWT) for connecting to Kubeadapt cloud backend
     # This token is automatically generated when you create an agent in the Kubeadapt platform
-    # Format: JWT with claims (agent_id, cluster_name, user_id, expiration)
     token: ""
 
     # Backend API endpoint for HTTP POST requests (metrics ingestion)
