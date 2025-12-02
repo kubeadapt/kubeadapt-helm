@@ -23,8 +23,6 @@ agent:
     create: true
   service:
     type: ClusterIP
-    port: 8080
-    protocol: TCP
   resources:
     requests:
       cpu: 50m

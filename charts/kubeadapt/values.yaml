@@ -9,7 +9,7 @@ agent:
   image:
     # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
     repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
-    tag: "v1.2.0" # Defaults to .Chart.AppVersion
+    tag: "v1.2.1" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -19,8 +19,6 @@ agent:
     create: true
   service:
     type: ClusterIP
-    port: 8080
-    protocol: TCP
   resources:
     requests:
       cpu: 200m
@@ -42,7 +40,7 @@ agent:
     # Backend API endpoint for HTTP POST requests (metrics ingestion)
     # This is the primary endpoint where agent sends collected metrics data
     # Example: "https://api.kubeadapt.io/api/v1/metrics/ingest"
-    backendApiEndpoint: ""
+    backendApiEndpoint: "https://api.kubeadapt.io"
 
     # ============================================================
     # Prometheus Configuration
@@ -104,7 +102,6 @@ agent:
 
     # Metrics server port for agent's own Prometheus metrics
     # Exposes agent health, collection stats, and performance metrics
-    # Access at: http://agent-pod:8080/metrics
     metricsPort: 8080
 
     # Write collected metrics to JSON file for debugging
@@ -134,16 +131,9 @@ agent:
     # ============================================================
     # Runtime Performance Tuning
     # ============================================================
-    # GOMAXPROCS: Number of OS threads for Go runtime
-    # Controls parallelism for CPU-bound operations
-    # Default: 2 (sufficient for most clusters)
-    # Increase for large clusters (1000+ nodes) or high query concurrency
     goMaxProcs: 2
 
-    # GOMEMLIMIT: Soft memory limit for Go runtime
-    # Go runtime will trigger GC more aggressively when approaching this limit
-    # Set to ~80-90% of container memory limit
-    goMemLimit: "256MiB"
+    goMemLimit: "968MiB"
 
   # ============================================================
   # Additional Environment Variables
@@ -151,14 +141,6 @@ agent:
   # Custom environment variables to inject into agent pod
   # Use this for advanced configuration or cloud-specific settings
   env: []
-  # Examples:
-  # - name: CUSTOM_ENV
-  #   value: "custom_value"
-  # - name: AWS_REGION
-  #   value: "us-west-2"
-  # - name: OTEL_EXPORTER_OTLP_ENDPOINT
-  #   value: "http://otel-collector:4317"
-
 
   tolerations: []
 
@@ -270,79 +252,73 @@ prometheus:
               action: keep
               regex: ^(kubecost_cluster_info|node_cpu_hourly_cost|node_ram_hourly_cost|node_gpu_hourly_cost|pv_hourly_cost|kube_node_labels|kubecost_cluster_management_cost|kube_persistentvolumeclaim_info|kubecost_node_is_spot|kube_persistentvolumeclaim_resource_requests_storage_bytes)$
 
+        # ============================================================
+        # KubeAdapt Agent Internal Metrics
+        # ============================================================
+        # Scrapes agent's own observability metrics for monitoring performance,
+        # errors, and operational health.
+        - job_name: "kubeadapt-agent"
+          kubernetes_sd_configs:
+            - role: endpoints
+              namespaces:
+                names:
+                  - kubeadapt
+          relabel_configs:
+            # Keep only endpoints with agent component label
+            - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_component]
+              regex: agent
+              action: keep
+            # Keep only the metrics port
+            - source_labels: [__meta_kubernetes_endpoint_port_name]
+              regex: metrics
+              action: keep
+            # Add agent pod name as label
+            - source_labels: [__meta_kubernetes_pod_name]
+              target_label: agent_pod
+          metric_relabel_configs:
+            # Filter: Keep only agent internal metrics (11 metrics total)
+            # Collection metrics (4): collection_duration, collection_total, data_points, collection_errors
+            # Prometheus query metrics (3): query_duration, query_errors, queries_total
+            # Backend metrics (2): backend_post_duration, backend_post_errors
+            # Compression metrics (2): compression_ratio, compression_duration
+            - source_labels: [__name__]
+              action: keep
+              regex: ^(kubeadapt_agent_collection_duration_seconds|kubeadapt_agent_collection_total|kubeadapt_agent_data_points_total|kubeadapt_agent_collection_errors_total|kubeadapt_agent_prometheus_query_duration_seconds|kubeadapt_agent_prometheus_query_errors_total|kubeadapt_agent_prometheus_queries_total|kubeadapt_agent_backend_post_duration_seconds|kubeadapt_agent_backend_post_errors_total|kubeadapt_agent_compression_ratio|kubeadapt_agent_compression_duration_seconds)$
+
+        # ============================================================
+        # Node-Exporter (Auto-discovery across all namespaces)
+        # ============================================================
+        # CRITICAL: Explicit config required to guarantee 15s interval for rate([1m])
+        # Auto-discovery uses label selectors, no namespace restriction needed
+        - job_name: "node-exporter"
+          scrape_interval: 15s
+          kubernetes_sd_configs:
+            - role: endpoints
+          relabel_configs:
+            - source_labels:
+                [__meta_kubernetes_service_label_app_kubernetes_io_name]
+              regex: prometheus-node-exporter
+              action: keep
+            - source_labels: [__meta_kubernetes_endpoint_port_name]
+              regex: (metrics|http-metrics)
+              action: keep
+            - source_labels: [__meta_kubernetes_endpoint_address_target_name]
+              target_label: node
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              action: keep
+              regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes|node_disk_io_time_seconds_total|node_disk_io_now)$
+
   # Adds additional scrape configs to prometheus.yml
   # Must be a string so you have to add a | after extraScrapeConfigs:
-  #
-  # NOTE: Even though prometheus-node-exporter.enabled=true, we define explicit
-  # scrape config to guarantee 15s interval for rate([1m]) queries.
-  # Built-in auto-discovery doesn't guarantee scrape interval control.
-  #
-  extraScrapeConfigs: |
-    # Node-Exporter (Chart-deployed, controlled discovery with 15s interval)
-    # CRITICAL: Explicit config required to guarantee 15s interval for rate([1m])
-    # Auto-discovery alone uses chart defaults (typically 1m) which breaks rate() queries
-    - job_name: "node-exporter"
-      scrape_interval: 15s      # ← GUARANTEED 15s for rate([1m]) compatibility (requires 4+ data points)
-      kubernetes_sd_configs:
-        - role: endpoints
-          namespaces:
-            names:
-              - kubeadapt      # ← Chart deploys node-exporter here
-      relabel_configs:
-        # Keep only prometheus-node-exporter service endpoints
-        - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_name]
-          regex: prometheus-node-exporter
-          action: keep
-        # Keep only the metrics port
-        - source_labels: [__meta_kubernetes_endpoint_port_name]
-          regex: metrics
-          action: keep
-        # Add node label from endpoint address
-        - source_labels: [__meta_kubernetes_endpoint_address_target_name]
-          target_label: node
-      metric_relabel_configs:
-        # Filter: Keep only required node metrics (7 metrics total)
-        - source_labels: [__name__]
-          action: keep
-          regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes|node_disk_io_time_seconds_total|node_disk_io_now)$
-
-    # ============================================================
-    # KubeAdapt Agent Internal Metrics
-    # ============================================================
-    # Scrapes agent's own observability metrics for monitoring performance,
-    # errors, and operational health.
-    - job_name: "kubeadapt-agent"
-      kubernetes_sd_configs:
-        - role: service
-          namespaces:
-            names:
-              - kubeadapt
-      relabel_configs:
-        # Keep only services with agent component label
-        - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_component]
-          regex: agent
-          action: keep
-        # Keep only the metrics port
-        - source_labels: [__meta_kubernetes_endpoint_port_name]
-          regex: metrics
-          action: keep
-        # Add agent pod name as label
-        - source_labels: [__meta_kubernetes_pod_name]
-          target_label: agent_pod
-      metric_relabel_configs:
-        # Filter: Keep only agent internal metrics (11 metrics total)
-        # Collection metrics (4): collection_duration, collection_total, data_points, collection_errors
-        # Prometheus query metrics (3): query_duration, query_errors, queries_total
-        # Backend metrics (2): backend_post_duration, backend_post_errors
-        # Compression metrics (2): compression_ratio, compression_duration
-        - source_labels: [__name__]
-          action: keep
-          regex: ^(kubeadapt_agent_collection_duration_seconds|kubeadapt_agent_collection_total|kubeadapt_agent_data_points_total|kubeadapt_agent_collection_errors_total|kubeadapt_agent_prometheus_query_duration_seconds|kubeadapt_agent_prometheus_query_errors_total|kubeadapt_agent_prometheus_queries_total|kubeadapt_agent_backend_post_duration_seconds|kubeadapt_agent_backend_post_errors_total|kubeadapt_agent_compression_ratio|kubeadapt_agent_compression_duration_seconds)$
-
+  # Note: Optional configs (DCGM, eBPF) are added dynamically via frontend when enabled
+  extraScrapeConfigs: ""
     # ============================================================
     # DCGM Exporter for GPU Metrics (Optional - Requires GPU Operator)
     # ============================================================
-    # Uncomment this section ONLY if gpu-operator.enabled=true
+    # This config is added dynamically when gpuEnabled=true
+    # Auto-discovery via label selectors - no namespace restriction needed
+    #
     # IMPORTANT: This requires NVIDIA GPU Operator to be deployed.
     # Without GPU operator, this scrape job will show "no endpoints found".
     #
@@ -356,9 +332,6 @@ prometheus:
     # - job_name: "dcgm-exporter"
     #   kubernetes_sd_configs:
     #     - role: pod
-    #       namespaces:
-    #         names:
-    #           - kubeadapt
     #   relabel_configs:
     #     - source_labels: [__meta_kubernetes_pod_label_app]
     #       action: keep
@@ -887,7 +860,7 @@ opencost:
     # - GCP: Query BigQuery for billing export, fetch preemptible pricing, track CUD utilization
     # - Azure: Read cost export from storage account, fetch spot VM pricing, track RI utilization
     cloudCost:
-      enabled: true
+      enabled: false
       # How often to refresh cloud cost data (hours)
       # Lower values = more up-to-date data but higher API costs
       refreshRateHours: 6
