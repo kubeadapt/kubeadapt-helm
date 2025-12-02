@@ -24,9 +24,6 @@ spec:
           image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
           ports:
-            - name: websocket
-              containerPort: {{ .Values.agent.service.port }}
-              protocol: {{ .Values.agent.service.protocol }}
             - name: metrics
               containerPort: {{ .Values.agent.config.metricsPort }}
               protocol: TCP

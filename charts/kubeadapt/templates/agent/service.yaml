@@ -9,10 +9,6 @@ metadata:
 spec:
   type: {{ .Values.agent.service.type }}
   ports:
-    - port: {{ .Values.agent.service.port }}
-      targetPort: websocket
-      protocol: {{ .Values.agent.service.protocol }}
-      name: websocket
     - port: {{ .Values.agent.config.metricsPort }}
       targetPort: metrics
       protocol: TCP
