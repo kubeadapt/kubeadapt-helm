@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 0.10.0](https://img.shields.io/badge/Version-0.10.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.11.0](https://img.shields.io/badge/Version-0.11.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -44,6 +44,7 @@ helm delete my-release
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| agent.affinity | object | `{}` |  |
 | agent.config.backendApiEndpoint | string | `""` |  |
 | agent.config.collectionInterval | string | `"60s"` |  |
 | agent.config.compressionEnabled | bool | `true` |  |
@@ -64,18 +65,21 @@ helm delete my-release
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent"` |  |
-| agent.image.tag | string | `"v1.0.0"` |  |
+| agent.image.tag | string | `"v1.2.0"` |  |
+| agent.nodeSelector | object | `{}` |  |
 | agent.rbac.create | bool | `true` |  |
-| agent.resources.limits.cpu | string | `"500m"` |  |
-| agent.resources.limits.memory | string | `"256Mi"` |  |
-| agent.resources.requests.cpu | string | `"100m"` |  |
-| agent.resources.requests.memory | string | `"128Mi"` |  |
+| agent.resources.limits.cpu | string | `"1000m"` |  |
+| agent.resources.limits.memory | string | `"1024Mi"` |  |
+| agent.resources.requests.cpu | string | `"200m"` |  |
+| agent.resources.requests.memory | string | `"256Mi"` |  |
 | agent.service.port | int | `8080` |  |
 | agent.service.protocol | string | `"TCP"` |  |
 | agent.service.type | string | `"ClusterIP"` |  |
 | agent.serviceAccount.annotations | object | `{}` |  |
 | agent.serviceAccount.create | bool | `true` |  |
 | agent.serviceAccount.name | string | `""` |  |
+| agent.tolerations | list | `[]` |  |
+| agent.topologySpreadConstraints | list | `[]` |  |
 | global.fullnameOverride | string | `""` |  |
 | global.name | string | `"kubeadapt"` |  |
 | global.nameOverride | string | `""` |  |
@@ -119,6 +123,7 @@ helm delete my-release
 | gpu-operator.toolkit.repository | string | `"nvcr.io/nvidia/k8s"` |  |
 | opencost.cloudIntegrationSecret | string | `""` |  |
 | opencost.extraVolumes | list | `[]` |  |
+| opencost.opencost.affinity | object | `{}` |  |
 | opencost.opencost.annotations."prometheus.io/path" | string | `"/metrics"` |  |
 | opencost.opencost.annotations."prometheus.io/port" | string | `"9003"` |  |
 | opencost.opencost.annotations."prometheus.io/scrape" | string | `"true"` |  |
@@ -148,12 +153,15 @@ helm delete my-release
 | opencost.opencost.exporter.resources.limits.memory | string | `"1Gi"` |  |
 | opencost.opencost.exporter.resources.requests.cpu | string | `"10m"` |  |
 | opencost.opencost.exporter.resources.requests.memory | string | `"55Mi"` |  |
+| opencost.opencost.nodeSelector | object | `{}` |  |
 | opencost.opencost.prometheus.external.enabled | bool | `false` |  |
 | opencost.opencost.prometheus.external.url | string | `""` |  |
 | opencost.opencost.prometheus.internal.enabled | bool | `true` |  |
 | opencost.opencost.prometheus.internal.namespaceName | string | `"kubeadapt"` |  |
 | opencost.opencost.prometheus.internal.port | int | `80` |  |
 | opencost.opencost.prometheus.internal.serviceName | string | `"kubeadapt-prometheus-server"` |  |
+| opencost.opencost.tolerations | list | `[]` |  |
+| opencost.opencost.topologySpreadConstraints | list | `[]` |  |
 | opencost.opencost.ui.enabled | bool | `false` |  |
 | opencost.rbac.enabled | bool | `true` |  |
 | opencost.restartJob.enabled | bool | `true` |  |
@@ -166,12 +174,16 @@ helm delete my-release
 | prometheus.extraScrapeConfigs | string | `"# Node-Exporter (Chart-deployed, controlled discovery with 15s interval)\n# CRITICAL: Explicit config required to guarantee 15s interval for rate([1m])\n# Auto-discovery alone uses chart defaults (typically 1m) which breaks rate() queries\n- job_name: \"node-exporter\"\n  scrape_interval: 15s      # ← GUARANTEED 15s for rate([1m]) compatibility (requires 4+ data points)\n  kubernetes_sd_configs:\n    - role: endpoints\n      namespaces:\n        names:\n          - kubeadapt      # ← Chart deploys node-exporter here\n  relabel_configs:\n    # Keep only prometheus-node-exporter service endpoints\n    - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_name]\n      regex: prometheus-node-exporter\n      action: keep\n    # Keep only the metrics port\n    - source_labels: [__meta_kubernetes_endpoint_port_name]\n      regex: metrics\n      action: keep\n    # Add node label from endpoint address\n    - source_labels: [__meta_kubernetes_endpoint_address_target_name]\n      target_label: node\n  metric_relabel_configs:\n    # Filter: Keep only required node metrics (7 metrics total)\n    - source_labels: [__name__]\n      action: keep\n      regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes|node_disk_io_time_seconds_total|node_disk_io_now)$\n\n# ============================================================\n# KubeAdapt Agent Internal Metrics\n# ============================================================\n# Scrapes agent's own observability metrics for monitoring performance,\n# errors, and operational health.\n- job_name: \"kubeadapt-agent\"\n  kubernetes_sd_configs:\n    - role: service\n      namespaces:\n        names:\n          - kubeadapt\n  relabel_configs:\n    # Keep only services with agent component label\n    - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_component]\n      regex: agent\n      action: keep\n    # Keep only the metrics port\n    - source_labels: [__meta_kubernetes_endpoint_port_name]\n      regex: metrics\n      action: keep\n    # Add agent pod name as label\n    - source_labels: [__meta_kubernetes_pod_name]\n      target_label: agent_pod\n  metric_relabel_configs:\n    # Filter: Keep only agent internal metrics (11 metrics total)\n    # Collection metrics (4): collection_duration, collection_total, data_points, collection_errors\n    # Prometheus query metrics (3): query_duration, query_errors, queries_total\n    # Backend metrics (2): backend_post_duration, backend_post_errors\n    # Compression metrics (2): compression_ratio, compression_duration\n    - source_labels: [__name__]\n      action: keep\n      regex: ^(kubeadapt_agent_collection_duration_seconds|kubeadapt_agent_collection_total|kubeadapt_agent_data_points_total|kubeadapt_agent_collection_errors_total|kubeadapt_agent_prometheus_query_duration_seconds|kubeadapt_agent_prometheus_query_errors_total|kubeadapt_agent_prometheus_queries_total|kubeadapt_agent_backend_post_duration_seconds|kubeadapt_agent_backend_post_errors_total|kubeadapt_agent_compression_ratio|kubeadapt_agent_compression_duration_seconds)$\n\n# ============================================================\n# DCGM Exporter for GPU Metrics (Optional - Requires GPU Operator)\n# ============================================================\n# Uncomment this section ONLY if gpu-operator.enabled=true\n# IMPORTANT: This requires NVIDIA GPU Operator to be deployed.\n# Without GPU operator, this scrape job will show \"no endpoints found\".\n#\n# ⚠️  MIG MODE LIMITATION:\n# DCGM Exporter in Kubernetes mode does NOT support container-level\n# GPU utilization mapping when MIG (Multi-Instance GPU) is enabled.\n# For MIG environments, we have eBPF-based agent that works as daemonset\n# and expose the gpu utilization metrics per MIG profile\n# ============================================================\n#\n# - job_name: \"dcgm-exporter\"\n#   kubernetes_sd_configs:\n#     - role: pod\n#       namespaces:\n#         names:\n#           - kubeadapt\n#   relabel_configs:\n#     - source_labels: [__meta_kubernetes_pod_label_app]\n#       action: keep\n#       regex: dcgm-exporter\n#     - source_labels: [__meta_kubernetes_pod_container_port_name]\n#       action: keep\n#       regex: metrics\n#   metric_relabel_configs:\n#     - source_labels: [__name__]\n#       action: keep\n#       regex: ^(DCGM_FI_DEV_GPU_UTIL|DCGM_FI_DEV_FB_USED)$\n\n# ============================================================\n# eBPF Network Cost Tracking (Optional - Requires eBPF Agent)\n# ============================================================\n# Uncomment this section to enable pod-to-pod network traffic monitoring\n#\n# REQUIREMENTS:\n# - Linux kernel >= 5.8 (required for TC eBPF support)\n# - eBPF agent deployed as DaemonSet (see ebpf-agent chart)\n#\n# WHAT IT TRACKS:\n# - Pod-to-pod network traffic (bytes and packets)\n# - Protocol-level metrics (TCP/UDP)\n#\n# METRICS EXPOSED:\n# - kubeadapt_connection_traffic_bytes_total: Cumulative bytes between pod IPs\n# - kubeadapt_connection_traffic_packets_total: Cumulative packets between pod IPs\n# - Labels: src_ip, dst_ip, protocol, daemonset_pod_uid, daemonset_node_name\n#\n# Backend enriches raw IP metrics with K8s metadata (pod names, namespaces, services)\n# and calculates network costs based on corresponding cloud provider pricing\n# ============================================================\n#\n# - job_name: \"kubeadapt-ebpf-agent\"\n#   kubernetes_sd_configs:\n#     - role: pod\n#       namespaces:\n#         names:\n#           - kubeadapt\n#   relabel_configs:\n#     # Keep only eBPF agent pods\n#     - source_labels: [__meta_kubernetes_pod_label_app]\n#       action: keep\n#       regex: kubeadapt-ebpf-agent\n#     # Keep only the metrics port\n#     - source_labels: [__meta_kubernetes_pod_container_port_name]\n#       action: keep\n#       regex: metrics\n#     # Add node label from pod's node\n#     - source_labels: [__meta_kubernetes_pod_node_name]\n#       target_label: node\n#   metric_relabel_configs:\n#     # Filter: Keep network traffic AND internal observability metrics\n#     # Network traffic (2 metrics):\n#     #   - kubeadapt_connection_traffic_bytes_total\n#     #   - kubeadapt_connection_traffic_packets_total\n#     # Internal observability (10 metrics):\n#     #   - kubeadapt_bpf_load_status (BPF load success/failure)\n#     #   - kubeadapt_bpf_load_attempts_total (BPF load attempts)\n#     #   - kubeadapt_bpf_load_duration_seconds (BPF load time)\n#     #   - kubeadapt_active_connections (active connection count)\n#     #   - kubeadapt_connection_tracking_info (tracking metadata)\n#     #   - kubeadapt_bpf_map_utilization_percent (map usage %)\n#     #   - kubeadapt_overflow_flows_total (overflow events)\n#     #   - kubeadapt_ip_pairs_batch_size (batch size)\n#     #   - kubeadapt_ebpf_collection_duration_seconds (collection time histogram)\n#     #   - kubeadapt_collector_errors_total (error counter)\n#     - source_labels: [__name__]\n#       action: keep\n#       regex: ^(kubeadapt_connection_traffic_bytes_total|kubeadapt_connection_traffic_packets_total|kubeadapt_bpf_load_status|kubeadapt_bpf_load_attempts_total|kubeadapt_bpf_load_duration_seconds|kubeadapt_active_connections|kubeadapt_connection_tracking_info|kubeadapt_bpf_map_utilization_percent|kubeadapt_overflow_flows_total|kubeadapt_ip_pairs_batch_size|kubeadapt_ebpf_collection_duration_seconds|kubeadapt_collector_errors_total)$\n"` |  |
 | prometheus.kube-state-metrics | object | `{"enabled":true,"podAnnotations":{"prometheus.io/port":"8080","prometheus.io/scrape":"true"}}` | Kube State Metrics Configuration |
 | prometheus.prometheus-node-exporter | object | `{"enabled":true}` | Node Exporter Configuration: If you already have node-exporter running in your cluster (e.g., from kube-prometheus-stack), keep prometheus-node-exporter.enabled as false. Because we can read node exporter metrics from existing up and running prometheus node exporters. If you don't have any existing node-exporter, set prometheus-node-exporter.enabled to true. |
+| prometheus.server.affinity | object | `{}` |  |
 | prometheus.server.fullnameOverride | string | `"kubeadapt-prometheus-server"` |  |
+| prometheus.server.nodeSelector | object | `{}` |  |
 | prometheus.server.persistentVolume.enabled | bool | `false` |  |
-| prometheus.server.persistentVolume.size | string | `"20Gi"` |  |
+| prometheus.server.persistentVolume.size | string | `"30Gi"` |  |
 | prometheus.server.retention | string | `"30m"` |  |
 | prometheus.server.service.servicePort | int | `80` |  |
 | prometheus.server.service.type | string | `"ClusterIP"` |  |
+| prometheus.server.tolerations | list | `[]` |  |
+| prometheus.server.topologySpreadConstraints | list | `[]` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[0].job_name | string | `"prometheus"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[0].metric_relabel_configs[0].action | string | `"keep"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[0].metric_relabel_configs[0].regex | string | `"^(prometheus_.*|up|time)$"` |  |
@@ -182,7 +194,7 @@ helm delete my-release
 | prometheus.serverFiles."prometheus.yml".scrape_configs[1].kubernetes_sd_configs[0].namespaces.names[0] | string | `"kubeadapt"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[1].kubernetes_sd_configs[0].role | string | `"service"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[1].metric_relabel_configs[0].action | string | `"keep"` |  |
-| prometheus.serverFiles."prometheus.yml".scrape_configs[1].metric_relabel_configs[0].regex | string | `"^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity_cpu_cores|kube_node_status_capacity_memory_bytes|kube_node_status_allocatable|kube_node_labels|kube_node_status_condition|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_terminated_reason|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_status_replicas_ready|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_status_replicas_ready|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes|kube_pod_container_status_waiting_reason|kube_replicaset_status_ready_replicas|kube_replicaset_spec_replicas|kube_replicaset_created|kube_pod_container_state_started)$"` |  |
+| prometheus.serverFiles."prometheus.yml".scrape_configs[1].metric_relabel_configs[0].regex | string | `"^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity|kube_node_status_allocatable|kube_node_labels|kube_node_status_condition|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_terminated_reason|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_status_replicas_ready|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_status_replicas_ready|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes|kube_pod_container_status_waiting_reason|kube_replicaset_status_ready_replicas|kube_replicaset_spec_replicas|kube_replicaset_created|kube_pod_container_state_started)$"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[1].metric_relabel_configs[0].source_labels[0] | string | `"__name__"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[1].relabel_configs[0].action | string | `"keep"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[1].relabel_configs[0].regex | string | `"kube-state-metrics"` |  |

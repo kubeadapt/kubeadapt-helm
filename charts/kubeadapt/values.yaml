@@ -9,7 +9,7 @@ agent:
   image:
     # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
     repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
-    tag: "v1.0.0" # Defaults to .Chart.AppVersion
+    tag: "v1.2.0" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -23,11 +23,11 @@ agent:
     protocol: TCP
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 500m
+      cpu: 200m
       memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
 
   # ============================================================
   # Agent Configuration
@@ -159,6 +159,15 @@ agent:
   # - name: OTEL_EXPORTER_OTLP_ENDPOINT
   #   value: "http://otel-collector:4317"
 
+
+  tolerations: []
+
+  nodeSelector: {}
+
+  affinity: {}
+
+  topologySpreadConstraints: []
+
 # Dependencies configuration
 prometheus:
   enabled: true
@@ -167,13 +176,22 @@ prometheus:
       # Optional: Enable persistent storage for Prometheus (default: emptyDir)
       # With 30m retention, emptyDir is sufficient
       enabled: false
-      size: 20Gi
+      size: 30Gi
       # storageClass: gp2 # For AWS - adjust based on your infrastructure -> https://kubeadapt.io/docs/v1/getting-started/quick-start/#configuration-options
     service:
       type: ClusterIP
       servicePort: 80
     fullnameOverride: kubeadapt-prometheus-server
     retention: "30m"
+
+    tolerations: []
+
+    nodeSelector: {}
+
+    affinity: {}
+
+    topologySpreadConstraints: []
+
   alertmanager:
     enabled: false
   # -- Node Exporter Configuration:
@@ -219,7 +237,7 @@ prometheus:
           metric_relabel_configs:
             - source_labels: [__name__]
               action: keep
-              regex: ^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity_cpu_cores|kube_node_status_capacity_memory_bytes|kube_node_status_allocatable|kube_node_labels|kube_node_status_condition|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_terminated_reason|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_status_replicas_ready|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_status_replicas_ready|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes|kube_pod_container_status_waiting_reason|kube_replicaset_status_ready_replicas|kube_replicaset_spec_replicas|kube_replicaset_created|kube_pod_container_state_started)$
+              regex: ^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity|kube_node_status_allocatable|kube_node_labels|kube_node_status_condition|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_terminated_reason|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_status_replicas_ready|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_status_replicas_ready|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes|kube_pod_container_status_waiting_reason|kube_replicaset_status_ready_replicas|kube_replicaset_spec_replicas|kube_replicaset_created|kube_pod_container_state_started)$
 
         # Metrics from cAdvisor (Container and Network metrics)
         - job_name: "kubernetes-nodes-cadvisor"
@@ -881,6 +899,12 @@ opencost:
     carbonCost:
       # -- Enable carbon cost exposed in the API
       enabled: false
+
+
+    tolerations: []
+    nodeSelector: {}
+    affinity: {}
+    topologySpreadConstraints: []
 
 # NVIDIA GPU Operator configuration for cost optimization
 gpu-operator:
