@@ -16,7 +16,7 @@ dependencies:
     repository: "https://opencost.github.io/opencost-helm-chart"
     condition: opencost.enabled
   - name: gpu-operator
-    version: "v25.10.0"
+    version: "v25.10.1"
     repository: "https://helm.ngc.nvidia.com/nvidia"
     condition: gpu-operator.enabled
 
