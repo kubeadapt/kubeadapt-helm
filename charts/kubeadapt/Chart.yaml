@@ -12,7 +12,7 @@ dependencies:
     repository: "https://prometheus-community.github.io/helm-charts"
     condition: prometheus.enabled
   - name: opencost
-    version: "2.4.0"
+    version: "2.4.1"
     repository: "https://opencost.github.io/opencost-helm-chart"
     condition: opencost.enabled
   - name: gpu-operator
