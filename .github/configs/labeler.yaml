@@ -1,3 +1,7 @@
 kubeadapt:
   - changed-files:
       - any-glob-to-any-file: charts/kubeadapt/**
+
+ebpf-agent:
+  - changed-files:
+      - any-glob-to-any-file: charts/ebpf-agent/**

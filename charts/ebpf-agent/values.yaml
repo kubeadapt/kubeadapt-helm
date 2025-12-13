@@ -1,0 +1,111 @@
+# KubeAdapt eBPF Network Metrics Agent
+# High-performance eBPF-based network observation for Kubernetes
+
+# Enable/disable the agent
+enabled: true
+
+image:
+  repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-ebpf-agent
+  tag: "v0.1.1"
+  pullPolicy: Always
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# ============================================================
+# eBPF Agent Configuration
+# ============================================================
+config:
+  # Metrics server port for Prometheus scraping
+  # Exposes: /metrics, /health/live, /health/ready
+  metricsPort: 9090
+
+  # Collection interval for BPF map reads
+  collectionInterval: "25s"
+
+  # Log level for agent
+  # Options: "debug", "info", "warn", "error"
+  logLevel: "info"
+
+  # Log format
+  # Options: "json" (production), "console" (development)
+  logFormat: "json"
+
+  # Network namespace filter mode
+  # Options:
+  #   - "default": Track all K8s pods (including hostNetwork:true), filter host system processes
+  #   - "disabled": Track everything (useful for debugging)
+  netnsFilterMode: "default"
+
+  # Enable connection tracking (read-then-delete pattern with overflow ringbuffer)
+  connectionTracking: true
+
+  # ============================================================
+  # Debug Options (use with caution in production)
+  # ============================================================
+  # Enable pprof profiling endpoints
+  enableProfiling: false
+  profilingPort: 6060
+
+  # Dump BPF maps before deletion (synchronized with collection cycle)
+  # WARNING: High I/O, only enable for troubleshooting
+  dumpBPFMaps: false
+
+# Resource limits for eBPF agent
+# Note: eBPF agents are lightweight but require sufficient memory for BPF maps
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 384Mi
+
+# ============================================================
+# Scheduling Configuration
+# ============================================================
+# Default tolerations to run on all nodes including masters
+tolerations:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/control-plane
+  - key: node.kubernetes.io/unschedulable
+    operator: Exists
+    effect: NoSchedule
+  - key: node.kubernetes.io/not-ready
+    operator: Exists
+    effect: NoExecute
+    tolerationSeconds: 300
+  - key: node.kubernetes.io/unreachable
+    operator: Exists
+    effect: NoExecute
+    tolerationSeconds: 300
+  - key: node.kubernetes.io/disk-pressure
+    operator: Exists
+    effect: NoSchedule
+  - key: node.kubernetes.io/memory-pressure
+    operator: Exists
+    effect: NoSchedule
+  - key: node.kubernetes.io/pid-pressure
+    operator: Exists
+    effect: NoSchedule
+  # Karpenter disruption tolerance
+  - key: karpenter.sh/disrupted
+    operator: Exists
+    effect: NoSchedule
+  # Custom workload taints
+  - key: workload
+    operator: Exists
+    effect: NoSchedule
+
+nodeSelector: {}
+
+affinity: {}
+
+topologySpreadConstraints: []
+
+# Additional environment variables
+env: []
