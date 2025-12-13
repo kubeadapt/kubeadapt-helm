@@ -1,0 +1,134 @@
+# {{ .Name }}
+
+{{ template "chart.versionBadge" . }} {{ template "chart.typeBadge" . }} {{ template "chart.appVersionBadge" . }}
+
+{{ template "chart.description" . }}
+
+## Overview
+
+The eBPF agent runs as a DaemonSet on each Kubernetes node, capturing network packets at the Traffic Control (TC) layer to track pod-to-pod traffic. It exports raw IP-based connection metrics to Prometheus.
+
+### Key Features
+
+- **Pod-Level Traffic Tracking**: Monitors network traffic between pods using TC eBPF hooks
+- **Protocol Support**: TCP and UDP traffic with separate tracking
+- **IPv4 and IPv6 Support**: Full dual-stack support on kernel 5.10+
+- **Egress-Only Tracking**: Same-node and cross-node across pods
+- **Multi-Interface Deduplication**: Prevents counting same packet across interface paths
+- **Overflow Protection**: Ringbuffer captures flows when map reaches capacity
+
+## Prerequisites
+
+- **Kubernetes**: 1.24+
+- **Linux Kernel**: 5.10+ (full IPv4+IPv6 dual-stack support)
+- **Helm**: 3.0.0+
+
+## Get Repo Info
+
+```console
+helm repo add kubeadapt https://kubeadapt.github.io/kubeadapt-helm
+helm repo update
+```
+
+Or use OCI registry:
+
+```console
+helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/{{ .Name }} --version {{ .Version }}
+```
+
+## Installing the Chart
+
+To install the chart with the release name `kubeadapt-ebpf-agent`:
+
+```console
+helm install kubeadapt-ebpf-agent kubeadapt/{{ .Name }} -n kubeadapt --create-namespace
+```
+
+Or via OCI:
+
+```console
+helm install kubeadapt-ebpf-agent oci://ghcr.io/kubeadapt/kubeadapt-helm/{{ .Name }} -n kubeadapt --create-namespace
+```
+
+> **Note:** Using `kubeadapt-ebpf-agent` as release name ensures the service name matches Prometheus scrape configurations.
+
+## Uninstalling the Chart
+
+To uninstall/delete the deployment:
+
+```console
+helm delete kubeadapt-ebpf-agent -n kubeadapt
+```
+
+## Security Requirements
+
+The eBPF agent requires privileged access:
+
+```yaml
+securityContext:
+  privileged: true
+  capabilities:
+    add:
+      - SYS_ADMIN    # Load/attach eBPF programs
+      - SYS_RESOURCE # Lock memory for BPF maps
+      - NET_ADMIN    # Network namespace operations
+```
+
+Additionally requires:
+- `hostNetwork: true` - Access host network namespace
+- `hostPID: true` - Track processes for connection attribution
+
+## Exported Metrics
+
+### Pod-Level Traffic Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `kubeadapt_connection_traffic_bytes_total` | Counter | Cumulative egress bytes (use `rate()` for throughput) |
+| `kubeadapt_connection_traffic_packets_total` | Counter | Cumulative egress packets |
+| `kubeadapt_active_connections` | Gauge | Current active connections |
+
+### Internal Monitoring Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `kubeadapt_bpf_load_status` | Gauge | BPF program load status (1=loaded, 0=failed) |
+| `kubeadapt_bpf_load_attempts_total` | Counter | Total BPF load attempts |
+| `kubeadapt_bpf_load_duration_seconds` | Gauge | BPF program load duration |
+| `kubeadapt_bpf_map_utilization_percent` | Gauge | BPF map utilization (0-100%) |
+| `kubeadapt_overflow_flows_total` | Counter | Flows sent to overflow ringbuffer |
+| `kubeadapt_ip_pairs_batch_size` | Gauge | Number of IP pairs in current batch |
+| `kubeadapt_ebpf_collection_duration_seconds` | Histogram | Map collection cycle duration |
+| `kubeadapt_collector_errors_total` | Counter | Collection errors by type |
+| `kubeadapt_connection_tracking_info` | Gauge | Connection tracking configuration info |
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}
+
+## Troubleshooting
+
+### Agent Won't Start
+
+```bash
+# Check kernel version (needs 5.10+)
+uname -r
+
+# Verify BPF filesystem mounted
+ls /sys/fs/bpf
+```
+
+### No Metrics Appearing
+
+On the **worker node** (via SSH):
+```bash
+sudo bpftool prog list | grep tc_
+sudo bpftool map list | grep connection_flows
+```
+
+Via **kubectl**:
+```bash
+kubectl logs -n kubeadapt -l app.kubernetes.io/name=ebpf-agent --tail=50
+kubectl port-forward -n kubeadapt daemonset/kubeadapt-ebpf-agent 9090:9090
+curl http://localhost:9090/metrics | grep kubeadapt
+```

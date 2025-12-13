@@ -15,5 +15,6 @@ validate-maintainers: true
 validate-yaml: true
 exclude-deprecated: true
 excluded-charts: []
+# Note: ebpf-agent now supported with eBPF-enabled Kind config (see kind-config.yaml)
 
 skip-clean-up: false # Add this line to prevent cleanup after installation so we can verify installation

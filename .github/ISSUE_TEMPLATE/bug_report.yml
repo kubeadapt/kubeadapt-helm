@@ -25,6 +25,7 @@ body:
       multiple: true
       options:
         - Kubeadapt Agent (templates/agent)
+        - eBPF Agent (ebpf-agent chart)
         - Prometheus (dependency chart)
         - OpenCost (dependency chart)
         - Chart Configuration

@@ -34,6 +34,7 @@ jobs:
           # Configure which scopes are allowed (which part of the system is affected)
           scopes: |
             agent
+            ebpf-agent
             prometheus
             opencost
             chart
