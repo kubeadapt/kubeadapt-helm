@@ -69,6 +69,86 @@ entries:
   - annotations:
       artifacthub.io/changes: |
         - kind: changed
+          description: Update opencost to 2.4.1
+      artifacthub.io/compatibility: |
+        kubernetes:
+          platforms:
+            eks:
+              versions: ["1.24-1.34"]
+              tested: true
+              requirements: ["IRSA or Static Credentials for OpenCost"]
+            aks:
+              versions: ["1.24-1.34"]
+              tested: true
+              requirements: ["Managed Identity or Static Credentials for OpenCost"]
+            gke:
+              versions: ["1.24-1.34"]
+              tested: true
+              requirements: ["Workload Identity or Service Account Key for OpenCost"]
+            on-premise:
+              versions: ["1.24-1.34"]
+              tested: true
+              requirements: ["Custom Pricing Configuration for OpenCost"]
+      artifacthub.io/containsSecurityUpdates: "false"
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: Documentation
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/README.md
+        - name: Compatibility Matrix
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/COMPATIBILITY.md
+        - name: Security Policy
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/SECURITY.md
+      artifacthub.io/platforms: |
+        - eks
+        - aks
+        - gke
+        - on-premise
+      artifacthub.io/prerelease: "true"
+      artifacthub.io/recommendations: |
+        - url: https://artifacthub.io/packages/helm/prometheus-community/prometheus
+        - url: https://artifacthub.io/packages/helm/opencost/opencost
+        - url: https://artifacthub.io/packages/helm/gpu-operator/gpu-operator
+      artifacthub.io/signKey: |
+        fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
+        url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
+    apiVersion: v2
+    appVersion: 0.1.0
+    created: "2025-12-14T18:42:25.98111707Z"
+    dependencies:
+    - condition: prometheus.enabled
+      name: prometheus
+      repository: https://prometheus-community.github.io/helm-charts
+      version: 27.46.0
+    - condition: opencost.enabled
+      name: opencost
+      repository: https://opencost.github.io/opencost-helm-chart
+      version: 2.4.1
+    - condition: gpu-operator.enabled
+      name: gpu-operator
+      repository: https://helm.ngc.nvidia.com/nvidia
+      version: v25.10.1
+    description: A Helm chart for Kubeadapt
+    digest: 44c18c2a80df7bacb1585b51f2296eb99bbe66e6669d9bf4a7502d650932dfb0
+    keywords:
+    - kubernetes
+    - resource optimization
+    - cost optimization
+    - monitoring
+    - cloud native
+    - multi-cloud
+    maintainers:
+    - email: ugurcan@kubeadapt.io
+      name: ugurcancaykara
+    - email: authors@kubeadapt.io
+      name: Kubeadapt
+    name: kubeadapt
+    type: application
+    urls:
+    - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-0.12.3/kubeadapt-0.12.3.tgz
+    version: 0.12.3
+  - annotations:
+      artifacthub.io/changes: |
+        - kind: changed
           description: Update gpu-operator to v25.10.1
       artifacthub.io/compatibility: |
         kubernetes:
@@ -1607,4 +1687,4 @@ entries:
     urls:
     - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-0.1.0/kubeadapt-0.1.0.tgz
     version: 0.1.0
-generated: "2025-12-14T12:44:19.469540786Z"
+generated: "2025-12-14T18:42:25.981270131Z"
