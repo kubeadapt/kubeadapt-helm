@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 0.12.1](https://img.shields.io/badge/Version-0.12.1-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.12.2](https://img.shields.io/badge/Version-0.12.2-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -36,7 +36,7 @@ helm delete my-release
 
 | Repository | Name | Version |
 |------------|------|---------|
-| https://helm.ngc.nvidia.com/nvidia | gpu-operator | v25.10.0 |
+| https://helm.ngc.nvidia.com/nvidia | gpu-operator | v25.10.1 |
 | https://opencost.github.io/opencost-helm-chart | opencost | 2.4.0 |
 | https://prometheus-community.github.io/helm-charts | prometheus | 27.46.0 |
 
