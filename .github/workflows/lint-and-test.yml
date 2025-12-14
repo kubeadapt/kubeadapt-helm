@@ -104,6 +104,19 @@ jobs:
             echo -e '\033[0;32mDocumentation up to date\033[0m ✔'
           fi
 
+      # Ensure BPF filesystem is mounted (required for eBPF agent)
+      - name: Setup BPF filesystem
+        if: steps.list-changed.outputs.changed == 'true' && contains(steps.list-changed.outputs.changed_charts, 'ebpf-agent')
+        run: |
+          # Check if bpf filesystem is mounted
+          if ! mount | grep -q "type bpf"; then
+            echo "Mounting BPF filesystem..."
+            sudo mount -t bpf bpf /sys/fs/bpf || true
+          fi
+          echo "BPF filesystem status:"
+          mount | grep bpf || echo "BPF not mounted (may be built-in)"
+          ls -la /sys/fs/bpf/ || echo "/sys/fs/bpf not accessible"
+
       # Only create cluster if all previous steps pass
       - name: Create kind cluster
         uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0

@@ -16,6 +16,7 @@ body:
       multiple: true
       options:
         - Kubeadapt Agent Deployment
+        - eBPF Agent
         - Prometheus Integration
         - OpenCost Integration
         - Chart Configuration
