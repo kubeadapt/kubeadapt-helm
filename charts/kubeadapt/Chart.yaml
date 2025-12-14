@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 0.12.1
+version: 0.12.2
 appVersion: "0.1.0"
 
 # Dependencies
@@ -16,7 +16,7 @@ dependencies:
     repository: "https://opencost.github.io/opencost-helm-chart"
     condition: opencost.enabled
   - name: gpu-operator
-    version: "v25.10.0"
+    version: "v25.10.1"
     repository: "https://helm.ngc.nvidia.com/nvidia"
     condition: gpu-operator.enabled
 
@@ -41,7 +41,7 @@ annotations:
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
     - kind: changed
-      description: Update prometheus to 27.46.0
+      description: Update gpu-operator to v25.10.1
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0
