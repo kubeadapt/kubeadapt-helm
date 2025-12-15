@@ -1,6 +1,6 @@
 # ebpf-agent
 
-![Version: 0.1.1](https://img.shields.io/badge/Version-0.1.1-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.1](https://img.shields.io/badge/AppVersion-0.1.1-informational?style=flat-square)
+![Version: 0.2.0](https://img.shields.io/badge/Version-0.2.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.2.0](https://img.shields.io/badge/AppVersion-0.2.0-informational?style=flat-square)
 
 High-performance eBPF-based network metrics agent for Kubernetes
 
@@ -33,7 +33,7 @@ helm repo update
 Or use OCI registry:
 
 ```console
-helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/ebpf-agent --version 0.1.1
+helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/ebpf-agent --version 0.2.0
 ```
 
 ## Installing the Chart
@@ -114,13 +114,12 @@ Additionally requires:
 | config.logFormat | string | `"json"` |  |
 | config.logLevel | string | `"info"` |  |
 | config.metricsPort | int | `9090` |  |
-| config.netnsFilterMode | string | `"default"` |  |
 | config.profilingPort | int | `6060` |  |
 | enabled | bool | `true` |  |
 | env | list | `[]` |  |
 | image.pullPolicy | string | `"Always"` |  |
 | image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-ebpf-agent"` |  |
-| image.tag | string | `"v0.1.1"` |  |
+| image.tag | string | `"v0.2.0"` |  |
 | nodeSelector | object | `{}` |  |
 | resources.limits.cpu | string | `"500m"` |  |
 | resources.limits.memory | string | `"384Mi"` |  |
@@ -129,36 +128,7 @@ Additionally requires:
 | serviceAccount.annotations | object | `{}` |  |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
-| tolerations[0].effect | string | `"NoSchedule"` |  |
-| tolerations[0].key | string | `"node-role.kubernetes.io/master"` |  |
-| tolerations[1].effect | string | `"NoSchedule"` |  |
-| tolerations[1].key | string | `"node-role.kubernetes.io/control-plane"` |  |
-| tolerations[2].effect | string | `"NoSchedule"` |  |
-| tolerations[2].key | string | `"node.kubernetes.io/unschedulable"` |  |
-| tolerations[2].operator | string | `"Exists"` |  |
-| tolerations[3].effect | string | `"NoExecute"` |  |
-| tolerations[3].key | string | `"node.kubernetes.io/not-ready"` |  |
-| tolerations[3].operator | string | `"Exists"` |  |
-| tolerations[3].tolerationSeconds | int | `300` |  |
-| tolerations[4].effect | string | `"NoExecute"` |  |
-| tolerations[4].key | string | `"node.kubernetes.io/unreachable"` |  |
-| tolerations[4].operator | string | `"Exists"` |  |
-| tolerations[4].tolerationSeconds | int | `300` |  |
-| tolerations[5].effect | string | `"NoSchedule"` |  |
-| tolerations[5].key | string | `"node.kubernetes.io/disk-pressure"` |  |
-| tolerations[5].operator | string | `"Exists"` |  |
-| tolerations[6].effect | string | `"NoSchedule"` |  |
-| tolerations[6].key | string | `"node.kubernetes.io/memory-pressure"` |  |
-| tolerations[6].operator | string | `"Exists"` |  |
-| tolerations[7].effect | string | `"NoSchedule"` |  |
-| tolerations[7].key | string | `"node.kubernetes.io/pid-pressure"` |  |
-| tolerations[7].operator | string | `"Exists"` |  |
-| tolerations[8].effect | string | `"NoSchedule"` |  |
-| tolerations[8].key | string | `"karpenter.sh/disrupted"` |  |
-| tolerations[8].operator | string | `"Exists"` |  |
-| tolerations[9].effect | string | `"NoSchedule"` |  |
-| tolerations[9].key | string | `"workload"` |  |
-| tolerations[9].operator | string | `"Exists"` |  |
+| tolerations | list | `[]` |  |
 | topologySpreadConstraints | list | `[]` |  |
 
 ## Troubleshooting

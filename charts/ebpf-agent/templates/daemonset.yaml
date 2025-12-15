@@ -70,8 +70,6 @@ spec:
               value: {{ .Values.config.metricsPort | quote }}
             - name: EBPF_COLLECTION_INTERVAL
               value: {{ .Values.config.collectionInterval | quote }}
-            - name: EBPF_NETNS_FILTER_MODE
-              value: {{ .Values.config.netnsFilterMode | quote }}
             - name: EBPF_CONNECTION_TRACKING
               value: {{ .Values.config.connectionTracking | quote }}
 
