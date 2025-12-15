@@ -2,8 +2,8 @@ apiVersion: v2
 name: ebpf-agent
 description: High-performance eBPF-based network metrics agent for Kubernetes
 type: application
-version: 0.1.1
-appVersion: "0.1.1"
+version: 0.2.0
+appVersion: "0.2.0"
 
 home: https://github.com/kubeadapt/ebpf-agent
 sources:
@@ -33,8 +33,8 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
-    - kind: added
-      description: Initial standalone chart release
+    - kind: removed
+      description: NETNS filter removed due to re-designed targeted architecture
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/license: Apache-2.0
@@ -62,4 +62,4 @@ annotations:
       url: https://github.com/kubeadapt/ebpf-agent
   artifacthub.io/images: |
     - name: ebpf-agent
-      image: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-ebpf-agent:v0.1.1
+      image: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-ebpf-agent:v0.2.0

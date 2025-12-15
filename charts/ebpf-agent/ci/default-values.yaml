@@ -25,9 +25,6 @@ config:
   logLevel: "debug"
   logFormat: "json"
 
-  # Default filter mode
-  netnsFilterMode: "default"
-
   # Enable connection tracking
   connectionTracking: true
 
