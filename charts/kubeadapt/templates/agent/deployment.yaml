@@ -42,8 +42,8 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
 
-            # Agent Version (injected from Helm chart)
-            - name: KUBEADAPT_AGENT_VERSION
+            # Chart Version (injected from Helm chart)
+            - name: KUBEADAPT_CHART_VERSION
               value: {{ .Chart.Version | quote }}
 
             # Backend API Configuration

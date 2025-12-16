@@ -9,7 +9,7 @@ agent:
   image:
     # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
     repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
-    tag: "v1.2.1" # Defaults to .Chart.AppVersion
+    tag: "v1.2.2" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -21,11 +21,11 @@ agent:
     type: ClusterIP
   resources:
     requests:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 500m
+      memory: 512Mi
     limits:
-      cpu: 1000m
-      memory: 1024Mi
+      cpu: 3000m
+      memory: 4096Mi
 
   # ============================================================
   # Agent Configuration
@@ -37,9 +37,7 @@ agent:
     # This token is automatically generated when you create an agent in the Kubeadapt platform
     token: ""
 
-    # Backend API endpoint for HTTP POST requests (metrics ingestion)
-    # This is the primary endpoint where agent sends collected metrics data
-    # Example: "https://api.kubeadapt.io/api/v1/metrics/ingest"
+    # Don't change
     backendApiEndpoint: "https://api.kubeadapt.io"
 
     # ============================================================
@@ -51,23 +49,20 @@ agent:
     prometheusUrl: "http://kubeadapt-prometheus-server.kubeadapt.svc:80"
 
     # Prometheus query timeout
-    # Maximum time to wait for Prometheus query responses
-    # Format: duration string (e.g., "30s", "1m", "90s")
+    # Don't change unless you have a specific reason because this aligns with context timeout value in the agent code
     prometheusTimeout: "30s"
 
     # Query concurrency limit
     # Maximum number of parallel Prometheus queries agent can execute
     # Higher values = faster collection but more memory/CPU usage
     # Range: 1-100
-    queryConcurrency: 10
+    queryConcurrency: 30
 
     # ============================================================
     # Collection Settings
     # ============================================================
     # How often agent collects and sends metrics to backend
-    # Format: duration string (e.g., "60s", "1m", "2m")
-    # Minimum: 10s (enforced by agent)
-    # Recommended: 60s for production, 30s for development
+    # Don't change, 1m data points are recommended
     collectionInterval: "60s"
 
     # ============================================================
@@ -131,9 +126,12 @@ agent:
     # ============================================================
     # Runtime Performance Tuning
     # ============================================================
-    goMaxProcs: 2
+    # - goMaxProcs: 6
+    # - goMemLimit: 3600MiB (~90% of 4096Mi limit, leaves room for OS overhead)
+    # - queryConcurrency: 30
+    goMaxProcs: 6
 
-    goMemLimit: "968MiB"
+    goMemLimit: "3600MiB"
 
   # ============================================================
   # Additional Environment Variables
@@ -165,6 +163,13 @@ prometheus:
       servicePort: 80
     fullnameOverride: kubeadapt-prometheus-server
     retention: "30m"
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 4Gi
+      limits:
+        cpu: 8000m
+        memory: 24Gi
 
     tolerations: []
 
@@ -179,19 +184,33 @@ prometheus:
   # -- Node Exporter Configuration:
   # If you already have node-exporter running in your cluster (e.g., from kube-prometheus-stack),
   # keep prometheus-node-exporter.enabled as false. Because we can read node exporter metrics from existing up and running prometheus node exporters.
-  # If you don't have any existing node-exporter, set prometheus-node-exporter.enabled to true.
+  # If you don't have any existing node-exporter, keep it as is prometheus-node-exporter.enabled=true.
   prometheus-node-exporter:
     enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 30Mi
+      limits:
+        cpu: 200m
+        memory: 100Mi
   # -- Kube State Metrics Configuration
   kube-state-metrics:
     enabled: true
     podAnnotations:
       prometheus.io/scrape: "true"
       prometheus.io/port: "8080"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
   serverFiles:
     prometheus.yml:
       scrape_configs:
-        # Prometheus's own metrics
+        # Prometheus's own metrics, don't change scrape_configs, if you have additional scrapes add them under extraScrapeConfigs
         - job_name: prometheus
           static_configs:
             - targets:
@@ -223,7 +242,7 @@ prometheus:
 
         # Metrics from cAdvisor (Container and Network metrics)
         - job_name: "kubernetes-nodes-cadvisor"
-          scrape_interval: 15s # Required for rate([1m]) queries to work (needs 4+ data points)
+          scrape_interval: 15s
           scheme: https
           tls_config:
             ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
@@ -312,22 +331,37 @@ prometheus:
   # Adds additional scrape configs to prometheus.yml
   # Must be a string so you have to add a | after extraScrapeConfigs:
   # Note: Optional configs (DCGM, eBPF) are added dynamically via frontend when enabled
-  extraScrapeConfigs: ""
+  extraScrapeConfigs: |
+    # ============================================================
+    # eBPF Network Cost Tracking
+    # ============================================================
+    # Pod-to-pod network traffic monitoring via eBPF TC hooks
+    # - job_name: "kubeadapt-ebpf-agent"
+    #   scrape_interval: 30s
+    #   kubernetes_sd_configs:
+    #     - role: endpoints
+    #   relabel_configs:
+    #     # Keep only KubeAdapt eBPF agent endpoints (via service name)
+    #     - source_labels: [__meta_kubernetes_service_name]
+    #       action: keep
+    #       regex: kubeadapt-ebpf-agent
+    #     # Keep only the metrics port
+    #     - source_labels: [__meta_kubernetes_endpoint_port_name]
+    #       action: keep
+    #       regex: metrics
+    #     # Add node label from endpoint's target node
+    #     - source_labels: [__meta_kubernetes_endpoint_node_name]
+    #       target_label: node
+    #   metric_relabel_configs:
+    #     # Filter: Keep network traffic AND internal observability metrics
+    #     - source_labels: [__name__]
+    #       action: keep
+    #       regex: ^(kubeadapt_connection_traffic_bytes_total|kubeadapt_connection_traffic_packets_total|kubeadapt_bpf_load_status|kubeadapt_bpf_load_attempts_total|kubeadapt_bpf_load_duration_seconds|kubeadapt_active_connections|kubeadapt_connection_tracking_info|kubeadapt_bpf_map_utilization_percent|kubeadapt_overflow_flows_total|kubeadapt_ip_pairs_batch_size|kubeadapt_ebpf_collection_duration_seconds|kubeadapt_collector_errors_total)$
+
     # ============================================================
     # DCGM Exporter for GPU Metrics (Optional - Requires GPU Operator)
     # ============================================================
-    # This config is added dynamically when gpuEnabled=true
-    # Auto-discovery via label selectors - no namespace restriction needed
-    #
-    # IMPORTANT: This requires NVIDIA GPU Operator to be deployed.
-    # Without GPU operator, this scrape job will show "no endpoints found".
-    #
-    # ⚠️  MIG MODE LIMITATION:
-    # DCGM Exporter in Kubernetes mode does NOT support container-level
-    # GPU utilization mapping when MIG (Multi-Instance GPU) is enabled.
-    # For MIG environments, we have eBPF-based agent that works as daemonset
-    # and expose the gpu utilization metrics per MIG profile
-    # ============================================================
+    # Uncomment this section if you have NVIDIA GPU Operator deployed
     #
     # - job_name: "dcgm-exporter"
     #   kubernetes_sd_configs:
@@ -344,71 +378,11 @@ prometheus:
     #       action: keep
     #       regex: ^(DCGM_FI_DEV_GPU_UTIL|DCGM_FI_DEV_FB_USED)$
 
-    # ============================================================
-    # eBPF Network Cost Tracking (Optional - Requires eBPF Agent)
-    # ============================================================
-    # Uncomment this section to enable pod-to-pod network traffic monitoring
-    #
-    # REQUIREMENTS:
-    # - Linux kernel >= 5.8 (required for TC eBPF support)
-    # - eBPF agent deployed as DaemonSet (see ebpf-agent chart)
-    #
-    # WHAT IT TRACKS:
-    # - Pod-to-pod network traffic (bytes and packets)
-    # - Protocol-level metrics (TCP/UDP)
-    #
-    # METRICS EXPOSED:
-    # - kubeadapt_connection_traffic_bytes_total: Cumulative bytes between pod IPs
-    # - kubeadapt_connection_traffic_packets_total: Cumulative packets between pod IPs
-    # - Labels: src_ip, dst_ip, protocol, daemonset_pod_uid, daemonset_node_name
-    #
-    # Backend enriches raw IP metrics with K8s metadata (pod names, namespaces, services)
-    # and calculates network costs based on corresponding cloud provider pricing
-    # ============================================================
-    #
-    # - job_name: "kubeadapt-ebpf-agent"
-    #   kubernetes_sd_configs:
-    #     - role: pod
-    #       namespaces:
-    #         names:
-    #           - kubeadapt
-    #   relabel_configs:
-    #     # Keep only eBPF agent pods
-    #     - source_labels: [__meta_kubernetes_pod_label_app]
-    #       action: keep
-    #       regex: kubeadapt-ebpf-agent
-    #     # Keep only the metrics port
-    #     - source_labels: [__meta_kubernetes_pod_container_port_name]
-    #       action: keep
-    #       regex: metrics
-    #     # Add node label from pod's node
-    #     - source_labels: [__meta_kubernetes_pod_node_name]
-    #       target_label: node
-    #   metric_relabel_configs:
-    #     # Filter: Keep network traffic AND internal observability metrics
-    #     # Network traffic (2 metrics):
-    #     #   - kubeadapt_connection_traffic_bytes_total
-    #     #   - kubeadapt_connection_traffic_packets_total
-    #     # Internal observability (10 metrics):
-    #     #   - kubeadapt_bpf_load_status (BPF load success/failure)
-    #     #   - kubeadapt_bpf_load_attempts_total (BPF load attempts)
-    #     #   - kubeadapt_bpf_load_duration_seconds (BPF load time)
-    #     #   - kubeadapt_active_connections (active connection count)
-    #     #   - kubeadapt_connection_tracking_info (tracking metadata)
-    #     #   - kubeadapt_bpf_map_utilization_percent (map usage %)
-    #     #   - kubeadapt_overflow_flows_total (overflow events)
-    #     #   - kubeadapt_ip_pairs_batch_size (batch size)
-    #     #   - kubeadapt_ebpf_collection_duration_seconds (collection time histogram)
-    #     #   - kubeadapt_collector_errors_total (error counter)
-    #     - source_labels: [__name__]
-    #       action: keep
-    #       regex: ^(kubeadapt_connection_traffic_bytes_total|kubeadapt_connection_traffic_packets_total|kubeadapt_bpf_load_status|kubeadapt_bpf_load_attempts_total|kubeadapt_bpf_load_duration_seconds|kubeadapt_active_connections|kubeadapt_connection_tracking_info|kubeadapt_bpf_map_utilization_percent|kubeadapt_overflow_flows_total|kubeadapt_ip_pairs_batch_size|kubeadapt_ebpf_collection_duration_seconds|kubeadapt_collector_errors_total)$
-
 opencost:
   # ============================================================
   # OpenCost Chart Configuration
   # ============================================================
-  # The following values map to the upstream OpenCost Helm chart
+  # The following example values map to the upstream OpenCost Helm chart
   # Chart: https://github.com/opencost/opencost-helm-chart
 
   # ============================================================
@@ -443,10 +417,6 @@ opencost:
   # - authorizer.authorizerType: "AWSAccessKey" (with id/secret) or "AWSServiceAccountKey" (for IRSA)
   # - authorizer.id: AWS Access Key ID (only for AWSAccessKey type)
   # - authorizer.secret: AWS Secret Access Key (only for AWSAccessKey type)
-  # - spotDataBucket: S3 bucket with Spot Instance Data Feed (optional, for accurate spot pricing)
-  # - spotDataRegion: Region where Spot Data Feed is configured
-  # - spotDataPrefix: Prefix for Spot Data Feed files in S3 (optional)
-  # - projectID: AWS Account ID where this cluster is running
   #
   # Example (Single Account with Access Keys):
   # {
@@ -464,11 +434,7 @@ opencost:
   #         "id": "<ACCESS_KEY_ID>",
   #         "secret": "<ACCESS_KEY_SECRET>"
   #       }
-  #     }],
-  #     "spotDataBucket": "my-spot-data-bucket",
-  #     "spotDataRegion": "us-east-1",
-  #     "spotDataPrefix": "spot-data",
-  #     "projectID": "123456789012"
+  #     }]
   #   }
   # }
   #
@@ -484,8 +450,7 @@ opencost:
   #       "workgroup": "Primary",
   #       "account": "123456789012",
   #       "authorizer": {"authorizerType": "AWSServiceAccountKey"}
-  #     }],
-  #     "projectID": "123456789012"
+  #     }]
   #   }
   # }
   #
@@ -502,8 +467,7 @@ opencost:
   #       "account": "111111111111",
   #       "masterPayerARN": "arn:aws:iam::111111111111:role/KubeadaptRole",
   #       "authorizer": {"authorizerType": "AWSServiceAccountKey"}
-  #     }],
-  #     "projectID": "222222222222"
+  #     }]
   #   }
   # }
   #
@@ -664,8 +628,8 @@ opencost:
   #   }
   # }
   #
-  cloudIntegrationSecret: ""
-  # Example: "cloud-integration"
+  # NOTE: cloudIntegrationSecret is configured under opencost.opencost section below
+  #
 
   # ============================================================
   # Additional Volumes (Azure Rate Card API Only)
@@ -724,6 +688,22 @@ opencost:
     enabled: true
 
   opencost:
+    # ============================================================
+    # Cloud Integration Secret (Cloud Cost Data)
+    # ============================================================
+    # Secret name containing cloud-integration.json for CLOUD COST data:
+    # - AWS Athena/CUR (cloud costs)
+    # - GCP BigQuery (cloud costs)
+    # - Azure Cost Export (cloud costs)
+    #
+    # NOTE: AWS Spot Instance Data Feed is configured in customPricing.costModel section below,
+    #       NOT in cloud-integration.json!
+    #
+    # Create with: kubectl create secret generic cloud-integration --from-file=cloud-integration.json -n kubeadapt
+    # See cloud-integration.json format examples in the comments above (under opencost: section) or you can find details at kubeadapt docs
+    cloudIntegrationSecret: ""
+    # Example: "cloud-integration"
+
     annotations:
       prometheus.io/scrape: "true"
       prometheus.io/port: "9003"
@@ -801,42 +781,66 @@ opencost:
       #     readOnly: true
 
       resources:
-        # These are the default values for the opencost exporter at 2.4.0
         requests:
-          cpu: "10m"
-          memory: "55Mi"
+          cpu: 200m
+          memory: 512Mi
         limits:
-          cpu: "999m"
-          memory: "1Gi"
+          cpu: 2000m
+          memory: 4Gi
 
     # ============================================================
-    # Custom Pricing Configuration (On-Premises / Bare Metal)
+    # Custom Pricing & AWS Spot Data Feed Configuration
     # ============================================================
-    # Enable custom pricing for on-premises, bare metal, or self-managed Kubernetes clusters.
-    # This allows you to configure datacenter-specific resource costs.
+    # This section serves TWO purposes:
     #
-    # Calculation example:
-    # - Server cost: $3,000 (24 cores, 128GB RAM)
-    # - Lifespan: 36 months
-    # - Hours per month: 720
-    # - CPU cost = $3,000 / 36 / 720 / 24 = $0.00579 per core-hour
-    # - RAM cost = $3,000 / 36 / 720 / 128 = $0.00108 per GB-hour
+    # 1. ON-PREMISES / BARE METAL: Configure custom resource costs for
+    #    self-managed Kubernetes clusters without cloud provider pricing APIs.
     #
+    # 2. AWS SPOT DATA FEED: Configure S3 bucket details for accurate spot
+    #    instance pricing. The CPU/RAM/GPU costs below are only FALLBACK values
+    #    when AWS Pricing API data is unavailable - OpenCost still uses dynamic
+    #    per-instance-type pricing from AWS for on-demand instances.
+    #
+
     # See: https://kubeadapt.io/docs/v1/how-to-guides/integrations/on-premises
     customPricing:
       enabled: false
+      # ============================================================
+      # Provider Setting (CRITICAL for AWS Spot Data Feed!)
+      # ============================================================
+      # Sets the config filename: "custom" → default.json, "aws" → aws.json
+      # OpenCost's AWS provider looks for aws.json, so this MUST be "aws"
+      # when using AWS Spot Data Feed! Similarly, use "gcp" or "azure" for those clouds.
+      #
+      # Options:
+      # - "custom" (default): Creates default.json - for on-premises or custom pricing
+      # - "aws": Creates aws.json - REQUIRED for AWS Spot Data Feed to work
+      # - "gcp": Creates gcp.json
+      # - "azure": Creates azure.json
+      provider: custom
       costModel:
+        awsSpotDataBucket: ""
+        awsSpotDataRegion: ""
+        awsSpotDataPrefix: ""
+        projectID: ""
         # Description of the pricing model
         description: "Default prices based on GCP us-central1"
-        # CPU cost per core-hour (USD)
+        # ============================================================
+        # Fallback Pricing (used when cloud API pricing unavailable)
+        # ============================================================
+        # For cloud environments (AWS/GCP/Azure): These are FALLBACK values only.
+        # OpenCost fetches actual per-instance-type pricing from cloud APIs.
+        # For on-premises: These are the primary pricing values.
+        #
+        # CPU cost per core-hour (USD) - fallback for cloud, primary for on-prem
         CPU: "0.031611"
-        # Spot/Preemptible CPU cost per core-hour (USD)
+        # Spot/Preemptible CPU cost per core-hour (USD) - fallback only
         spotCPU: "0.006655"
-        # RAM cost per GB-hour (USD)
+        # RAM cost per GB-hour (USD) - fallback for cloud, primary for on-prem
         RAM: "0.004237"
-        # Spot/Preemptible RAM cost per GB-hour (USD)
+        # Spot/Preemptible RAM cost per GB-hour (USD) - fallback only
         spotRAM: "0.000892"
-        # GPU cost per GPU-hour (USD)
+        # GPU cost per GPU-hour (USD) - fallback for cloud, primary for on-prem
         GPU: "0.95"
         # Storage cost per GB-hour (USD)
         storage: "0.00005479452"
@@ -856,9 +860,12 @@ opencost:
     # Requires valid cloudIntegrationSecret to be configured above.
     #
     # When enabled, OpenCost will:
-    # - AWS: Query Athena for CUR data, read Spot Data Feed, fetch RI/Savings Plans from Cost Explorer API
-    # - GCP: Query BigQuery for billing export, fetch preemptible pricing, track CUD utilization
-    # - Azure: Read cost export from storage account, fetch spot VM pricing, track RI utilization
+    # - AWS: Query Athena for CUR data, fetch RI/Savings Plans from Cost Explorer API
+    # - GCP: Query BigQuery for billing export, track CUD utilization
+    # - Azure: Read cost export from storage account, track RI utilization
+    #
+    # NOTE: Spot/Preemptible pricing is configured separately via customPricing section above,
+    #       NOT via cloudCost/cloud-integration.json
     cloudCost:
       enabled: false
       # How often to refresh cloud cost data (hours)
@@ -878,6 +885,39 @@ opencost:
     nodeSelector: {}
     affinity: {}
     topologySpreadConstraints: []
+
+# ============================================================
+# eBPF Agent Configuration (Network Cost Tracking)
+# ============================================================
+# Deploys a DaemonSet that uses eBPF to track pod-to-pod network traffic
+# Required for network cost metrics (networkCostEnabled: true in agent config)
+
+# Prerequisites:
+# - Linux kernel >= 5.8 (required for TC eBPF support)
+# - Privileged container access
+#
+# IMPORTANT: When enabling ebpf-agent, also set agent.config.networkCostEnabled: true
+# so the KubeAdapt agent knows to collect network metrics from the eBPF DaemonSet.
+#
+# For full configuration options, see: charts/ebpf-agent/values.yaml
+ebpf-agent:
+  # Set to true to deploy the eBPF agent DaemonSet for network cost tracking
+  enabled: false
+
+
+  # Override defaults if needed - see charts/ebpf-agent/values.yaml for all options
+  # config:
+  #   logLevel: "info"
+  #   collectionInterval: "25s"
+
+  # Scheduling - configure as needed for your cluster
+  tolerations: []
+
+  nodeSelector: {}
+
+  affinity: {}
+
+  topologySpreadConstraints: []
 
 # NVIDIA GPU Operator configuration for cost optimization
 gpu-operator:
