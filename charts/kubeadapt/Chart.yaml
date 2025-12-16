@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 0.12.3
+version: 0.13.0
 appVersion: "0.1.0"
 
 # Dependencies
@@ -19,6 +19,10 @@ dependencies:
     version: "v25.10.1"
     repository: "https://helm.ngc.nvidia.com/nvidia"
     condition: gpu-operator.enabled
+  - name: ebpf-agent
+    version: "0.2.0"
+    repository: "oci://ghcr.io/kubeadapt/kubeadapt-helm"
+    condition: ebpf-agent.enabled
 
 maintainers:
   - name: "ugurcancaykara"
@@ -41,7 +45,7 @@ annotations:
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
     - kind: changed
-      description: Update opencost to 2.4.1
+      description: Updated resource configs, added ebpf-agent dependency.
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0

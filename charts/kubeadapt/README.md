@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 0.12.3](https://img.shields.io/badge/Version-0.12.3-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.13.0](https://img.shields.io/badge/Version-0.13.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -39,6 +39,7 @@ helm delete my-release
 | https://helm.ngc.nvidia.com/nvidia | gpu-operator | v25.10.1 |
 | https://opencost.github.io/opencost-helm-chart | opencost | 2.4.1 |
 | https://prometheus-community.github.io/helm-charts | prometheus | 27.46.0 |
+| oci://ghcr.io/kubeadapt/kubeadapt-helm | ebpf-agent | 0.2.0 |
 
 ## Values
 
@@ -50,34 +51,39 @@ helm delete my-release
 | agent.config.compressionEnabled | bool | `true` |  |
 | agent.config.compressionLevel | int | `3` |  |
 | agent.config.e2eMode | bool | `false` |  |
-| agent.config.goMaxProcs | int | `2` |  |
-| agent.config.goMemLimit | string | `"968MiB"` |  |
+| agent.config.goMaxProcs | int | `6` |  |
+| agent.config.goMemLimit | string | `"3600MiB"` |  |
 | agent.config.gpuEnabled | bool | `false` |  |
 | agent.config.logLevel | string | `"info"` |  |
 | agent.config.metricsPort | int | `8080` |  |
 | agent.config.networkCostEnabled | bool | `false` |  |
 | agent.config.prometheusTimeout | string | `"30s"` |  |
 | agent.config.prometheusUrl | string | `"http://kubeadapt-prometheus-server.kubeadapt.svc:80"` |  |
-| agent.config.queryConcurrency | int | `10` |  |
+| agent.config.queryConcurrency | int | `30` |  |
 | agent.config.token | string | `""` |  |
 | agent.config.writeJsonDebug | bool | `false` |  |
 | agent.enabled | bool | `true` |  |
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent"` |  |
-| agent.image.tag | string | `"v1.2.1"` |  |
+| agent.image.tag | string | `"v1.2.2"` |  |
 | agent.nodeSelector | object | `{}` |  |
 | agent.rbac.create | bool | `true` |  |
-| agent.resources.limits.cpu | string | `"1000m"` |  |
-| agent.resources.limits.memory | string | `"1024Mi"` |  |
-| agent.resources.requests.cpu | string | `"200m"` |  |
-| agent.resources.requests.memory | string | `"256Mi"` |  |
+| agent.resources.limits.cpu | string | `"3000m"` |  |
+| agent.resources.limits.memory | string | `"4096Mi"` |  |
+| agent.resources.requests.cpu | string | `"500m"` |  |
+| agent.resources.requests.memory | string | `"512Mi"` |  |
 | agent.service.type | string | `"ClusterIP"` |  |
 | agent.serviceAccount.annotations | object | `{}` |  |
 | agent.serviceAccount.create | bool | `true` |  |
 | agent.serviceAccount.name | string | `""` |  |
 | agent.tolerations | list | `[]` |  |
 | agent.topologySpreadConstraints | list | `[]` |  |
+| ebpf-agent.affinity | object | `{}` |  |
+| ebpf-agent.enabled | bool | `false` |  |
+| ebpf-agent.nodeSelector | object | `{}` |  |
+| ebpf-agent.tolerations | list | `[]` |  |
+| ebpf-agent.topologySpreadConstraints | list | `[]` |  |
 | global.fullnameOverride | string | `""` |  |
 | global.name | string | `"kubeadapt"` |  |
 | global.nameOverride | string | `""` |  |
@@ -119,7 +125,6 @@ helm delete my-release
 | gpu-operator.toolkit.image | string | `"container-toolkit"` |  |
 | gpu-operator.toolkit.imagePullSecrets[0] | string | `"nvcr-cred"` |  |
 | gpu-operator.toolkit.repository | string | `"nvcr.io/nvidia/k8s"` |  |
-| opencost.cloudIntegrationSecret | string | `""` |  |
 | opencost.extraVolumes | list | `[]` |  |
 | opencost.opencost.affinity | object | `{}` |  |
 | opencost.opencost.annotations."prometheus.io/path" | string | `"/metrics"` |  |
@@ -129,17 +134,23 @@ helm delete my-release
 | opencost.opencost.cloudCost.enabled | bool | `false` |  |
 | opencost.opencost.cloudCost.refreshRateHours | int | `6` |  |
 | opencost.opencost.cloudCost.runWindowDays | int | `3` |  |
+| opencost.opencost.cloudIntegrationSecret | string | `""` |  |
 | opencost.opencost.customPricing.costModel.CPU | string | `"0.031611"` |  |
 | opencost.opencost.customPricing.costModel.GPU | string | `"0.95"` |  |
 | opencost.opencost.customPricing.costModel.RAM | string | `"0.004237"` |  |
+| opencost.opencost.customPricing.costModel.awsSpotDataBucket | string | `""` |  |
+| opencost.opencost.customPricing.costModel.awsSpotDataPrefix | string | `""` |  |
+| opencost.opencost.customPricing.costModel.awsSpotDataRegion | string | `""` |  |
 | opencost.opencost.customPricing.costModel.description | string | `"Default prices based on GCP us-central1"` |  |
 | opencost.opencost.customPricing.costModel.internetNetworkEgress | string | `"0.12"` |  |
+| opencost.opencost.customPricing.costModel.projectID | string | `""` |  |
 | opencost.opencost.customPricing.costModel.regionNetworkEgress | string | `"0.01"` |  |
 | opencost.opencost.customPricing.costModel.spotCPU | string | `"0.006655"` |  |
 | opencost.opencost.customPricing.costModel.spotRAM | string | `"0.000892"` |  |
 | opencost.opencost.customPricing.costModel.storage | string | `"0.00005479452"` |  |
 | opencost.opencost.customPricing.costModel.zoneNetworkEgress | string | `"0.01"` |  |
 | opencost.opencost.customPricing.enabled | bool | `false` |  |
+| opencost.opencost.customPricing.provider | string | `"custom"` |  |
 | opencost.opencost.dataRetention.dailyResolutionDays | int | `15` |  |
 | opencost.opencost.exporter.aws.access_key_id | string | `""` |  |
 | opencost.opencost.exporter.aws.secret_access_key | string | `""` |  |
@@ -147,10 +158,10 @@ helm delete my-release
 | opencost.opencost.exporter.defaultClusterId | string | `"default"` |  |
 | opencost.opencost.exporter.extraEnv | object | `{}` |  |
 | opencost.opencost.exporter.extraVolumeMounts | list | `[]` |  |
-| opencost.opencost.exporter.resources.limits.cpu | string | `"999m"` |  |
-| opencost.opencost.exporter.resources.limits.memory | string | `"1Gi"` |  |
-| opencost.opencost.exporter.resources.requests.cpu | string | `"10m"` |  |
-| opencost.opencost.exporter.resources.requests.memory | string | `"55Mi"` |  |
+| opencost.opencost.exporter.resources.limits.cpu | string | `"2000m"` |  |
+| opencost.opencost.exporter.resources.limits.memory | string | `"4Gi"` |  |
+| opencost.opencost.exporter.resources.requests.cpu | string | `"200m"` |  |
+| opencost.opencost.exporter.resources.requests.memory | string | `"512Mi"` |  |
 | opencost.opencost.nodeSelector | object | `{}` |  |
 | opencost.opencost.prometheus.external.enabled | bool | `false` |  |
 | opencost.opencost.prometheus.external.url | string | `""` |  |
@@ -169,14 +180,18 @@ helm delete my-release
 | opencost.serviceAccount.name | string | `""` |  |
 | prometheus.alertmanager.enabled | bool | `false` |  |
 | prometheus.enabled | bool | `true` |  |
-| prometheus.extraScrapeConfigs | string | `""` |  |
-| prometheus.kube-state-metrics | object | `{"enabled":true,"podAnnotations":{"prometheus.io/port":"8080","prometheus.io/scrape":"true"}}` | Kube State Metrics Configuration |
-| prometheus.prometheus-node-exporter | object | `{"enabled":true}` | Node Exporter Configuration: If you already have node-exporter running in your cluster (e.g., from kube-prometheus-stack), keep prometheus-node-exporter.enabled as false. Because we can read node exporter metrics from existing up and running prometheus node exporters. If you don't have any existing node-exporter, set prometheus-node-exporter.enabled to true. |
+| prometheus.extraScrapeConfigs | string | `"# ============================================================\n# eBPF Network Cost Tracking\n# ============================================================\n# Pod-to-pod network traffic monitoring via eBPF TC hooks\n# - job_name: \"kubeadapt-ebpf-agent\"\n#   scrape_interval: 30s\n#   kubernetes_sd_configs:\n#     - role: endpoints\n#   relabel_configs:\n#     # Keep only KubeAdapt eBPF agent endpoints (via service name)\n#     - source_labels: [__meta_kubernetes_service_name]\n#       action: keep\n#       regex: kubeadapt-ebpf-agent\n#     # Keep only the metrics port\n#     - source_labels: [__meta_kubernetes_endpoint_port_name]\n#       action: keep\n#       regex: metrics\n#     # Add node label from endpoint's target node\n#     - source_labels: [__meta_kubernetes_endpoint_node_name]\n#       target_label: node\n#   metric_relabel_configs:\n#     # Filter: Keep network traffic AND internal observability metrics\n#     - source_labels: [__name__]\n#       action: keep\n#       regex: ^(kubeadapt_connection_traffic_bytes_total|kubeadapt_connection_traffic_packets_total|kubeadapt_bpf_load_status|kubeadapt_bpf_load_attempts_total|kubeadapt_bpf_load_duration_seconds|kubeadapt_active_connections|kubeadapt_connection_tracking_info|kubeadapt_bpf_map_utilization_percent|kubeadapt_overflow_flows_total|kubeadapt_ip_pairs_batch_size|kubeadapt_ebpf_collection_duration_seconds|kubeadapt_collector_errors_total)$\n\n# ============================================================\n# DCGM Exporter for GPU Metrics (Optional - Requires GPU Operator)\n# ============================================================\n# Uncomment this section if you have NVIDIA GPU Operator deployed\n#\n# - job_name: \"dcgm-exporter\"\n#   kubernetes_sd_configs:\n#     - role: pod\n#   relabel_configs:\n#     - source_labels: [__meta_kubernetes_pod_label_app]\n#       action: keep\n#       regex: dcgm-exporter\n#     - source_labels: [__meta_kubernetes_pod_container_port_name]\n#       action: keep\n#       regex: metrics\n#   metric_relabel_configs:\n#     - source_labels: [__name__]\n#       action: keep\n#       regex: ^(DCGM_FI_DEV_GPU_UTIL|DCGM_FI_DEV_FB_USED)$\n"` |  |
+| prometheus.kube-state-metrics | object | `{"enabled":true,"podAnnotations":{"prometheus.io/port":"8080","prometheus.io/scrape":"true"},"resources":{"limits":{"cpu":"1000m","memory":"2Gi"},"requests":{"cpu":"200m","memory":"512Mi"}}}` | Kube State Metrics Configuration |
+| prometheus.prometheus-node-exporter | object | `{"enabled":true,"resources":{"limits":{"cpu":"200m","memory":"100Mi"},"requests":{"cpu":"100m","memory":"30Mi"}}}` | Node Exporter Configuration: If you already have node-exporter running in your cluster (e.g., from kube-prometheus-stack), keep prometheus-node-exporter.enabled as false. Because we can read node exporter metrics from existing up and running prometheus node exporters. If you don't have any existing node-exporter, keep it as is prometheus-node-exporter.enabled=true. |
 | prometheus.server.affinity | object | `{}` |  |
 | prometheus.server.fullnameOverride | string | `"kubeadapt-prometheus-server"` |  |
 | prometheus.server.nodeSelector | object | `{}` |  |
 | prometheus.server.persistentVolume.enabled | bool | `false` |  |
 | prometheus.server.persistentVolume.size | string | `"30Gi"` |  |
+| prometheus.server.resources.limits.cpu | string | `"8000m"` |  |
+| prometheus.server.resources.limits.memory | string | `"24Gi"` |  |
+| prometheus.server.resources.requests.cpu | string | `"2000m"` |  |
+| prometheus.server.resources.requests.memory | string | `"4Gi"` |  |
 | prometheus.server.retention | string | `"30m"` |  |
 | prometheus.server.service.servicePort | int | `80` |  |
 | prometheus.server.service.type | string | `"ClusterIP"` |  |
