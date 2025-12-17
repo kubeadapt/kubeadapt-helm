@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 0.14.0](https://img.shields.io/badge/Version-0.14.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.15.0](https://img.shields.io/badge/Version-0.15.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -66,7 +66,7 @@ helm delete my-release
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent"` |  |
-| agent.image.tag | string | `"v1.2.2"` |  |
+| agent.image.tag | string | `"v1.2.3"` |  |
 | agent.nodeSelector | object | `{}` |  |
 | agent.rbac.create | bool | `true` |  |
 | agent.resources.limits.cpu | string | `"3000m"` |  |
@@ -249,14 +249,16 @@ helm delete my-release
 | prometheus.serverFiles."prometheus.yml".scrape_configs[4].relabel_configs[1].source_labels[0] | string | `"__meta_kubernetes_endpoint_port_name"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[4].relabel_configs[2].source_labels[0] | string | `"__meta_kubernetes_pod_name"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[4].relabel_configs[2].target_label | string | `"agent_pod"` |  |
+| prometheus.serverFiles."prometheus.yml".scrape_configs[4].scrape_interval | string | `"30s"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[5].job_name | string | `"node-exporter"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[5].kubernetes_sd_configs[0].role | string | `"endpoints"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[5].metric_relabel_configs[0].action | string | `"keep"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[5].metric_relabel_configs[0].regex | string | `"^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes|node_disk_io_time_seconds_total|node_disk_io_now)$"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[5].metric_relabel_configs[0].source_labels[0] | string | `"__name__"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[5].relabel_configs[0].action | string | `"keep"` |  |
-| prometheus.serverFiles."prometheus.yml".scrape_configs[5].relabel_configs[0].regex | string | `"prometheus-node-exporter"` |  |
+| prometheus.serverFiles."prometheus.yml".scrape_configs[5].relabel_configs[0].regex | string | `"(.*node-exporter.*|node-exporter)"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[5].relabel_configs[0].source_labels[0] | string | `"__meta_kubernetes_service_label_app_kubernetes_io_name"` |  |
+| prometheus.serverFiles."prometheus.yml".scrape_configs[5].relabel_configs[0].source_labels[1] | string | `"__meta_kubernetes_service_label_component"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[5].relabel_configs[1].action | string | `"keep"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[5].relabel_configs[1].regex | string | `"(metrics|http-metrics)"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[5].relabel_configs[1].source_labels[0] | string | `"__meta_kubernetes_endpoint_port_name"` |  |
