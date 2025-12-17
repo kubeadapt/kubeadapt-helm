@@ -9,11 +9,21 @@ agent:
   image:
     # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
     repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
-    tag: "v1.2.3" # Defaults to .Chart.AppVersion
+    tag: "v1.3.0" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
+  # ============================================================
+  # Service Account Configuration
+  # ============================================================
+  # Service account for agent pod - required for IRSA (IAM Roles for Service Accounts)
   serviceAccount:
+    # Create a service account for the agent
     create: true
+    # Annotations for the service account
+    # Use this to configure IRSA for AWS Spot Price API access
+    # Example for AWS IRSA:
+    #   eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/kubeadapt-agent-spot-price
     annotations: {}
+    # Override the service account name (default: kubeadapt-agent)
     name: ""
   rbac:
     create: true
@@ -122,6 +132,29 @@ agent:
     # Skips backend operations, used for integration testing only
     # WARNING: Never enable in production!
     e2eMode: false
+
+    # ============================================================
+    # AWS Spot Price Settings
+    # ============================================================
+    # Enable real-time spot price fetching from AWS EC2 API
+    # When enabled, agent fetches current spot prices for accurate cost calculation
+    # Requires AWS credentials (via IRSA or access keys)
+    spotPriceEnabled: false
+
+    # AWS region for spot price API calls
+    # Should match the region where your EKS cluster is running
+    # Example: "eu-west-1", "us-east-1"
+    awsRegion: "eu-west-1"
+
+    # AWS Access Key ID (Optional - only if not using IRSA)
+    # Recommended: Use IRSA instead of hardcoding credentials
+    # Leave empty when using IAM Roles for Service Accounts
+    awsAccessKeyId: ""
+
+    # AWS Secret Access Key (Optional - only if not using IRSA)
+    # Recommended: Use IRSA instead of hardcoding credentials
+    # Leave empty when using IAM Roles for Service Accounts
+    awsSecretAccessKey: ""
 
     # ============================================================
     # Runtime Performance Tuning
@@ -269,7 +302,7 @@ prometheus:
           metric_relabel_configs:
             - source_labels: [__name__]
               action: keep
-              regex: ^(kubecost_cluster_info|node_cpu_hourly_cost|node_ram_hourly_cost|node_gpu_hourly_cost|pv_hourly_cost|kube_node_labels|kubecost_cluster_management_cost|kube_persistentvolumeclaim_info|kubecost_node_is_spot|kube_persistentvolumeclaim_resource_requests_storage_bytes)$
+              regex: ^(kubecost_cluster_info|node_cpu_hourly_cost|node_ram_hourly_cost|node_gpu_hourly_cost|pv_hourly_cost|kube_node_labels|kubecost_cluster_management_cost|kube_persistentvolumeclaim_info|kubecost_node_is_spot|kube_persistentvolumeclaim_resource_requests_storage_bytes|node_total_hourly_cost)$
 
         # ============================================================
         # KubeAdapt Agent Internal Metrics
@@ -677,7 +710,7 @@ opencost:
     annotations: {}
     # AWS IRSA Example:
     # annotations:
-    #   eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/KubeadaptAthenaRole
+      # eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/KubeadaptAthenaRole
     #
     # GCP Workload Identity Example:
     # annotations:

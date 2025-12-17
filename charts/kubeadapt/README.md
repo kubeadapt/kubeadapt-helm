@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 0.15.0](https://img.shields.io/badge/Version-0.15.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.16.0](https://img.shields.io/badge/Version-0.16.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -46,6 +46,9 @@ helm delete my-release
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | agent.affinity | object | `{}` |  |
+| agent.config.awsAccessKeyId | string | `""` |  |
+| agent.config.awsRegion | string | `"eu-west-1"` |  |
+| agent.config.awsSecretAccessKey | string | `""` |  |
 | agent.config.backendApiEndpoint | string | `"https://api.kubeadapt.io"` |  |
 | agent.config.collectionInterval | string | `"60s"` |  |
 | agent.config.compressionEnabled | bool | `true` |  |
@@ -60,13 +63,14 @@ helm delete my-release
 | agent.config.prometheusTimeout | string | `"30s"` |  |
 | agent.config.prometheusUrl | string | `"http://kubeadapt-prometheus-server.kubeadapt.svc:80"` |  |
 | agent.config.queryConcurrency | int | `30` |  |
+| agent.config.spotPriceEnabled | bool | `false` |  |
 | agent.config.token | string | `""` |  |
 | agent.config.writeJsonDebug | bool | `false` |  |
 | agent.enabled | bool | `true` |  |
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent"` |  |
-| agent.image.tag | string | `"v1.2.3"` |  |
+| agent.image.tag | string | `"v1.3.0"` |  |
 | agent.nodeSelector | object | `{}` |  |
 | agent.rbac.create | bool | `true` |  |
 | agent.resources.limits.cpu | string | `"3000m"` |  |
@@ -232,7 +236,7 @@ helm delete my-release
 | prometheus.serverFiles."prometheus.yml".scrape_configs[3].honor_labels | bool | `true` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[3].job_name | string | `"opencost"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[3].metric_relabel_configs[0].action | string | `"keep"` |  |
-| prometheus.serverFiles."prometheus.yml".scrape_configs[3].metric_relabel_configs[0].regex | string | `"^(kubecost_cluster_info|node_cpu_hourly_cost|node_ram_hourly_cost|node_gpu_hourly_cost|pv_hourly_cost|kube_node_labels|kubecost_cluster_management_cost|kube_persistentvolumeclaim_info|kubecost_node_is_spot|kube_persistentvolumeclaim_resource_requests_storage_bytes)$"` |  |
+| prometheus.serverFiles."prometheus.yml".scrape_configs[3].metric_relabel_configs[0].regex | string | `"^(kubecost_cluster_info|node_cpu_hourly_cost|node_ram_hourly_cost|node_gpu_hourly_cost|pv_hourly_cost|kube_node_labels|kubecost_cluster_management_cost|kube_persistentvolumeclaim_info|kubecost_node_is_spot|kube_persistentvolumeclaim_resource_requests_storage_bytes|node_total_hourly_cost)$"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[3].metric_relabel_configs[0].source_labels[0] | string | `"__name__"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[3].static_configs[0].targets[0] | string | `"kubeadapt-opencost.kubeadapt.svc:9003"` |  |
 | prometheus.serverFiles."prometheus.yml".scrape_configs[4].job_name | string | `"kubeadapt-agent"` |  |

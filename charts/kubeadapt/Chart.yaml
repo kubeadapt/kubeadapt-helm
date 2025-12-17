@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 0.15.0
+version: 0.16.0
 appVersion: "0.1.0"
 
 # Dependencies
@@ -45,7 +45,7 @@ annotations:
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
     - kind: changed
-      description:  fixed chunk problem in kubeadapt agent
+      description: "Implemented spot pricing for AWS to agent"
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0
