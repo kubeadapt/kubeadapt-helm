@@ -92,6 +92,22 @@ spec:
             - name: KUBEADAPT_E2E_MODE
               value: {{ .Values.agent.config.e2eMode | quote }}
 
+            # AWS Spot Price Settings
+            - name: KUBEADAPT_SPOT_PRICE_ENABLED
+              value: {{ .Values.agent.config.spotPriceEnabled | quote }}
+            {{- if .Values.agent.config.awsRegion }}
+            - name: AWS_REGION
+              value: {{ .Values.agent.config.awsRegion | quote }}
+            {{- end }}
+            {{- if .Values.agent.config.awsAccessKeyId }}
+            - name: AWS_ACCESS_KEY_ID
+              value: {{ .Values.agent.config.awsAccessKeyId | quote }}
+            {{- end }}
+            {{- if .Values.agent.config.awsSecretAccessKey }}
+            - name: AWS_SECRET_ACCESS_KEY
+              value: {{ .Values.agent.config.awsSecretAccessKey | quote }}
+            {{- end }}
+
             # Runtime Performance Tuning
             - name: GOMAXPROCS
               value: {{ .Values.agent.config.goMaxProcs | quote }}
