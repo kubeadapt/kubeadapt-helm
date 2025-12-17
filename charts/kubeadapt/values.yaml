@@ -9,7 +9,7 @@ agent:
   image:
     # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
     repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
-    tag: "v1.2.2" # Defaults to .Chart.AppVersion
+    tag: "v1.2.3" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -274,9 +274,10 @@ prometheus:
         # ============================================================
         # KubeAdapt Agent Internal Metrics
         # ============================================================
-        # Scrapes agent's own observability metrics for monitoring performance,
+        # Scrapes agent's own internal metrics for monitoring performance,
         # errors, and operational health.
         - job_name: "kubeadapt-agent"
+          scrape_interval: 30s
           kubernetes_sd_configs:
             - role: endpoints
               namespaces:
@@ -309,14 +310,20 @@ prometheus:
         # ============================================================
         # CRITICAL: Explicit config required to guarantee 15s interval for rate([1m])
         # Auto-discovery uses label selectors, no namespace restriction needed
+        # Supports multiple node-exporter deployments:
+        # - kube-prometheus-stack (app.kubernetes.io/name=prometheus-node-exporter)
+        # - kubecost (component=node-exporter)
+        # - Other Helm charts with node-exporter in label values
         - job_name: "node-exporter"
           scrape_interval: 15s
           kubernetes_sd_configs:
             - role: endpoints
           relabel_configs:
+            # Flexible label matching: supports app.kubernetes.io/name OR component label
+            # Matches: prometheus-node-exporter, kubecost-prometheus-node-exporter, etc.
             - source_labels:
-                [__meta_kubernetes_service_label_app_kubernetes_io_name]
-              regex: prometheus-node-exporter
+                [__meta_kubernetes_service_label_app_kubernetes_io_name, __meta_kubernetes_service_label_component]
+              regex: (.*node-exporter.*|node-exporter)
               action: keep
             - source_labels: [__meta_kubernetes_endpoint_port_name]
               regex: (metrics|http-metrics)
