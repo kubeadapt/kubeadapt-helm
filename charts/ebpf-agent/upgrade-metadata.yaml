@@ -1,0 +1,26 @@
+# upgrade-metadata.yaml
+# Defines explicit upgrade paths for this chart version.
+# This file is embedded in the chart package and used by KubeAdapt auto-upgrade system.
+
+chartVersion: "0.2.1"
+
+# Versions that can upgrade to this version
+upgradeFrom:
+  - "0.2.0"
+  - "0.1.1"
+  - "0.1.0"
+
+# Channels this version is available in
+# - stable: Production-ready releases
+# - fast: Early access releases
+channels:
+  - stable
+  - fast
+  # Note: In both channels because artifacthub.io/prerelease: "false"
+
+# Optional metadata
+metadata:
+  releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/ebpf-agent-0.2.1"
+  containsSecurityUpdates: false
+  minKubernetesVersion: "1.24.0"
+  minKernelVersion: "5.10"
