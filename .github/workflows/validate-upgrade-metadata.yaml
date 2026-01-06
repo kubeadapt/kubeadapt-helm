@@ -66,8 +66,8 @@ jobs:
 
             # 4. Channel-based maturity check
             echo "Checking channel consistency..."
-            HAS_STABLE=$(yq -e '.channels[] | select(. == "stable")' "$META_FILE" 2>/dev/null && echo "true" || echo "false")
-            HAS_FAST=$(yq -e '.channels[] | select(. == "fast")' "$META_FILE" 2>/dev/null && echo "true" || echo "false")
+            HAS_STABLE=$(yq -e '.channels[] | select(. == "stable")' "$META_FILE" > /dev/null 2>&1 && echo "true" || echo "false")
+            HAS_FAST=$(yq -e '.channels[] | select(. == "fast")' "$META_FILE" > /dev/null 2>&1 && echo "true" || echo "false")
 
             if [ "$HAS_STABLE" = "false" ] && [ "$HAS_FAST" = "false" ]; then
               echo "ERROR: At least one channel (stable or fast) must be specified"
