@@ -167,6 +167,52 @@ agent:
     goMemLimit: "3600MiB"
 
   # ============================================================
+  # Auto-Upgrade Configuration
+  # ============================================================
+  # Enables automatic chart upgrades when new versions are available.
+  # The agent checks for updates periodically and spawns a Helm upgrade Job.
+  autoUpgrade:
+    # Enable/disable auto-upgrade feature
+    enabled: false
+
+    # How often to check for updates
+    # Recommended: 6h for production, 1h for testing
+    checkInterval: "6h"
+
+    # Upgrade policy - controls which versions to upgrade to
+    # Options:
+    #   - "minor": Upgrade minor and patch versions (0.16.x -> 0.17.x) - DEFAULT
+    #   - "patch": Only upgrade patch versions (0.16.0 -> 0.16.1)
+    #   - "all": Upgrade all versions including major (breaking changes)
+    policy: "minor"
+
+    # Release channel
+    # Options:
+    #   - "stable": Production-ready releases (recommended)
+    #   - "fast": Early access releases (may have bugs)
+    channel: "stable"
+
+    # Upgrade timeout - how long to wait for helm upgrade to complete
+    timeout: "15m"
+
+    # Helm image for upgrade Job
+    # Contains helm binary for performing upgrades
+    jobImage: "alpine/helm:3.14.3"
+
+    # Service account for upgrade Job
+    # The Job needs permissions to manage Helm releases (secrets/configmaps)
+    # and update all KubeAdapt resources during upgrade
+    serviceAccount:
+      create: true
+      annotations: {}
+      name: ""
+
+    # RBAC for upgrade ServiceAccount
+    # Permissions needed to perform helm upgrade operations
+    rbac:
+      create: true
+
+  # ============================================================
   # Additional Environment Variables
   # ============================================================
   # Custom environment variables to inject into agent pod
@@ -329,14 +375,9 @@ prometheus:
             - source_labels: [__meta_kubernetes_pod_name]
               target_label: agent_pod
           metric_relabel_configs:
-            # Filter: Keep only agent internal metrics (11 metrics total)
-            # Collection metrics (4): collection_duration, collection_total, data_points, collection_errors
-            # Prometheus query metrics (3): query_duration, query_errors, queries_total
-            # Backend metrics (2): backend_post_duration, backend_post_errors
-            # Compression metrics (2): compression_ratio, compression_duration
             - source_labels: [__name__]
               action: keep
-              regex: ^(kubeadapt_agent_collection_duration_seconds|kubeadapt_agent_collection_total|kubeadapt_agent_data_points_total|kubeadapt_agent_collection_errors_total|kubeadapt_agent_prometheus_query_duration_seconds|kubeadapt_agent_prometheus_query_errors_total|kubeadapt_agent_prometheus_queries_total|kubeadapt_agent_backend_post_duration_seconds|kubeadapt_agent_backend_post_errors_total|kubeadapt_agent_compression_ratio|kubeadapt_agent_compression_duration_seconds)$
+              regex: ^(kubeadapt_agent_build_info|kubeadapt_agent_collection_duration_seconds.*|kubeadapt_agent_collection_total|kubeadapt_agent_data_points_total|kubeadapt_agent_prometheus_query_duration_seconds.*|kubeadapt_agent_prometheus_queries_total|kubeadapt_agent_backend_post_duration_seconds.*|kubeadapt_agent_last_collection_duration_seconds|kubeadapt_agent_last_backend_post_duration_seconds|kubeadapt_agent_compression_ratio|kubeadapt_agent_compression_duration_seconds.*)$
 
         # ============================================================
         # Node-Exporter (Auto-discovery across all namespaces)
@@ -396,7 +437,7 @@ prometheus:
     #     # Filter: Keep network traffic AND internal observability metrics
     #     - source_labels: [__name__]
     #       action: keep
-    #       regex: ^(kubeadapt_connection_traffic_bytes_total|kubeadapt_connection_traffic_packets_total|kubeadapt_bpf_load_status|kubeadapt_bpf_load_attempts_total|kubeadapt_bpf_load_duration_seconds|kubeadapt_active_connections|kubeadapt_connection_tracking_info|kubeadapt_bpf_map_utilization_percent|kubeadapt_overflow_flows_total|kubeadapt_ip_pairs_batch_size|kubeadapt_ebpf_collection_duration_seconds|kubeadapt_collector_errors_total)$
+    #       regex: ^(kubeadapt_connection_traffic_bytes_total|kubeadapt_connection_traffic_packets_total|kubeadapt_bpf_load_status|kubeadapt_bpf_load_attempts_total|kubeadapt_bpf_load_duration_seconds|kubeadapt_active_connections|kubeadapt_connection_tracking_info|kubeadapt_bpf_map_utilization_percent|kubeadapt_overflow_flows_total|kubeadapt_ip_pairs_batch_size|kubeadapt_ebpf_collection_duration_seconds|kubeadapt_ebpf_last_collection_duration_seconds|kubeadapt_collector_errors_total)$
 
     # ============================================================
     # DCGM Exporter for GPU Metrics (Optional - Requires GPU Operator)

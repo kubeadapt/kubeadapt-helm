@@ -14,6 +14,7 @@ metadata:
 {{- end }}
 ---
 {{- if .Values.agent.rbac.create }}
+# ClusterRole: Cluster-wide read access for metrics collection
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -22,20 +23,25 @@ metadata:
     {{- include "kubeadapt.labels" . | nindent 4 }}
     app.kubernetes.io/component: agent
 rules:
-  # Core resources
+  # Core cluster-scoped resources
   - apiGroups: [""]
     resources:
       - nodes
       - namespaces
-      - pods
       - persistentvolumes
+    verbs: ["get", "list"]
+
+  # Namespace-scoped resources (read from all namespaces for metrics)
+  - apiGroups: [""]
+    resources:
+      - pods
       - persistentvolumeclaims
       - resourcequotas
       - limitranges
       - replicationcontrollers
     verbs: ["get", "list"]
 
-  # Apps resources
+  # Apps resources (read from all namespaces for metrics)
   - apiGroups: ["apps"]
     resources:
       - deployments
@@ -62,6 +68,40 @@ rules:
       - networkpolicies
     verbs: ["get", "list"]
 ---
+# Role: Namespace-scoped permissions for auto-upgrade (kubeadapt namespace only)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "kubeadapt.name" . }}-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+rules:
+  # Auto-Upgrade: Job management for helm upgrade
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+    verbs: ["get", "list", "create", "delete", "watch"]
+
+  # Auto-Upgrade: ConfigMap for distributed upgrade lock
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    verbs: ["get", "list", "create", "update", "delete"]
+
+  # Auto-Upgrade: ServiceAccount verification
+  - apiGroups: [""]
+    resources:
+      - serviceaccounts
+    verbs: ["get"]
+
+  # Auto-Upgrade: Secrets for Helm values (namespace-scoped only)
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["get", "list"]
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -72,6 +112,23 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
+  name: {{ include "kubeadapt.name" . }}-agent
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kubeadapt.name" . }}-agent
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "kubeadapt.name" . }}-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
   name: {{ include "kubeadapt.name" . }}-agent
 subjects:
   - kind: ServiceAccount
