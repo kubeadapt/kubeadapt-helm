@@ -114,6 +114,26 @@ spec:
             - name: GOMEMLIMIT
               value: {{ .Values.agent.config.goMemLimit | quote }}
 
+            # Auto-Upgrade Settings
+            {{- with .Values.agent.autoUpgrade }}
+            - name: KUBEADAPT_UPGRADE_ENABLED
+              value: {{ .enabled | quote }}
+            - name: KUBEADAPT_UPGRADE_CHECK_INTERVAL
+              value: {{ .checkInterval | quote }}
+            - name: KUBEADAPT_UPGRADE_POLICY
+              value: {{ .policy | quote }}
+            - name: KUBEADAPT_UPGRADE_CHANNEL
+              value: {{ .channel | quote }}
+            - name: KUBEADAPT_UPGRADE_DRY_RUN
+              value: {{ .dryRun | quote }}
+            - name: KUBEADAPT_UPGRADE_TIMEOUT
+              value: {{ .timeout | quote }}
+            - name: KUBEADAPT_UPGRADE_JOB_IMAGE
+              value: {{ .jobImage | quote }}
+            {{- end }}
+            - name: HELM_RELEASE_NAME
+              value: {{ .Release.Name | quote }}
+
             {{- if .Values.agent.env }}
             # Additional custom environment variables
             {{- toYaml .Values.agent.env | nindent 12 }}

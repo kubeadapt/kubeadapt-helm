@@ -1,0 +1,30 @@
+# upgrade-metadata.yaml
+# Defines explicit upgrade paths for this chart version.
+# This file is embedded in the chart package and used by KubeAdapt auto-upgrade system.
+
+chartVersion: "0.16.1"
+
+# Versions that can upgrade to this version
+upgradeFrom:
+  - "0.16.0"
+
+# Channels this version is available in
+# - stable: Production-ready releases
+# - fast: Early access releases (available before stable)
+channels:
+  - fast
+  # Note: Currently only in 'fast' because artifacthub.io/prerelease: "true"
+  # When promoted to stable, add:
+  # - stable
+
+# Optional: Promotion configuration
+# Uncomment when ready for delayed auto-promotion
+# promotion:
+#   toStable:
+#     delay: "48h"
+
+# Optional metadata
+metadata:
+  releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-0.16.1"
+  containsSecurityUpdates: false
+  minKubernetesVersion: "1.24.0"
