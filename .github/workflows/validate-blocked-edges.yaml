@@ -1,0 +1,206 @@
+name: Validate Blocked Edges
+
+on:
+  pull_request:
+    paths:
+      - 'blocked-edges/**/*.yaml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Validate blocked-edges
+        run: |
+          set -e
+
+          # Find all YAML files in blocked-edges (excluding README)
+          shopt -s globstar nullglob
+
+          for file in blocked-edges/**/*.yaml; do
+            [ -f "$file" ] || continue
+
+            echo "=== Validating $file ==="
+
+            # 1. YAML syntax check
+            if ! yq eval '.' "$file" > /dev/null 2>&1; then
+              echo "ERROR: Invalid YAML syntax in $file"
+              exit 1
+            fi
+
+            # 2. Required fields
+            if ! yq -e '.to' "$file" > /dev/null 2>&1; then
+              echo "ERROR: Missing 'to' field in $file"
+              exit 1
+            fi
+
+            if ! yq -e '.from' "$file" > /dev/null 2>&1; then
+              echo "ERROR: Missing 'from' field in $file"
+              exit 1
+            fi
+
+            if ! yq -e '.name' "$file" > /dev/null 2>&1; then
+              echo "ERROR: Missing 'name' field in $file"
+              exit 1
+            fi
+
+            if ! yq -e '.message' "$file" > /dev/null 2>&1; then
+              echo "ERROR: Missing 'message' field in $file"
+              exit 1
+            fi
+
+            # 3. 'to' version format validation
+            TO_VERSION=$(yq '.to' "$file" | tr -d '"')
+            if [[ ! "$TO_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+              echo "ERROR: Invalid 'to' version format: $TO_VERSION"
+              echo "  Expected format: X.Y.Z or X.Y.Z-suffix"
+              exit 1
+            fi
+            echo "✓ Valid 'to' version: $TO_VERSION"
+
+            # 4. 'from' regex validation
+            FROM_REGEX=$(yq '.from' "$file" | tr -d '"')
+            # Try to compile the regex - capture exit code before conditional
+            echo "0.15.0" | grep -E "$FROM_REGEX" > /dev/null 2>&1
+            GREP_EXIT=$?
+            # Exit code 2 means regex syntax error (1 just means no match)
+            if [ $GREP_EXIT -eq 2 ]; then
+              echo "ERROR: Invalid regex in 'from' field: $FROM_REGEX"
+              exit 1
+            fi
+            echo "✓ Valid 'from' regex: $FROM_REGEX"
+
+            # 5. matchingRules type validation (if exists)
+            if yq -e '.matchingRules' "$file" > /dev/null 2>&1; then
+              for rule_type in $(yq '.matchingRules[].type' "$file" | tr -d '"'); do
+                if [[ ! "$rule_type" =~ ^(Always|Platform|PromQL)$ ]]; then
+                  echo "WARNING: Unknown matchingRules type: $rule_type"
+                  echo "  Valid types: Always, Platform, PromQL"
+                fi
+              done
+
+              # Validate Platform type has platforms array
+              if yq -e '.matchingRules[] | select(.type == "Platform")' "$file" > /dev/null 2>&1; then
+                if ! yq -e '.matchingRules[] | select(.type == "Platform") | .platforms' "$file" > /dev/null 2>&1; then
+                  echo "ERROR: Platform matchingRule requires 'platforms' array"
+                  exit 1
+                fi
+
+                # Validate platform values
+                for platform in $(yq '.matchingRules[] | select(.type == "Platform") | .platforms[]' "$file" | tr -d '"'); do
+                  if [[ ! "$platform" =~ ^(eks|aks|gke|on-premise)$ ]]; then
+                    echo "WARNING: Unknown platform: $platform"
+                    echo "  Valid platforms: eks, aks, gke, on-premise"
+                  fi
+                done
+              fi
+              echo "✓ matchingRules valid"
+            fi
+
+            # 6. redirect_to version format (if exists)
+            if yq -e '.redirect_to' "$file" > /dev/null 2>&1; then
+              REDIRECT_TO=$(yq '.redirect_to' "$file" | tr -d '"')
+              if [[ ! "$REDIRECT_TO" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+                echo "ERROR: Invalid 'redirect_to' version format: $REDIRECT_TO"
+                exit 1
+              fi
+              echo "✓ Valid 'redirect_to' version: $REDIRECT_TO"
+            fi
+
+            # 7. Recommended fields (warnings)
+            if ! yq -e '.url' "$file" > /dev/null 2>&1; then
+              echo "⚠ WARNING: Missing 'url' field (recommended for documentation)"
+            fi
+
+            echo "=== $file validation passed ==="
+            echo ""
+          done
+
+          echo "All blocked-edge files validated successfully!"
+
+      - name: Check file naming convention
+        run: |
+          for file in blocked-edges/**/*.yaml; do
+            [ -f "$file" ] || continue
+
+            FILENAME=$(basename "$file" .yaml)
+            TO_VERSION=$(yq '.to' "$file" | tr -d '"')
+            NAME=$(yq '.name // "unknown"' "$file" | tr -d '"' | tr ' ' '-')
+
+            # Expected format: {version}-{name}.yaml
+            EXPECTED="${TO_VERSION}-${NAME}"
+
+            if [ "$FILENAME" != "$EXPECTED" ] && [ "$NAME" != "unknown" ]; then
+              echo "⚠ WARNING: File naming convention mismatch"
+              echo "  Expected: ${EXPECTED}.yaml"
+              echo "  Actual: $(basename $file)"
+            fi
+          done
+
+      - name: Check for redirect_to cycles
+        run: |
+          set -e
+          shopt -s globstar nullglob
+
+          # Build a map of all blocked edges with redirect_to
+          declare -A REDIRECTS
+
+          for file in blocked-edges/**/*.yaml; do
+            [ -f "$file" ] || continue
+
+            TO_VERSION=$(yq '.to' "$file" | tr -d '"')
+            REDIRECT_TO=$(yq '.redirect_to // ""' "$file" | tr -d '"')
+
+            if [ -n "$REDIRECT_TO" ]; then
+              # Key is the blocked version, value is redirect target
+              REDIRECTS["$TO_VERSION"]="$REDIRECT_TO"
+            fi
+          done
+
+          # Check for cycles using DFS
+          check_cycle() {
+            local start="$1"
+            local current="$1"
+            local visited=""
+
+            while [ -n "${REDIRECTS[$current]}" ]; do
+              next="${REDIRECTS[$current]}"
+
+              # Check if we've seen this version before
+              if [[ "$visited" == *"|$next|"* ]] || [ "$next" == "$start" ]; then
+                echo "ERROR: Redirect cycle detected!"
+                echo "  Starting from: $start"
+                echo "  Cycle at: $current -> $next"
+                echo "  Path: ${visited}$current -> $next"
+                return 1
+              fi
+
+              visited="${visited}${current} -> "
+              current="$next"
+            done
+
+            return 0
+          }
+
+          # Check each redirect chain for cycles
+          CYCLE_FOUND=0
+          for version in "${!REDIRECTS[@]}"; do
+            if ! check_cycle "$version"; then
+              CYCLE_FOUND=1
+            fi
+          done
+
+          if [ $CYCLE_FOUND -eq 1 ]; then
+            echo ""
+            echo "Redirect cycles can cause infinite loops in the upgrade system."
+            echo "Please fix the redirect_to chain to ensure it terminates."
+            exit 1
+          fi
+
+          echo "✓ No redirect_to cycles detected"

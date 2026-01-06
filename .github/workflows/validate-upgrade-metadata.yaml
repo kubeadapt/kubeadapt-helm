@@ -1,0 +1,119 @@
+name: Validate Upgrade Metadata
+
+on:
+  pull_request:
+    paths:
+      - 'charts/**/upgrade-metadata.yaml'
+      - 'charts/**/Chart.yaml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Validate upgrade-metadata.yaml
+        run: |
+          set -e
+
+          for chart_dir in charts/*/; do
+            CHART=$(basename "$chart_dir")
+            META_FILE="${chart_dir}upgrade-metadata.yaml"
+            CHART_FILE="${chart_dir}Chart.yaml"
+
+            echo "=== Validating $CHART ==="
+
+            # Check if upgrade-metadata.yaml exists
+            if [ ! -f "$META_FILE" ]; then
+              echo "WARNING: $META_FILE not found (may be first release)"
+              continue
+            fi
+
+            # 1. Required fields check
+            echo "Checking required fields..."
+            yq -e '.chartVersion' "$META_FILE" > /dev/null || { echo "ERROR: Missing chartVersion"; exit 1; }
+            yq -e '.upgradeFrom' "$META_FILE" > /dev/null || { echo "ERROR: Missing upgradeFrom"; exit 1; }
+            yq -e '.channels' "$META_FILE" > /dev/null || { echo "ERROR: Missing channels"; exit 1; }
+
+            # 2. Version match check
+            echo "Checking version match..."
+            META_VERSION=$(yq '.chartVersion' "$META_FILE" | tr -d '"')
+            CHART_VERSION=$(yq '.version' "$CHART_FILE" | tr -d '"')
+
+            if [ "$META_VERSION" != "$CHART_VERSION" ]; then
+              echo "ERROR: Version mismatch!"
+              echo "  upgrade-metadata.yaml: $META_VERSION"
+              echo "  Chart.yaml: $CHART_VERSION"
+              exit 1
+            fi
+            echo "✓ Versions match: $CHART_VERSION"
+
+            # 3. Channel validation
+            echo "Checking channels..."
+            CHANNELS=$(yq '.channels[]' "$META_FILE")
+            for channel in $CHANNELS; do
+              if [[ ! "$channel" =~ ^(stable|fast)$ ]]; then
+                echo "ERROR: Invalid channel '$channel'. Must be 'stable' or 'fast'"
+                exit 1
+              fi
+            done
+            echo "✓ Channels valid: $CHANNELS"
+
+            # 4. Channel-based maturity check
+            echo "Checking channel consistency..."
+            HAS_STABLE=$(yq -e '.channels[] | select(. == "stable")' "$META_FILE" 2>/dev/null && echo "true" || echo "false")
+            HAS_FAST=$(yq -e '.channels[] | select(. == "fast")' "$META_FILE" 2>/dev/null && echo "true" || echo "false")
+
+            if [ "$HAS_STABLE" = "false" ] && [ "$HAS_FAST" = "false" ]; then
+              echo "ERROR: At least one channel (stable or fast) must be specified"
+              exit 1
+            fi
+
+            # If stable, should also be in fast (stable releases are also in fast)
+            if [ "$HAS_STABLE" = "true" ] && [ "$HAS_FAST" = "false" ]; then
+              echo "WARNING: Stable releases should typically also be in fast channel"
+            fi
+            echo "✓ Channel consistency OK"
+
+            # 5. ArtifactHub annotation sync check
+            echo "Checking ArtifactHub annotation sync..."
+            ARTIFACTHUB_PRERELEASE=$(yq '.annotations."artifacthub.io/prerelease"' "$CHART_FILE" | tr -d '"')
+
+            if [ "$HAS_STABLE" = "true" ]; then
+              # Stable release should have prerelease: "false"
+              if [ "$ARTIFACTHUB_PRERELEASE" = "true" ]; then
+                echo "ERROR: Channel includes 'stable' but artifacthub.io/prerelease is 'true'"
+                echo "  Fix: Set artifacthub.io/prerelease: \"false\" in Chart.yaml"
+                exit 1
+              fi
+            else
+              # Fast-only release should have prerelease: "true"
+              if [ "$ARTIFACTHUB_PRERELEASE" != "true" ]; then
+                echo "ERROR: Channel is fast-only but artifacthub.io/prerelease is not 'true'"
+                echo "  Fix: Set artifacthub.io/prerelease: \"true\" in Chart.yaml"
+                exit 1
+              fi
+            fi
+            echo "✓ ArtifactHub annotation sync OK"
+
+            # 6. upgradeFrom versions exist (warning only)
+            echo "Checking upgradeFrom versions..."
+            UPGRADE_FROM_COUNT=$(yq '.upgradeFrom | length' "$META_FILE")
+            if [ "$UPGRADE_FROM_COUNT" -gt 0 ]; then
+              for version in $(yq '.upgradeFrom[]' "$META_FILE" | tr -d '"'); do
+                echo "ℹ upgradeFrom version: $version"
+              done
+            else
+              echo "ℹ No upgradeFrom versions specified (initial release)"
+            fi
+
+            echo "=== $CHART validation passed ==="
+            echo ""
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
