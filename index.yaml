@@ -38,6 +38,70 @@ entries:
         url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
     apiVersion: v2
     appVersion: 0.2.0
+    created: "2026-01-06T22:31:08.928035325Z"
+    description: High-performance eBPF-based network metrics agent for Kubernetes
+    digest: 243f212c47ebcd881eefe87aeaf4419c22704f7d6aecaf0efcc784be11f64265
+    home: https://github.com/kubeadapt/ebpf-agent
+    keywords:
+    - kubernetes
+    - ebpf
+    - network
+    - monitoring
+    - metrics
+    - prometheus
+    - observability
+    - bandwidth
+    - traffic
+    - daemonset
+    maintainers:
+    - email: ugurcan@kubeadapt.io
+      name: ugurcancaykara
+    - email: authors@kubeadapt.io
+      name: Kubeadapt
+    name: ebpf-agent
+    sources:
+    - https://github.com/kubeadapt/ebpf-agent
+    type: application
+    urls:
+    - https://github.com/kubeadapt/kubeadapt-helm/releases/download/ebpf-agent-0.2.1/ebpf-agent-0.2.1.tgz
+    version: 0.2.1
+  - annotations:
+      artifacthub.io/changes: |
+        - kind: removed
+          description: NETNS filter removed due to re-designed targeted architecture
+      artifacthub.io/compatibility: |
+        kubernetes:
+          versions: ["1.24-1.34"]
+          tested: true
+        linux:
+          kernel:
+            minimum: "5.10"
+            recommended: "5.10+"
+            note: "Full IPv4+IPv6 dual-stack support on kernel 5.10+"
+      artifacthub.io/containsSecurityUpdates: "false"
+      artifacthub.io/images: |
+        - name: ebpf-agent
+          image: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-ebpf-agent:v0.2.0
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: Documentation
+          url: https://github.com/kubeadapt/ebpf-agent/blob/main/README.md
+        - name: Architecture
+          url: https://github.com/kubeadapt/ebpf-agent/blob/main/docs/ARCHITECTURE.md
+        - name: Source Code
+          url: https://github.com/kubeadapt/ebpf-agent
+      artifacthub.io/operator: "false"
+      artifacthub.io/platforms: |
+        - eks
+        - aks
+        - gke
+        - on-premise
+      artifacthub.io/prerelease: "false"
+      artifacthub.io/signKey: |
+        fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
+        url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
+    apiVersion: v2
+    appVersion: 0.2.0
     created: "2025-12-15T21:02:20.864458096Z"
     description: High-performance eBPF-based network metrics agent for Kubernetes
     digest: d90b6266051f35d933d575f99e12bb33ed70f48eb001949a475803eb73286d68
@@ -2171,4 +2235,4 @@ entries:
     urls:
     - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-0.1.0/kubeadapt-0.1.0.tgz
     version: 0.1.0
-generated: "2026-01-06T21:57:01.564760175Z"
+generated: "2026-01-06T22:31:08.928108045Z"
