@@ -24,8 +24,8 @@ spec:
           image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
           ports:
-            - name: metrics
-              containerPort: {{ .Values.agent.config.metricsPort }}
+            - name: health
+              containerPort: {{ .Values.agent.config.healthPort }}
               protocol: TCP
           env:
             # Kubernetes metadata (injected via Downward API)
@@ -47,90 +47,63 @@ spec:
               value: {{ .Chart.Version | quote }}
 
             # Backend API Configuration
-            - name: KUBEADAPT_BACKEND_API_ENDPOINT
-              value: {{ .Values.agent.config.backendApiEndpoint | quote }}
+            - name: KUBEADAPT_BACKEND_URL
+              value: {{ .Values.agent.config.backendUrl | quote }}
             - name: KUBEADAPT_AGENT_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ include "kubeadapt.name" . }}-agent
                   key: token
 
-            # Prometheus Configuration
-            - name: KUBEADAPT_PROMETHEUS_URL
-              value: {{ .Values.agent.config.prometheusUrl | quote }}
-            - name: KUBEADAPT_PROMETHEUS_TIMEOUT
-              value: {{ .Values.agent.config.prometheusTimeout | quote }}
-            - name: KUBEADAPT_QUERY_CONCURRENCY
-              value: {{ .Values.agent.config.queryConcurrency | quote }}
+            # Cluster Identification
+            {{- if .Values.agent.config.clusterName }}
+            - name: KUBEADAPT_CLUSTER_NAME
+              value: {{ .Values.agent.config.clusterName | quote }}
+            {{- end }}
 
             # Collection Settings
-            - name: KUBEADAPT_COLLECTION_INTERVAL
-              value: {{ .Values.agent.config.collectionInterval | quote }}
+            - name: KUBEADAPT_SNAPSHOT_INTERVAL
+              value: {{ .Values.agent.config.snapshotInterval | quote }}
+            - name: KUBEADAPT_METRICS_INTERVAL
+              value: {{ .Values.agent.config.metricsInterval | quote }}
+            - name: KUBEADAPT_INFORMER_RESYNC
+              value: {{ .Values.agent.config.informerResync | quote }}
 
-            # Compression Settings
-            - name: KUBEADAPT_COMPRESSION_ENABLED
-              value: {{ .Values.agent.config.compressionEnabled | quote }}
+            # Compression
             - name: KUBEADAPT_COMPRESSION_LEVEL
               value: {{ .Values.agent.config.compressionLevel | quote }}
 
-            # HTTP Client Settings (hardcoded in agent - not configurable)
-            # HTTPTimeout: 10s, HTTPMaxRetries: 1, HTTPRetryDelay: 1s
+            # HTTP Client Settings
+            - name: KUBEADAPT_MAX_RETRIES
+              value: {{ .Values.agent.config.maxRetries | quote }}
+            - name: KUBEADAPT_REQUEST_TIMEOUT
+              value: {{ .Values.agent.config.requestTimeout | quote }}
+            - name: KUBEADAPT_BUFFER_MAX_BYTES
+              value: {{ .Values.agent.config.bufferMaxBytes | quote }}
 
             # Observability & Debugging
-            - name: LOG_LEVEL
-              value: {{ .Values.agent.config.logLevel | quote }}
-            - name: KUBEADAPT_METRICS_PORT
-              value: {{ .Values.agent.config.metricsPort | quote }}
-            - name: KUBEADAPT_WRITE_JSON_DEBUG
-              value: {{ .Values.agent.config.writeJsonDebug | quote }}
+            - name: KUBEADAPT_HEALTH_PORT
+              value: {{ .Values.agent.config.healthPort | quote }}
+            - name: KUBEADAPT_DEBUG_ENDPOINTS
+              value: {{ .Values.agent.config.debugEndpoints | quote }}
 
-            # Feature Flags
-            - name: KUBEADAPT_GPU_ENABLED
-              value: {{ .Values.agent.config.gpuEnabled | quote }}
-            - name: KUBEADAPT_NETWORK_COST_ENABLED
-              value: {{ .Values.agent.config.networkCostEnabled | quote }}
-            - name: KUBEADAPT_E2E_MODE
-              value: {{ .Values.agent.config.e2eMode | quote }}
-
-            # AWS Spot Price Settings
-            - name: KUBEADAPT_SPOT_PRICE_ENABLED
-              value: {{ .Values.agent.config.spotPriceEnabled | quote }}
-            {{- if .Values.agent.config.awsRegion }}
-            - name: AWS_REGION
-              value: {{ .Values.agent.config.awsRegion | quote }}
+            # GPU Metrics (Optional)
+            - name: KUBEADAPT_GPU_METRICS_ENABLED
+              value: {{ .Values.agent.config.gpuMetricsEnabled | quote }}
+            {{- if .Values.agent.config.dcgmPort }}
+            - name: KUBEADAPT_DCGM_PORT
+              value: {{ .Values.agent.config.dcgmPort | quote }}
             {{- end }}
-            {{- if .Values.agent.config.awsAccessKeyId }}
-            - name: AWS_ACCESS_KEY_ID
-              value: {{ .Values.agent.config.awsAccessKeyId | quote }}
+            {{- if .Values.agent.config.dcgmNamespace }}
+            - name: KUBEADAPT_DCGM_NAMESPACE
+              value: {{ .Values.agent.config.dcgmNamespace | quote }}
             {{- end }}
-            {{- if .Values.agent.config.awsSecretAccessKey }}
-            - name: AWS_SECRET_ACCESS_KEY
-              value: {{ .Values.agent.config.awsSecretAccessKey | quote }}
+            {{- if .Values.agent.config.dcgmEndpoints }}
+            - name: KUBEADAPT_DCGM_ENDPOINTS
+              value: {{ .Values.agent.config.dcgmEndpoints | quote }}
             {{- end }}
 
-            # Runtime Performance Tuning
-            - name: GOMAXPROCS
-              value: {{ .Values.agent.config.goMaxProcs | quote }}
-            - name: GOMEMLIMIT
-              value: {{ .Values.agent.config.goMemLimit | quote }}
-
-            # Auto-Upgrade Settings
-            {{- with .Values.agent.autoUpgrade }}
-            - name: KUBEADAPT_UPGRADE_ENABLED
-              value: {{ .enabled | quote }}
-            - name: KUBEADAPT_UPGRADE_CHECK_INTERVAL
-              value: {{ .checkInterval | quote }}
-            - name: KUBEADAPT_UPGRADE_POLICY
-              value: {{ .policy | quote }}
-            - name: KUBEADAPT_UPGRADE_CHANNEL
-              value: {{ .channel | quote }}
-            - name: KUBEADAPT_UPGRADE_DRY_RUN
-              value: {{ .dryRun | quote }}
-            - name: KUBEADAPT_UPGRADE_TIMEOUT
-              value: {{ .timeout | quote }}
-            - name: KUBEADAPT_UPGRADE_JOB_IMAGE
-              value: {{ .jobImage | quote }}
-            {{- end }}
+            # Helm Release Name (for health reporting)
             - name: HELM_RELEASE_NAME
               value: {{ .Release.Name | quote }}
 
@@ -156,4 +129,4 @@ spec:
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-{{- end }} 
+{{- end }}

@@ -65,14 +65,6 @@ jobs:
             echo "changed_charts=$charts" >> $GITHUB_OUTPUT
           fi
 
-      - name: Add dependency repositories
-        if: steps.list-changed.outputs.changed == 'true'
-        run: |
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo add opencost https://opencost.github.io/opencost-helm-chart
-          helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
-          helm repo update
-
       - name: Run chart-testing (lint)
         run: ct lint --debug --config ./.github/configs/ct-lint.yaml --lint-conf ./.github/configs/lintconf.yaml
 
@@ -81,16 +73,14 @@ jobs:
         run: |
           cd charts/kubeadapt
           helm dependency build
-          # Check if dependencies are correctly resolved
-          if [ $(find charts/ -name "prometheus-*.tgz" | wc -l) -eq 0 ] || [ $(find charts/ -name "opencost-*.tgz" | wc -l) -eq 0 ]; then
+          if [ $(find charts/ -name "ebpf-agent-*.tgz" | wc -l) -eq 0 ]; then
             echo "Dependencies not correctly resolved"
-            echo "Expected to find prometheus-*.tgz and opencost-*.tgz in charts directory"
+            echo "Expected to find ebpf-agent-*.tgz in charts directory"
             ls -la charts/
             exit 1
           fi
           echo "Found dependencies:"
-          ls -la charts/prometheus-*.tgz
-          ls -la charts/opencost-*.tgz
+          ls -la charts/
 
       - name: Run docs-testing (helm-docs)
         id: helm-docs
@@ -127,27 +117,21 @@ jobs:
       - name: Test chart installation (dry-run)
         if: steps.list-changed.outputs.changed == 'true'
         run: |
-          # Test with default values (only configmap, dependencies disabled)
-          helm install kubeadapt-test ./charts/kubeadapt --dry-run
-
-          # Test with Prometheus enabled
-          helm install kubeadapt-test-prom ./charts/kubeadapt \
-            --set prometheus.enabled=true \
+          # Test with default values
+          helm install kubeadapt-test ./charts/kubeadapt \
+            --set agent.config.token=ci-test-key \
             --dry-run
 
-          # Test with OpenCost enabled
-          helm install kubeadapt-test-cost ./charts/kubeadapt \
-            --set opencost.enabled=true \
-            --dry-run
-
-          # Test with both enabled
-          helm install kubeadapt-test-all ./charts/kubeadapt \
-            --set prometheus.enabled=true \
-            --set opencost.enabled=true \
+          # Test with eBPF agent enabled
+          helm install kubeadapt-test-ebpf ./charts/kubeadapt \
+            --set agent.config.token=ci-test-key \
+            --set ebpf-agent.enabled=true \
             --dry-run
 
           # Test template rendering
-          helm template ./charts/kubeadapt | kubectl apply --dry-run=client -f -
+          helm template ./charts/kubeadapt \
+            --set agent.config.token=ci-test-key \
+            | kubectl apply --dry-run=client -f -
 
       - name: Run chart-testing (install)
         run: ct install --config ./.github/configs/ct-install.yaml

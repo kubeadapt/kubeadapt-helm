@@ -5,8 +5,7 @@ remote: origin
 target-branch: main
 chart-dirs:
   - charts
-chart-repos:
-  - dandydeveloper=https://dandydeveloper.github.io/charts/
+chart-repos: []
 validate-chart-schema: false
 validate-maintainers: true
 validate-yaml: true

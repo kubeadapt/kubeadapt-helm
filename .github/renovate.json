@@ -44,42 +44,6 @@
       ]
     },
     {
-      "description": "Group Prometheus chart updates",
-      "matchManagers": [
-        "helmv3"
-      ],
-      "matchPackageNames": [
-        "prometheus"
-      ],
-      "groupName": "Prometheus chart",
-      "labels": ["prometheus", "dependencies", "helm-dependency"],
-      "commitMessageExtra": "({{updateType}})"
-    },
-    {
-      "description": "Group OpenCost chart updates",
-      "matchManagers": [
-        "helmv3"
-      ],
-      "matchPackageNames": [
-        "opencost"
-      ],
-      "groupName": "OpenCost chart",
-      "labels": ["opencost", "dependencies", "helm-dependency"],
-      "commitMessageExtra": "({{updateType}})"
-    },
-    {
-      "description": "Group GPU Operator chart updates",
-      "matchManagers": [
-        "helmv3"
-      ],
-      "matchPackageNames": [
-        "gpu-operator"
-      ],
-      "groupName": "GPU Operator chart",
-      "labels": ["gpu-operator", "dependencies", "helm-dependency"],
-      "commitMessageExtra": "({{updateType}})"
-    },
-    {
       "description": "Group GitHub Actions updates",
       "matchManagers": [
         "github-actions"

@@ -5,9 +5,6 @@ remote: origin
 target-branch: main
 chart-dirs:
   - charts
-chart-repos:
-  - prometheus-community=https://prometheus-community.github.io/helm-charts
-  - opencost=https://opencost.github.io/opencost-helm-chart
 helm-extra-args: "--timeout 600s"
 # upgrade: true # TODO: Uncomment this when we have a proper upgrade path implemented
 validate-chart-schema: false
