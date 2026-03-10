@@ -138,6 +138,22 @@ agent:
     # Enable/disable auto-upgrade feature
     enabled: false
 
+    # Upgrader sidecar image
+    image:
+      # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader
+      repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader
+      tag: "" # Defaults to .Chart.AppVersion
+      pullPolicy: IfNotPresent
+
+    # Resource limits for the upgrader sidecar
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
     # How often to check for updates
     # Recommended: 6h for production, 1h for testing
     checkInterval: "6h"
@@ -161,6 +177,21 @@ agent:
     # Helm image for upgrade Job
     # Contains helm binary for performing upgrades
     jobImage: "alpine/helm:3.14.3"
+
+    # Chart repository URL for Helm upgrades
+    # Leave empty to use the default OCI registry (production default)
+    # Set to HTTP URL for testing: http://chartmuseum:8080
+    chartRepo: ""
+
+    # Initial delay before the first upgrade check
+    # Default: 1m — matches production behavior
+    # Set to 5s for faster tests
+    initialDelay: "1m"
+
+    # Dry-run mode — detects updates and logs them but does NOT create a Helm upgrade Job.
+    # Useful for validating upgrade logic without performing actual upgrades.
+    # Default: false
+    dryRun: false
 
     # Service account for upgrade Job
     # The Job needs permissions to manage Helm releases (secrets/configmaps)
