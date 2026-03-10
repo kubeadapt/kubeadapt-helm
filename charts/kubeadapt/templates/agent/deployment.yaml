@@ -55,12 +55,6 @@ spec:
                   name: {{ include "kubeadapt.name" . }}-agent
                   key: token
 
-            # Cluster Identification
-            {{- if .Values.agent.config.clusterName }}
-            - name: KUBEADAPT_CLUSTER_NAME
-              value: {{ .Values.agent.config.clusterName | quote }}
-            {{- end }}
-
             # Collection Settings
             - name: KUBEADAPT_SNAPSHOT_INTERVAL
               value: {{ .Values.agent.config.snapshotInterval | quote }}
@@ -119,7 +113,7 @@ spec:
           imagePullPolicy: {{ .Values.agent.autoUpgrade.image.pullPolicy }}
           env:
             # Required: Backend API endpoint (ingestion-api)
-            - name: KUBEADAPT_BACKEND_API_ENDPOINT
+            - name: KUBEADAPT_BACKEND_URL
               value: {{ .Values.agent.config.backendUrl | quote }}
             - name: KUBEADAPT_AGENT_TOKEN
               valueFrom:
@@ -142,12 +136,6 @@ spec:
               value: {{ .Chart.Version | quote }}
             - name: HELM_RELEASE_NAME
               value: {{ .Release.Name | quote }}
-
-            # Cluster ID (derived from agent token by backend if not set)
-            {{- if .Values.agent.config.clusterName }}
-            - name: KUBEADAPT_CLUSTER_ID
-              value: {{ .Values.agent.config.clusterName | quote }}
-            {{- end }}
 
             # Upgrade settings
             - name: KUBEADAPT_UPGRADE_ENABLED

@@ -51,12 +51,6 @@ agent:
     backendUrl: "https://api.kubeadapt.io"
 
     # ============================================================
-    # Cluster Identification
-    # ============================================================
-    # Human-readable name for the cluster.
-    clusterName: ""
-
-    # ============================================================
     # Collection Settings
     # ============================================================
     # How often agent collects cluster state snapshots (Go duration or seconds).
