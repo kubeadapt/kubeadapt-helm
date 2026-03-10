@@ -51,18 +51,19 @@ rules:
     resources:
       - deployments
       - daemonsets
-    verbs: ["get", "list", "create", "update", "patch", "delete"]
+      - replicasets
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources:
       - roles
       - rolebindings
-    verbs: ["get", "list", "create", "update", "patch", "delete"]
+    verbs: ["get", "list", "create", "update", "patch", "delete", "escalate"]
 
   - apiGroups: ["batch"]
     resources:
       - jobs
-    verbs: ["get", "list", "create", "update", "patch", "delete"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
   # Pods and events for debugging upgrade failures
   - apiGroups: [""]
@@ -106,13 +107,73 @@ rules:
     resourceNames:
       - "{{ include "kubeadapt.name" . }}-agent"
       - "{{ include "kubeadapt.name" . }}-upgrader"
-    verbs: ["get", "list", "update", "patch", "delete"]
+    verbs: ["get", "list", "update", "patch", "delete", "escalate"]
   # Separate rule for create (resourceNames constraint not supported)
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources:
       - clusterroles
       - clusterrolebindings
-    verbs: ["create"]
+    verbs: ["create", "escalate"]
+  # All permissions the agent ClusterRole grants — upgrader must hold them to patch the ClusterRoleBinding
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - namespaces
+      - persistentvolumes
+      - services
+      - pods
+      - persistentvolumeclaims
+      - resourcequotas
+      - limitranges
+      - replicationcontrollers
+    verbs: ["list", "watch"]
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+    verbs: ["list", "watch"]
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["list", "watch"]
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets
+    verbs: ["list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+      - networkpolicies
+    verbs: ["list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+    verbs: ["list", "watch"]
+  - apiGroups: ["scheduling.k8s.io"]
+    resources:
+      - priorityclasses
+    verbs: ["list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - pods
+      - nodes
+    verbs: ["list", "watch"]
+  - apiGroups: ["autoscaling.k8s.io"]
+    resources:
+      - verticalpodautoscalers
+    verbs: ["list", "watch"]
+  - apiGroups: ["karpenter.sh"]
+    resources:
+      - nodepools
+      - nodeclaims
+    verbs: ["list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

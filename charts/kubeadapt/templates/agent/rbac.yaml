@@ -14,7 +14,6 @@ metadata:
 {{- end }}
 ---
 {{- if .Values.agent.rbac.create }}
-# ClusterRole: Cluster-wide read access for metrics collection
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -23,15 +22,14 @@ metadata:
     {{- include "kubeadapt.labels" . | nindent 4 }}
     app.kubernetes.io/component: agent
 rules:
-  # Core cluster-scoped resources
   - apiGroups: [""]
     resources:
       - nodes
       - namespaces
       - persistentvolumes
-    verbs: ["get", "list"]
+      - services
+    verbs: ["list", "watch"]
 
-  # Namespace-scoped resources (read from all namespaces for metrics)
   - apiGroups: [""]
     resources:
       - pods
@@ -39,36 +37,68 @@ rules:
       - resourcequotas
       - limitranges
       - replicationcontrollers
-    verbs: ["get", "list"]
+    verbs: ["list", "watch"]
 
-  # Apps resources (read from all namespaces for metrics)
   - apiGroups: ["apps"]
     resources:
       - deployments
       - replicasets
       - statefulsets
       - daemonsets
-    verbs: ["get", "list"]
+    verbs: ["list", "watch"]
 
-  # Autoscaling resources
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["list", "watch"]
+
   - apiGroups: ["autoscaling"]
     resources:
       - horizontalpodautoscalers
-    verbs: ["get", "list"]
+    verbs: ["list", "watch"]
 
-  # Policy resources
   - apiGroups: ["policy"]
     resources:
       - poddisruptionbudgets
-    verbs: ["get", "list"]
+    verbs: ["list", "watch"]
 
-  # Networking resources
   - apiGroups: ["networking.k8s.io"]
     resources:
+      - ingresses
       - networkpolicies
-    verbs: ["get", "list"]
+    verbs: ["list", "watch"]
+
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+    verbs: ["list", "watch"]
+
+  - apiGroups: ["scheduling.k8s.io"]
+    resources:
+      - priorityclasses
+    verbs: ["list", "watch"]
+
+  # Metrics API (requires metrics-server)
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - pods
+      - nodes
+    verbs: ["list", "watch"]
+
+  # VPA (optional, if installed)
+  - apiGroups: ["autoscaling.k8s.io"]
+    resources:
+      - verticalpodautoscalers
+    verbs: ["list", "watch"]
+
+  # Karpenter (optional, if installed)
+  - apiGroups: ["karpenter.sh"]
+    resources:
+      - nodepools
+      - nodeclaims
+    verbs: ["list", "watch"]
 ---
-# Role: Namespace-scoped permissions for auto-upgrade (kubeadapt namespace only)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -78,25 +108,21 @@ metadata:
     {{- include "kubeadapt.labels" . | nindent 4 }}
     app.kubernetes.io/component: agent
 rules:
-  # Auto-Upgrade: Job management for helm upgrade
   - apiGroups: ["batch"]
     resources:
       - jobs
     verbs: ["get", "list", "create", "delete", "watch"]
 
-  # Auto-Upgrade: ConfigMap for distributed upgrade lock
   - apiGroups: [""]
     resources:
       - configmaps
     verbs: ["get", "list", "create", "update", "delete"]
 
-  # Auto-Upgrade: ServiceAccount verification
   - apiGroups: [""]
     resources:
       - serviceaccounts
     verbs: ["get"]
 
-  # Auto-Upgrade: Secrets for Helm values (namespace-scoped only)
   - apiGroups: [""]
     resources:
       - secrets
@@ -135,4 +161,4 @@ subjects:
     name: {{ include "kubeadapt.name" . }}-agent
     namespace: {{ .Release.Namespace }}
 {{- end }}
-{{- end }} 
+{{- end }}

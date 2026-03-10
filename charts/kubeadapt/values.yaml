@@ -9,19 +9,18 @@ agent:
   image:
     # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
     repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
-    tag: "v1.4.0" # Defaults to .Chart.AppVersion
+    tag: "v2.0.0" # Defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
   # ============================================================
   # Service Account Configuration
   # ============================================================
-  # Service account for agent pod - required for IRSA (IAM Roles for Service Accounts)
+  # Service account for agent pod
   serviceAccount:
     # Create a service account for the agent
     create: true
     # Annotations for the service account
-    # Use this to configure IRSA for AWS Spot Price API access
-    # Example for AWS IRSA:
-    #   eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/kubeadapt-agent-spot-price
+    # Example:
+    #   custom-annotation: value
     annotations: {}
     # Override the service account name (default: kubeadapt-agent)
     name: ""
@@ -31,11 +30,11 @@ agent:
     type: ClusterIP
   resources:
     requests:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 100m
+      memory: 128Mi
     limits:
-      cpu: 3000m
-      memory: 4096Mi
+      cpu: 1000m
+      memory: 1Gi
 
   # ============================================================
   # Agent Configuration
@@ -44,127 +43,85 @@ agent:
     # ============================================================
     # Authentication & Backend Configuration
     # ============================================================
-    # This token is automatically generated when you create an agent in the Kubeadapt platform
+    # Token for authenticating with the Kubeadapt backend.
+    # This is provided when you create a cluster in the Kubeadapt platform.
     token: ""
 
-    # Don't change
-    backendApiEndpoint: "https://api.kubeadapt.io"
-
-    # ============================================================
-    # Prometheus Configuration
-    # ============================================================
-    # In-cluster Prometheus URL for querying metrics
-    # Agent collects metrics from this Prometheus instance
-    # For internal prometheus: http://kubeadapt-prometheus-server.kubeadapt.svc:80
-    prometheusUrl: "http://kubeadapt-prometheus-server.kubeadapt.svc:80"
-
-    # Prometheus query timeout
-    # Don't change unless you have a specific reason because this aligns with context timeout value in the agent code
-    prometheusTimeout: "30s"
-
-    # Query concurrency limit
-    # Maximum number of parallel Prometheus queries agent can execute
-    # Higher values = faster collection but more memory/CPU usage
-    # Range: 1-100
-    queryConcurrency: 30
+    # Backend API endpoint
+    backendUrl: "https://api.kubeadapt.io"
 
     # ============================================================
     # Collection Settings
     # ============================================================
-    # How often agent collects and sends metrics to backend
-    # Don't change, 1m data points are recommended
-    collectionInterval: "60s"
+    # How often agent collects cluster state snapshots (Go duration or seconds).
+    # Min: 10s. Recommended: 60s.
+    snapshotInterval: "60s"
+
+    # How often agent collects resource metrics (Go duration or seconds).
+    # Min: 10s. Recommended: 60s.
+    metricsInterval: "60s"
+
+    # Kubernetes informer resync period (Go duration or seconds).
+    informerResync: "300s"
 
     # ============================================================
     # Data Compression Settings
     # ============================================================
-    # Enable zstd compression for metrics data before sending to backend
-    # Reduces network bandwidth by ~70-85%
-    # Recommended: true (unless debugging raw payloads)
-    compressionEnabled: true
-
-    # Zstd compression level
-    # Range: 1-22 (1=fastest/least compression, 22=slowest/best compression)
+    # Compression level for data sent to backend (1-4).
+    # 1=fastest/least compression, 4=slowest/best compression
     # Recommended: 3 (good balance of speed and compression ratio)
     compressionLevel: 3
 
     # ============================================================
     # HTTP Client Settings
     # ============================================================
-    # HTTP retry settings are hardcoded in the agent for safety:
-    # - HTTPTimeout: 10s (per request)
-    # - HTTPMaxRetries: 1 (2 total attempts)
-    # - HTTPRetryDelay: 1s (fixed, no exponential backoff)
-    # These values are intentionally not configurable to prevent timeout issues
+    # Max retry attempts for failed backend requests.
+    maxRetries: 5
+
+    # Timeout for HTTP requests to backend (Go duration or seconds).
+    requestTimeout: "30s"
+
+    # Max buffer size in bytes (default: 50 MB).
+    bufferMaxBytes: "52428800"
 
     # ============================================================
     # Observability & Debugging
     # ============================================================
-    # Log level for agent
-    # Options: "debug", "info", "warn", "error"
-    # Default: "info"
-    logLevel: "info"
+    # HTTP port for health check and metrics endpoint
+    # Exposes /healthz, /readyz, /metrics endpoints
+    healthPort: 8080
 
-    # Metrics server port for agent's own Prometheus metrics
-    # Exposes agent health, collection stats, and performance metrics
-    metricsPort: 8080
-
-    # Write collected metrics to JSON file for debugging
-    # Creates timestamped JSON files in /tmp/
-    # WARNING: High disk I/O, only enable for troubleshooting
-    writeJsonDebug: false
+    # Enable pprof/debug endpoints on health port
+    # WARNING: Only enable for troubleshooting
+    debugEndpoints: false
 
     # ============================================================
-    # Feature Flags
+    # GPU Metrics (Optional)
     # ============================================================
-    # Enable GPU metrics collection
-    # Requires DCGM exporter to be running in cluster (gpu-operator)
-    # Collects: GPU utilization, memory usage, power consumption
-    gpuEnabled: false
+    # Enable GPU metrics collection from DCGM exporter
+    # Requires DCGM exporter to be running in cluster (e.g., via gpu-operator)
+    # Collects: GPU utilization, memory usage
+    gpuMetricsEnabled: true
 
-    # Enable network cost metrics collection (eBPF agent)
-    # Requires kubeadapt eBPF agent to be deployed as DaemonSet
-    # Collects: Pod-to-pod egress traffic (bytes, packets) for network cost calculation
-    # Set to true only if you have deployed the eBPF agent
-    networkCostEnabled: false
+    # DCGM exporter port (default: 9400)
+    dcgmPort: 9400
 
-    # Enable E2E testing mode
-    # Skips backend operations, used for integration testing only
-    # WARNING: Never enable in production!
-    e2eMode: false
+    # DCGM exporter namespace (auto-detect if empty)
+    dcgmNamespace: ""
 
-    # ============================================================
-    # AWS Spot Price Settings
-    # ============================================================
-    # Enable real-time spot price fetching from AWS EC2 API
-    # When enabled, agent fetches current spot prices for accurate cost calculation
-    # Requires AWS credentials (via IRSA or access keys)
-    spotPriceEnabled: false
-
-    # AWS region for spot price API calls
-    # Should match the region where your EKS cluster is running
-    # Example: "eu-west-1", "us-east-1"
-    awsRegion: "eu-west-1"
-
-    # AWS Access Key ID (Optional - only if not using IRSA)
-    # Recommended: Use IRSA instead of hardcoding credentials
-    # Leave empty when using IAM Roles for Service Accounts
-    awsAccessKeyId: ""
-
-    # AWS Secret Access Key (Optional - only if not using IRSA)
-    # Recommended: Use IRSA instead of hardcoding credentials
-    # Leave empty when using IAM Roles for Service Accounts
-    awsSecretAccessKey: ""
+    # DCGM exporter endpoints override (comma-separated IPs/hosts)
+    # Use this if kubeadapt auto-discovery fails to find DCGM exporter pods.
+    # Example: "10.0.1.5,10.0.2.3"
+    dcgmEndpoints: ""
 
     # ============================================================
     # Runtime Performance Tuning
     # ============================================================
-    # - goMaxProcs: 6
-    # - goMemLimit: 3600MiB (~90% of 4096Mi limit, leaves room for OS overhead)
-    # - queryConcurrency: 30
-    goMaxProcs: 6
+    # GOMAXPROCS value (auto-tuned if not set)
+    # goMaxProcs: 4
 
-    goMemLimit: "3600MiB"
+    # GOMEMLIMIT value (auto-tuned if not set)
+    # goMemLimit: "900MiB"
 
   # ============================================================
   # Auto-Upgrade Configuration
@@ -175,14 +132,30 @@ agent:
     # Enable/disable auto-upgrade feature
     enabled: false
 
+    # Upgrader sidecar image
+    image:
+      # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader
+      repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader
+      tag: "" # Defaults to .Chart.AppVersion
+      pullPolicy: IfNotPresent
+
+    # Resource limits for the upgrader sidecar
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
     # How often to check for updates
     # Recommended: 6h for production, 1h for testing
     checkInterval: "6h"
 
     # Upgrade policy - controls which versions to upgrade to
     # Options:
-    #   - "minor": Upgrade minor and patch versions (0.16.x -> 0.17.x) - DEFAULT
-    #   - "patch": Only upgrade patch versions (0.16.0 -> 0.16.1)
+    #   - "minor": Upgrade minor and patch versions (0.17.x -> 0.18.x) - DEFAULT
+    #   - "patch": Only upgrade patch versions (0.17.0 -> 0.17.1)
     #   - "all": Upgrade all versions including major (breaking changes)
     policy: "minor"
 
@@ -199,6 +172,21 @@ agent:
     # Contains helm binary for performing upgrades
     jobImage: "alpine/helm:3.14.3"
 
+    # Chart repository URL for Helm upgrades
+    # Leave empty to use the default OCI registry (production default)
+    # Set to HTTP URL for testing: http://chartmuseum:8080
+    chartRepo: ""
+
+    # Initial delay before the first upgrade check
+    # Default: 1m — matches production behavior
+    # Set to 5s for faster tests
+    initialDelay: "1m"
+
+    # Dry-run mode — detects updates and logs them but does NOT create a Helm upgrade Job.
+    # Useful for validating upgrade logic without performing actual upgrades.
+    # Default: false
+    dryRun: false
+
     # Service account for upgrade Job
     # The Job needs permissions to manage Helm releases (secrets/configmaps)
     # and update all KubeAdapt resources during upgrade
@@ -211,7 +199,6 @@ agent:
     # Permissions needed to perform helm upgrade operations
     rbac:
       create: true
-
   # ============================================================
   # Additional Environment Variables
   # ============================================================
@@ -227,764 +214,19 @@ agent:
 
   topologySpreadConstraints: []
 
-# Dependencies configuration
-prometheus:
-  enabled: true
-  server:
-    persistentVolume:
-      # Optional: Enable persistent storage for Prometheus (default: emptyDir)
-      # With 30m retention, emptyDir is sufficient
-      enabled: false
-      size: 30Gi
-      # storageClass: gp2 # For AWS - adjust based on your infrastructure -> https://kubeadapt.io/docs/v1/getting-started/quick-start/#configuration-options
-    service:
-      type: ClusterIP
-      servicePort: 80
-    fullnameOverride: kubeadapt-prometheus-server
-    retention: "30m"
-    resources:
-      requests:
-        cpu: 2000m
-        memory: 4Gi
-      limits:
-        cpu: 8000m
-        memory: 24Gi
-
-    tolerations: []
-
-    nodeSelector: {}
-
-    affinity: {}
-
-    topologySpreadConstraints: []
-
-  alertmanager:
-    enabled: false
-  # -- Node Exporter Configuration:
-  # If you already have node-exporter running in your cluster (e.g., from kube-prometheus-stack),
-  # keep prometheus-node-exporter.enabled as false. Because we can read node exporter metrics from existing up and running prometheus node exporters.
-  # If you don't have any existing node-exporter, keep it as is prometheus-node-exporter.enabled=true.
-  prometheus-node-exporter:
-    enabled: true
-    resources:
-      requests:
-        cpu: 100m
-        memory: 30Mi
-      limits:
-        cpu: 200m
-        memory: 100Mi
-  # -- Kube State Metrics Configuration
-  kube-state-metrics:
-    enabled: true
-    podAnnotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8080"
-    resources:
-      requests:
-        cpu: 200m
-        memory: 512Mi
-      limits:
-        cpu: 1000m
-        memory: 2Gi
-  serverFiles:
-    prometheus.yml:
-      scrape_configs:
-        # Prometheus's own metrics, don't change scrape_configs, if you have additional scrapes add them under extraScrapeConfigs
-        - job_name: prometheus
-          static_configs:
-            - targets:
-                - localhost:9090
-          metric_relabel_configs:
-            - source_labels: [__name__]
-              action: keep
-              regex: ^(prometheus_.*|up|time)$
-
-        # Kube State Metrics
-        - job_name: kube-state-metrics
-          honor_labels: true
-          kubernetes_sd_configs:
-            - role: service
-              namespaces:
-                names:
-                  - kubeadapt
-          relabel_configs:
-            - source_labels:
-                [__meta_kubernetes_service_label_app_kubernetes_io_name]
-              regex: kube-state-metrics
-              action: keep
-            - action: labelmap
-              regex: __meta_kubernetes_service_label_(.+)
-          metric_relabel_configs:
-            - source_labels: [__name__]
-              action: keep
-              regex: ^(kube_pod_info|kube_deployment_created|kube_namespace_labels|kube_node_info|kube_persistentvolume_info|kube_pod_container_info|kube_node_status_capacity|kube_node_status_allocatable|kube_node_labels|kube_node_status_condition|kube_pod_container_resource_requests|kube_pod_owner|kube_pod_container_status_running|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_status_waiting|kube_pod_container_status_terminated|kube_pod_container_status_terminated_reason|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_deployment_status_replicas|kube_deployment_status_replicas_ready|kube_deployment_spec_replicas|kube_horizontalpodautoscaler_info|kube_pod_spec_volumes_persistentvolumeclaims_info|kube_statefulset_metadata_generation|kube_statefulset_status_replicas|kube_statefulset_status_replicas_ready|kube_statefulset_replicas|kube_daemonset_metadata_generation|kube_daemonset_status_number_ready|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_current_number_scheduled|kube_job_owner|kube_job_status_succeeded|kube_job_status_failed|kube_job_status_active|kube_job_spec_completions|kube_job_complete_time|kube_cronjob_spec_suspend|kube_persistentvolume_capacity_bytes|kube_pod_container_status_waiting_reason|kube_replicaset_status_ready_replicas|kube_replicaset_spec_replicas|kube_replicaset_created|kube_pod_container_state_started)$
-
-        # Metrics from cAdvisor (Container and Network metrics)
-        - job_name: "kubernetes-nodes-cadvisor"
-          scrape_interval: 15s
-          scheme: https
-          tls_config:
-            ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          kubernetes_sd_configs:
-            - role: node
-          relabel_configs:
-            - target_label: __address__
-              replacement: kubernetes.default.svc:443
-            - source_labels: [__meta_kubernetes_node_name]
-              regex: (.+)
-              target_label: __metrics_path__
-              replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
-          metric_relabel_configs:
-            - source_labels: [__name__]
-              action: keep
-              regex: ^(container_cpu_usage_seconds_total|container_cpu_cfs_periods_total|container_cpu_cfs_throttled_periods_total|container_cpu_cfs_throttled_seconds_total|container_memory_working_set_bytes|container_network_receive_bytes_total|container_network_transmit_bytes_total|machine_cpu_cores|container_fs_reads_total|container_fs_writes_total|container_fs_reads_bytes_total|container_fs_writes_bytes_total)$
-
-        # Metrics from OpenCost
-        - job_name: "opencost"
-          honor_labels: true
-          static_configs:
-            - targets: ["kubeadapt-opencost.kubeadapt.svc:9003"]
-          metric_relabel_configs:
-            - source_labels: [__name__]
-              action: keep
-              regex: ^(kubecost_cluster_info|node_cpu_hourly_cost|node_ram_hourly_cost|node_gpu_hourly_cost|pv_hourly_cost|kube_node_labels|kubecost_cluster_management_cost|kube_persistentvolumeclaim_info|kubecost_node_is_spot|kube_persistentvolumeclaim_resource_requests_storage_bytes|node_total_hourly_cost)$
-
-        # ============================================================
-        # KubeAdapt Agent Internal Metrics
-        # ============================================================
-        # Scrapes agent's own internal metrics for monitoring performance,
-        # errors, and operational health.
-        - job_name: "kubeadapt-agent"
-          scrape_interval: 30s
-          kubernetes_sd_configs:
-            - role: endpoints
-              namespaces:
-                names:
-                  - kubeadapt
-          relabel_configs:
-            # Keep only endpoints with agent component label
-            - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_component]
-              regex: agent
-              action: keep
-            # Keep only the metrics port
-            - source_labels: [__meta_kubernetes_endpoint_port_name]
-              regex: metrics
-              action: keep
-            # Add agent pod name as label
-            - source_labels: [__meta_kubernetes_pod_name]
-              target_label: agent_pod
-          metric_relabel_configs:
-            - source_labels: [__name__]
-              action: keep
-              regex: ^(kubeadapt_agent_build_info|kubeadapt_agent_collection_duration_seconds.*|kubeadapt_agent_collection_total|kubeadapt_agent_data_points_total|kubeadapt_agent_prometheus_query_duration_seconds.*|kubeadapt_agent_prometheus_queries_total|kubeadapt_agent_backend_post_duration_seconds.*|kubeadapt_agent_last_collection_duration_seconds|kubeadapt_agent_last_backend_post_duration_seconds|kubeadapt_agent_compression_ratio|kubeadapt_agent_compression_duration_seconds.*)$
-
-        # ============================================================
-        # Node-Exporter (Auto-discovery across all namespaces)
-        # ============================================================
-        # CRITICAL: Explicit config required to guarantee 15s interval for rate([1m])
-        # Auto-discovery uses label selectors, no namespace restriction needed
-        # Supports multiple node-exporter deployments:
-        # - kube-prometheus-stack (app.kubernetes.io/name=prometheus-node-exporter)
-        # - kubecost (component=node-exporter)
-        # - Other Helm charts with node-exporter in label values
-        - job_name: "node-exporter"
-          scrape_interval: 15s
-          kubernetes_sd_configs:
-            - role: endpoints
-          relabel_configs:
-            # Flexible label matching: supports app.kubernetes.io/name OR component label
-            # Matches: prometheus-node-exporter, kubecost-prometheus-node-exporter, etc.
-            - source_labels:
-                [__meta_kubernetes_service_label_app_kubernetes_io_name, __meta_kubernetes_service_label_component]
-              regex: (.*node-exporter.*|node-exporter)
-              action: keep
-            - source_labels: [__meta_kubernetes_endpoint_port_name]
-              regex: (metrics|http-metrics)
-              action: keep
-            - source_labels: [__meta_kubernetes_endpoint_address_target_name]
-              target_label: node
-          metric_relabel_configs:
-            - source_labels: [__name__]
-              action: keep
-              regex: ^(node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_filesystem_size_bytes|node_filesystem_avail_bytes|node_disk_io_time_seconds_total|node_disk_io_now)$
-
-  # Adds additional scrape configs to prometheus.yml
-  # Must be a string so you have to add a | after extraScrapeConfigs:
-  # Note: Optional configs (DCGM, eBPF) are added dynamically via frontend when enabled
-  extraScrapeConfigs: |
-    # ============================================================
-    # eBPF Network Cost Tracking
-    # ============================================================
-    # Pod-to-pod network traffic monitoring via eBPF TC hooks
-    # - job_name: "kubeadapt-ebpf-agent"
-    #   scrape_interval: 30s
-    #   kubernetes_sd_configs:
-    #     - role: endpoints
-    #   relabel_configs:
-    #     # Keep only KubeAdapt eBPF agent endpoints (via service name)
-    #     - source_labels: [__meta_kubernetes_service_name]
-    #       action: keep
-    #       regex: kubeadapt-ebpf-agent
-    #     # Keep only the metrics port
-    #     - source_labels: [__meta_kubernetes_endpoint_port_name]
-    #       action: keep
-    #       regex: metrics
-    #     # Add node label from endpoint's target node
-    #     - source_labels: [__meta_kubernetes_endpoint_node_name]
-    #       target_label: node
-    #   metric_relabel_configs:
-    #     # Filter: Keep network traffic AND internal observability metrics
-    #     - source_labels: [__name__]
-    #       action: keep
-    #       regex: ^(kubeadapt_connection_traffic_bytes_total|kubeadapt_connection_traffic_packets_total|kubeadapt_bpf_load_status|kubeadapt_bpf_load_attempts_total|kubeadapt_bpf_load_duration_seconds|kubeadapt_active_connections|kubeadapt_connection_tracking_info|kubeadapt_bpf_map_utilization_percent|kubeadapt_overflow_flows_total|kubeadapt_ip_pairs_batch_size|kubeadapt_ebpf_collection_duration_seconds|kubeadapt_ebpf_last_collection_duration_seconds|kubeadapt_collector_errors_total)$
-
-    # ============================================================
-    # DCGM Exporter for GPU Metrics (Optional - Requires GPU Operator)
-    # ============================================================
-    # Uncomment this section if you have NVIDIA GPU Operator deployed
-    #
-    # - job_name: "dcgm-exporter"
-    #   kubernetes_sd_configs:
-    #     - role: pod
-    #   relabel_configs:
-    #     - source_labels: [__meta_kubernetes_pod_label_app]
-    #       action: keep
-    #       regex: dcgm-exporter
-    #     - source_labels: [__meta_kubernetes_pod_container_port_name]
-    #       action: keep
-    #       regex: metrics
-    #   metric_relabel_configs:
-    #     - source_labels: [__name__]
-    #       action: keep
-    #       regex: ^(DCGM_FI_DEV_GPU_UTIL|DCGM_FI_DEV_FB_USED)$
-
-opencost:
-  # ============================================================
-  # OpenCost Chart Configuration
-  # ============================================================
-  # The following example values map to the upstream OpenCost Helm chart
-  # Chart: https://github.com/opencost/opencost-helm-chart
-
-  # ============================================================
-  # Secret containing cloud provider credentials for cost data retrieval.
-  # This is required for AWS Athena/CUR, GCP BigQuery, and Azure Cost Export integrations.
-  #
-  # Create secret with: kubectl create secret generic cloud-integration --from-file=cloud-integration.json --namespace kubeadapt
-  #
-  # See documentation for detailed setup and prerequisites:
-  # - AWS: https://kubeadapt.io/docs/v1/how-to-guides/integrations/aws
-  # - GCP: https://kubeadapt.io/docs/v1/how-to-guides/integrations/gcp
-  # - Azure: https://kubeadapt.io/docs/v1/how-to-guides/integrations/azure
-  #
-  # ============================================================
-  # cloud-integration.json Format Examples (OpenCost Official Format)
-  # ============================================================
-  #
-  # ============================================================
-  # AWS Cloud Integration Configuration
-  # ============================================================
-  # Configuration format for cloud-integration.json secret (see cloudIntegrationSecret above)
-  #
-  # Field Descriptions:
-  # - bucket: S3 bucket for Athena query results (e.g., "s3://my-athena-results-bucket")
-  # - region: AWS region where Athena database is located (e.g., "us-east-1")
-  # - database: Athena database name created by CUR setup (e.g., "athenacurcfn_my_cur_report")
-  # - table: Athena table name for CUR data (e.g., "my_cur_report")
-  # - catalog: Athena data catalog name (default: "AwsDataCatalog")
-  # - workgroup: Athena workgroup name (default: "Primary")
-  # - account: AWS Account ID where CUR is stored (for multi-account: management/payer account ID)
-  # - masterPayerARN: (Multi-account only) ARN of role in management account to assume for CUR access
-  # - authorizer.authorizerType: "AWSAccessKey" (with id/secret) or "AWSServiceAccountKey" (for IRSA)
-  # - authorizer.id: AWS Access Key ID (only for AWSAccessKey type)
-  # - authorizer.secret: AWS Secret Access Key (only for AWSAccessKey type)
-  #
-  # Example (Single Account with Access Keys):
-  # {
-  #   "aws": {
-  #     "athena": [{
-  #       "bucket": "s3://my-athena-results-bucket",
-  #       "region": "us-east-1",
-  #       "database": "athenacurcfn_my_cur_report",
-  #       "table": "my_cur_report",
-  #       "catalog": "AwsDataCatalog",
-  #       "workgroup": "Primary",
-  #       "account": "123456789012",
-  #       "authorizer": {
-  #         "authorizerType": "AWSAccessKey",
-  #         "id": "<ACCESS_KEY_ID>",
-  #         "secret": "<ACCESS_KEY_SECRET>"
-  #       }
-  #     }]
-  #   }
-  # }
-  #
-  # Example (IRSA - Recommended for EKS):
-  # {
-  #   "aws": {
-  #     "athena": [{
-  #       "bucket": "s3://my-athena-results-bucket",
-  #       "region": "us-east-1",
-  #       "database": "athenacurcfn_my_cur_report",
-  #       "table": "my_cur_report",
-  #       "catalog": "AwsDataCatalog",
-  #       "workgroup": "Primary",
-  #       "account": "123456789012",
-  #       "authorizer": {"authorizerType": "AWSServiceAccountKey"}
-  #     }]
-  #   }
-  # }
-  #
-  # Example (Multi-Account):
-  # {
-  #   "aws": {
-  #     "athena": [{
-  #       "bucket": "s3://organization-cur-bucket",
-  #       "region": "us-east-1",
-  #       "database": "athenacurcfn_organization_cur",
-  #       "table": "organization_cur",
-  #       "catalog": "AwsDataCatalog",
-  #       "workgroup": "Primary",
-  #       "account": "111111111111",
-  #       "masterPayerARN": "arn:aws:iam::111111111111:role/KubeadaptRole",
-  #       "authorizer": {"authorizerType": "AWSServiceAccountKey"}
-  #     }]
-  #   }
-  # }
-  #
-  # GCP Configuration Example (with Service Account Key):
-  # {
-  #   "gcp": {
-  #     "bigQuery": [
-  #       {
-  #         "projectID": "my-billing-project",
-  #         "dataset": "billing_export",
-  #         "table": "gcp_billing_export_v1_018AIF_74KD1D_534A2",
-  #         "authorizer": {
-  #           "authorizerType": "GCPServiceAccountKey",
-  #           "key": {
-  #             "type": "service_account",
-  #             "project_id": "my-billing-project",
-  #             "private_key_id": "...",
-  #             "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
-  #             "client_email": "kubeadapt-bigquery@my-billing-project.iam.gserviceaccount.com",
-  #             "client_id": "...",
-  #             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  #             "token_uri": "https://oauth2.googleapis.com/token",
-  #             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  #             "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/..."
-  #           }
-  #         }
-  #       }
-  #     ]
-  #   }
-  # }
-  #
-  # GCP with Workload Identity Example:
-  # {
-  #   "gcp": {
-  #     "bigQuery": [
-  #       {
-  #         "projectID": "my-billing-project",
-  #         "dataset": "billing_export",
-  #         "table": "gcp_billing_export_v1_018AIF_74KD1D_534A2",
-  #         "authorizer": {
-  #           "authorizerType": "GCPWorkloadIdentity"
-  #         }
-  #       }
-  #     ]
-  #   }
-  # }
-  # Note: When using Workload Identity, set serviceAccount.annotations.iam.gke.io/gcp-service-account
-  #
-  # ============================================================
-  # GCP Cloud Integration Configuration
-  # ============================================================
-  # Configuration format for cloud-integration.json secret
-  #
-  # Field Descriptions:
-  # - projectID: GCP project ID where BigQuery billing export is located
-  # - dataset: BigQuery dataset name containing billing data
-  # - table: BigQuery table name (full table name, e.g., "gcp_billing_export_v1_018AIF_74KD1D_534A2")
-  # - authorizer.authorizerType: "GCPServiceAccountKey" (with key) or "GCPWorkloadIdentity" (for GKE)
-  # - authorizer.key: Service account JSON key (only for GCPServiceAccountKey type)
-  #
-  # Example (Multi-Project with Service Account Key):
-  # {
-  #   "gcp": {
-  #     "bigQuery": [{
-  #       "projectID": "billing-project-111111",
-  #       "dataset": "organization_billing_export",
-  #       "table": "gcp_billing_export_v1_012345_ABCDEF_678901",
-  #       "authorizer": {
-  #         "authorizerType": "GCPServiceAccountKey",
-  #         "key": {
-  #           "type": "service_account",
-  #           "project_id": "billing-project-111111",
-  #           "private_key_id": "...",
-  #           "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
-  #           "client_email": "kubeadapt-org-billing@billing-project-111111.iam.gserviceaccount.com",
-  #           "client_id": "...",
-  #           "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  #           "token_uri": "https://oauth2.googleapis.com/token",
-  #           "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  #           "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/..."
-  #         }
-  #       }
-  #     }]
-  #   }
-  # }
-  #
-  # Example (Workload Identity - Recommended for GKE):
-  # {
-  #   "gcp": {
-  #     "bigQuery": [{
-  #       "projectID": "billing-project-111111",
-  #       "dataset": "organization_billing_export",
-  #       "table": "gcp_billing_export_v1_012345_ABCDEF_678901",
-  #       "authorizer": {"authorizerType": "GCPWorkloadIdentity"}
-  #     }]
-  #   }
-  # }
-  #
-  # ============================================================
-  # Azure Cloud Integration Configuration
-  # ============================================================
-  # Configuration format for cloud-integration.json secret
-  #
-  # Field Descriptions:
-  # - subscriptionID: Azure subscription ID
-  # - account: Storage account name containing cost export data
-  # - container: Container name where cost export CSV files are stored
-  # - path: Path within container (use "" if cost export is at container root)
-  # - cloud: Azure cloud type ("public", "gov", "china", "germany")
-  # - authorizer.authorizerType: "AzureAccessKey" (with accessKey) or use Managed Identity (no authorizer needed)
-  # - authorizer.accessKey: Storage account access key (only for AzureAccessKey type)
-  # - authorizer.account: Storage account name (only for AzureAccessKey type)
-  #
-  # Note: Unlike AWS/GCP, Azure does NOT use opencost.exporter fields for credentials.
-  # All Azure authentication goes through cloud-integration.json or extraVolumes (for Rate Card API).
-  #
-  # Example (Single Subscription with Access Key):
-  # {
-  #   "azure": {
-  #     "storage": [{
-  #       "subscriptionID": "12345678-1234-1234-1234-123456789012",
-  #       "account": "myazurestorageaccount",
-  #       "container": "cost-export",
-  #       "path": "",
-  #       "cloud": "public",
-  #       "authorizer": {
-  #         "authorizerType": "AzureAccessKey",
-  #         "accessKey": "<STORAGE_ACCESS_KEY>",
-  #         "account": "myazurestorageaccount"
-  #       }
-  #     }]
-  #   }
-  # }
-  #
-  # Example (Managed Identity - Recommended for AKS):
-  # {
-  #   "azure": {
-  #     "storage": [{
-  #       "subscriptionID": "12345678-1234-1234-1234-123456789012",
-  #       "account": "myazurestorageaccount",
-  #       "container": "cost-export",
-  #       "path": "",
-  #       "cloud": "public"
-  #     }]
-  #   }
-  # }
-  #
-  # Multi-Cloud Example (AWS + GCP + Azure):
-  # {
-  #   "aws": {
-  #     "athena": [ ... ]
-  #   },
-  #   "gcp": {
-  #     "bigQuery": [ ... ]
-  #   },
-  #   "azure": {
-  #     "storage": [ ... ]
-  #   }
-  # }
-  #
-  # NOTE: cloudIntegrationSecret is configured under opencost.opencost section below
-  #
-
-  # ============================================================
-  # Additional Volumes (Azure Rate Card API Only)
-  # ============================================================
-  # Used ONLY for Azure service principal authentication for Rate Card API (node pricing).
-  # Not needed for AWS or GCP.
-  #
-  # Azure has two separate authentication mechanisms:
-  # 1. cloudIntegrationSecret - For cloud costs (storage account billing data)
-  # 2. extraVolumes - For Rate Card API (node pricing via service principal)
-  #
-  # Create service-key.json: {"subscriptionId": "...", "serviceKey": {...}}
-  # Create secret: kubectl create secret generic azure-service-key --from-file=service-key.json
-  # File MUST be named "service-key.json"
-  extraVolumes: []
-  # Example:
-  # extraVolumes:
-  #   - name: service-key-secret
-  #     secret:
-  #       secretName: azure-service-key
-
-  serviceAccount:
-    create: true
-    # ============================================================
-    # Service Account Annotations (IAM / Workload Identity)
-    # ============================================================
-    # Annotations for cloud provider IAM integration using workload identity.
-    # This is the RECOMMENDED approach over using direct credentials.
-    #
-    # AWS IRSA (IAM Roles for Service Accounts) - EKS:
-    # Recommended over direct access keys. Use "AWSServiceAccountKey" in cloud-integration.json.
-    #
-    # GCP Workload Identity - GKE:
-    # Recommended over service account keys. Use "GCPWorkloadIdentity" in cloud-integration.json.
-    #
-    # Azure Managed Identity - AKS:
-    # Recommended over access keys. No authorizer needed in cloud-integration.json.
-    annotations: {}
-    # AWS IRSA Example:
-    # annotations:
-      # eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/KubeadaptAthenaRole
-    #
-    # GCP Workload Identity Example:
-    # annotations:
-    #   iam.gke.io/gcp-service-account: kubeadapt-bigquery@my-project.iam.gserviceaccount.com
-    #
-    # Azure Managed Identity Example:
-    # annotations:
-    #   azure.workload.identity/client-id: "12345678-1234-1234-1234-123456789012"
-    name: ""
-    automountServiceAccountToken: true
-  rbac:
-    enabled: true
-
-  restartJob:
-    enabled: true
-
-  opencost:
-    # ============================================================
-    # Cloud Integration Secret (Cloud Cost Data)
-    # ============================================================
-    # Secret name containing cloud-integration.json for CLOUD COST data:
-    # - AWS Athena/CUR (cloud costs)
-    # - GCP BigQuery (cloud costs)
-    # - Azure Cost Export (cloud costs)
-    #
-    # NOTE: AWS Spot Instance Data Feed is configured in customPricing.costModel section below,
-    #       NOT in cloud-integration.json!
-    #
-    # Create with: kubectl create secret generic cloud-integration --from-file=cloud-integration.json -n kubeadapt
-    # See cloud-integration.json format examples in the comments above (under opencost: section) or you can find details at kubeadapt docs
-    cloudIntegrationSecret: ""
-    # Example: "cloud-integration"
-
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "9003"
-      prometheus.io/path: "/metrics"
-    prometheus:
-      internal:
-        enabled: true
-        serviceName: kubeadapt-prometheus-server
-        namespaceName: kubeadapt
-        port: 80
-      external:
-        enabled: false
-        url: ""
-    exporter:
-      defaultClusterId: default # This can be overridden by the user by setting the opencost.opencost.clusterId value
-
-      # ============================================================
-      # GCP Cloud Billing API Key
-      # ============================================================
-      # API key for fetching GCP SKU list prices from Cloud Billing API.
-      # Required for GCP to show pricing for new resources not yet in BigQuery billing export.
-      #
-      # This is separate from cloudIntegrationSecret because:
-      # - cloudIntegrationSecret (service account): Reads actual billing data from BigQuery
-      # - cloudProviderApiKey: Fetches current list prices from Cloud Billing API
-      #
-      # Create at: Google Cloud Console → APIs & Services → Credentials → Create Credentials → API Key
-      # Optionally restrict to Cloud Billing API only for security
-      cloudProviderApiKey: ""
-      # Example: "AIzaSyD-1234567890abcdefghijklmnop"
-
-      # ============================================================
-      # AWS Direct Credentials (Alternative to IRSA)
-      # ============================================================
-      # Direct AWS credentials for Athena/CUR and Spot Data Feed access.
-      # Use "AWSAccessKey" authorizer type in cloud-integration.json with these credentials.
-      # IRSA is recommended over this approach (see serviceAccount.annotations).
-      aws:
-        access_key_id: ""
-        # Example: "AKIAIOSFODNN7EXAMPLE"
-        secret_access_key: ""
-        # Example: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-
-      # ============================================================
-      # Azure Configuration (Enterprise Agreement)
-      # ============================================================
-      # Azure uses cloudIntegrationSecret (root level) for credentials.
-      # These settings are for OPTIONAL Azure Enterprise Agreement features.
-      #
-      # NOTE: Unlike AWS (which has aws.access_key_id) or GCP (which has cloudProviderApiKey),
-      # Azure does NOT have a dedicated field. All Azure credentials go in cloudIntegrationSecret.
-      #
-      # Extra Environment Variables (Azure EA only)
-      # Required when using Azure EA for customer-specific pricing via Consumption Price Sheet API.
-      # Find billing account ID in Azure Portal → Cost Management → Billing accounts
-      extraEnv: {}
-      # Example for Azure EA:
-      # extraEnv:
-      #   AZURE_BILLING_ACCOUNT: "12345678"
-      #   AZURE_OFFER_ID: "MS-AZR-0017P"
-
-      # ============================================================
-      # Extra Volume Mounts (Azure Service Principal)
-      # ============================================================
-      # Additional volume mounts for the OpenCost exporter pod.
-      # Used in conjunction with extraVolumes (root level) for Azure service principal secret.
-      #
-      # This is ONLY needed when using Azure Service Principal authentication.
-      # If using Azure Managed Identity, this is NOT required.
-      extraVolumeMounts: []
-      # Example for Azure Service Principal:
-      # extraVolumeMounts:
-      #   - mountPath: /var/secrets
-      #     name: service-key-secret
-      #     readOnly: true
-
-      resources:
-        requests:
-          cpu: 200m
-          memory: 512Mi
-        limits:
-          cpu: 2000m
-          memory: 4Gi
-
-    # ============================================================
-    # Custom Pricing & AWS Spot Data Feed Configuration
-    # ============================================================
-    # This section serves TWO purposes:
-    #
-    # 1. ON-PREMISES / BARE METAL: Configure custom resource costs for
-    #    self-managed Kubernetes clusters without cloud provider pricing APIs.
-    #
-    # 2. AWS SPOT DATA FEED: Configure S3 bucket details for accurate spot
-    #    instance pricing. The CPU/RAM/GPU costs below are only FALLBACK values
-    #    when AWS Pricing API data is unavailable - OpenCost still uses dynamic
-    #    per-instance-type pricing from AWS for on-demand instances.
-    #
-
-    # See: https://kubeadapt.io/docs/v1/how-to-guides/integrations/on-premises
-    customPricing:
-      enabled: false
-      # ============================================================
-      # Provider Setting (CRITICAL for AWS Spot Data Feed!)
-      # ============================================================
-      # Sets the config filename: "custom" → default.json, "aws" → aws.json
-      # OpenCost's AWS provider looks for aws.json, so this MUST be "aws"
-      # when using AWS Spot Data Feed! Similarly, use "gcp" or "azure" for those clouds.
-      #
-      # Options:
-      # - "custom" (default): Creates default.json - for on-premises or custom pricing
-      # - "aws": Creates aws.json - REQUIRED for AWS Spot Data Feed to work
-      # - "gcp": Creates gcp.json
-      # - "azure": Creates azure.json
-      provider: custom
-      costModel:
-        awsSpotDataBucket: ""
-        awsSpotDataRegion: ""
-        awsSpotDataPrefix: ""
-        projectID: ""
-        # Description of the pricing model
-        description: "Default prices based on GCP us-central1"
-        # ============================================================
-        # Fallback Pricing (used when cloud API pricing unavailable)
-        # ============================================================
-        # For cloud environments (AWS/GCP/Azure): These are FALLBACK values only.
-        # OpenCost fetches actual per-instance-type pricing from cloud APIs.
-        # For on-premises: These are the primary pricing values.
-        #
-        # CPU cost per core-hour (USD) - fallback for cloud, primary for on-prem
-        CPU: "0.031611"
-        # Spot/Preemptible CPU cost per core-hour (USD) - fallback only
-        spotCPU: "0.006655"
-        # RAM cost per GB-hour (USD) - fallback for cloud, primary for on-prem
-        RAM: "0.004237"
-        # Spot/Preemptible RAM cost per GB-hour (USD) - fallback only
-        spotRAM: "0.000892"
-        # GPU cost per GPU-hour (USD) - fallback for cloud, primary for on-prem
-        GPU: "0.95"
-        # Storage cost per GB-hour (USD)
-        storage: "0.00005479452"
-        # Network egress cost per GB - same availability zone (USD)
-        zoneNetworkEgress: "0.01"
-        # Network egress cost per GB - same region, different zone (USD)
-        regionNetworkEgress: "0.01"
-        # Network egress cost per GB - internet egress (USD)
-        internetNetworkEgress: "0.12"
-
-    ui:
-      enabled: false
-    # ============================================================
-    # Cloud Cost Integration Settings
-    # ============================================================
-    # Controls cloud cost data ingestion from AWS, GCP, and Azure.
-    # Requires valid cloudIntegrationSecret to be configured above.
-    #
-    # When enabled, OpenCost will:
-    # - AWS: Query Athena for CUR data, fetch RI/Savings Plans from Cost Explorer API
-    # - GCP: Query BigQuery for billing export, track CUD utilization
-    # - Azure: Read cost export from storage account, track RI utilization
-    #
-    # NOTE: Spot/Preemptible pricing is configured separately via customPricing section above,
-    #       NOT via cloudCost/cloud-integration.json
-    cloudCost:
-      enabled: false
-      # How often to refresh cloud cost data (hours)
-      # Lower values = more up-to-date data but higher API costs
-      refreshRateHours: 6
-      # Time window for cloud cost data retrieval (days)
-      # Larger values = more historical data but longer query times and higher costs
-      runWindowDays: 3
-    dataRetention:
-      dailyResolutionDays: 15
-    carbonCost:
-      # -- Enable carbon cost exposed in the API
-      enabled: false
-
-
-    tolerations: []
-    nodeSelector: {}
-    affinity: {}
-    topologySpreadConstraints: []
-
 # ============================================================
 # eBPF Agent Configuration (Network Cost Tracking)
 # ============================================================
 # Deploys a DaemonSet that uses eBPF to track pod-to-pod network traffic
-# Required for network cost metrics (networkCostEnabled: true in agent config)
-
+#
 # Prerequisites:
 # - Linux kernel >= 5.8 (required for TC eBPF support)
 # - Privileged container access
-#
-# IMPORTANT: When enabling ebpf-agent, also set agent.config.networkCostEnabled: true
-# so the KubeAdapt agent knows to collect network metrics from the eBPF DaemonSet.
 #
 # For full configuration options, see: charts/ebpf-agent/values.yaml
 ebpf-agent:
   # Set to true to deploy the eBPF agent DaemonSet for network cost tracking
   enabled: false
-
 
   # Override defaults if needed - see charts/ebpf-agent/values.yaml for all options
   # config:
@@ -999,76 +241,3 @@ ebpf-agent:
   affinity: {}
 
   topologySpreadConstraints: []
-
-# NVIDIA GPU Operator configuration for cost optimization
-gpu-operator:
-  enabled: false
-  operator:
-    defaultRuntime: containerd
-    cleanupCRD: false
-    upgradeCRD: true
-    imagePullSecrets:
-      - nvcr-cred
-
-  # DCGM Exporter configuration for GPU metrics collection
-  dcgmExporter:
-    enabled: true
-    repository: nvcr.io/nvidia/k8s
-    image: dcgm-exporter
-    version: 4.3.1-4.4.0-ubuntu22.04
-    imagePullPolicy: IfNotPresent
-    imagePullSecrets:
-      - nvcr-cred
-    resources:
-      requests:
-        memory: "128Mi"
-        cpu: "50m"
-      limits:
-        memory: "512Mi"
-        cpu: "250m"
-    serviceMonitor:
-      enabled: true
-      interval: 30s
-      additionalLabels:
-        prometheus: kube-prometheus
-
-  # Device Plugin for GPU resource management
-  devicePlugin:
-    enabled: true
-    repository: nvcr.io/nvidia
-    image: k8s-device-plugin
-    version: v0.17.3
-    imagePullSecrets:
-      - nvcr-cred
-
-  # GPU Feature Discovery (fixed image)
-  gfd:
-    enabled: true
-    # repository: nvcr.io/nvidia/k8s
-    repository: docker.io/nvidia
-    image: gpu-feature-discovery
-    version: v0.6.0
-    imagePullSecrets: []
-    # - nvcr-cred
-
-  # MIG Manager (disabled for simplicity)
-  migManager:
-    enabled: false
-
-  # Container Toolkit (AL2-compatible tag)
-  toolkit:
-    enabled: true
-    repository: nvcr.io/nvidia/k8s
-    image: container-toolkit
-    # version: v1.17.8-amzn2
-    imagePullSecrets:
-      - nvcr-cred
-
-  # Driver installation
-  driver:
-    enabled: true
-    repository: nvcr.io/nvidia
-    image: driver
-    version: "580.65.06"
-    imagePullSecrets:
-      - nvcr-cred

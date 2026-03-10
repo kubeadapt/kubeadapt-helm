@@ -40,12 +40,6 @@ jobs:
         with:
           version: v3.13.3
 
-      - name: Add dependency repos
-        run: |
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo add opencost https://opencost.github.io/opencost-helm-chart
-          helm repo update
-
       # Import GPG private key for chart signing
       - name: Prepare PGP key
         run: |

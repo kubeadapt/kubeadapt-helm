@@ -9,11 +9,11 @@ metadata:
 spec:
   type: {{ .Values.agent.service.type }}
   ports:
-    - port: {{ .Values.agent.config.metricsPort }}
-      targetPort: metrics
+    - port: {{ .Values.agent.config.healthPort }}
+      targetPort: health
       protocol: TCP
-      name: metrics
+      name: health
   selector:
     {{- include "kubeadapt.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: agent
-{{- end }} 
+{{- end }}
