@@ -48,7 +48,7 @@ agent:
     token: ""
 
     # Backend API endpoint
-    backendUrl: "https://api.kubeadapt.io"
+    backendUrl: "https://agent.kubeadapt.io"
 
     # ============================================================
     # Collection Settings

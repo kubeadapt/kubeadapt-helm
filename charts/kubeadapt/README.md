@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 0.18.0](https://img.shields.io/badge/Version-0.18.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.18.1](https://img.shields.io/badge/Version-0.18.1-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -64,7 +64,7 @@ helm delete my-release
 | agent.autoUpgrade.serviceAccount.create | bool | `true` |  |
 | agent.autoUpgrade.serviceAccount.name | string | `""` |  |
 | agent.autoUpgrade.timeout | string | `"15m"` |  |
-| agent.config.backendUrl | string | `"https://api.kubeadapt.io"` |  |
+| agent.config.backendUrl | string | `"https://agent.kubeadapt.io"` |  |
 | agent.config.bufferMaxBytes | string | `"52428800"` |  |
 | agent.config.compressionLevel | int | `3` |  |
 | agent.config.dcgmEndpoints | string | `""` |  |
