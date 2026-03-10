@@ -196,6 +196,76 @@ entries:
   kubeadapt:
   - annotations:
       artifacthub.io/changes: |
+        - kind: removed
+          description: "Removed prometheus, opencost, and gpu-operator dependencies"
+        - kind: changed
+          description: "Agent now uses Kubernetes API directly via kubeadapt-agent (no Prometheus required)"
+        - kind: changed
+          description: "Simplified chart configuration and reduced values.yaml surface area"
+        - kind: changed
+          description: "Updated RBAC to support kubeadapt-agent resource requirements"
+      artifacthub.io/compatibility: |
+        kubernetes:
+          platforms:
+            eks:
+              versions: ["1.24-1.35"]
+              tested: true
+            aks:
+              versions: ["1.24-1.35"]
+              tested: true
+            gke:
+              versions: ["1.24-1.35"]
+              tested: true
+            on-premise:
+              versions: ["1.24-1.35"]
+              tested: true
+      artifacthub.io/containsSecurityUpdates: "false"
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: Documentation
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/README.md
+        - name: Compatibility Matrix
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/COMPATIBILITY.md
+        - name: Security Policy
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/SECURITY.md
+      artifacthub.io/platforms: |
+        - eks
+        - aks
+        - gke
+        - on-premise
+      artifacthub.io/prerelease: "true"
+      artifacthub.io/signKey: |
+        fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
+        url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
+    apiVersion: v2
+    appVersion: 0.1.0
+    created: "2026-03-10T12:15:10.646885076Z"
+    dependencies:
+    - condition: ebpf-agent.enabled
+      name: ebpf-agent
+      repository: oci://ghcr.io/kubeadapt/kubeadapt-helm
+      version: 0.2.0
+    description: A Helm chart for Kubeadapt
+    digest: a4b5c21ba9be7667163419cdc5dded8359348486bda747d8c03e97d7d6ed5ed1
+    keywords:
+    - kubernetes
+    - resource optimization
+    - cost optimization
+    - monitoring
+    - cloud native
+    - multi-cloud
+    maintainers:
+    - email: ugurcan@kubeadapt.io
+      name: ugurcancaykara
+    - email: authors@kubeadapt.io
+      name: Kubeadapt
+    name: kubeadapt
+    type: application
+    urls:
+    - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-0.18.0/kubeadapt-0.18.0.tgz
+    version: 0.18.0
+  - annotations:
+      artifacthub.io/changes: |
         - kind: changed
           description: "Implemented node group rightsizing functionality, health tracking system and missing metrics"
       artifacthub.io/compatibility: |
@@ -2319,4 +2389,4 @@ entries:
     urls:
     - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-0.1.0/kubeadapt-0.1.0.tgz
     version: 0.1.0
-generated: "2026-01-19T20:25:17.981025624Z"
+generated: "2026-03-10T12:15:10.647466234Z"
