@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 0.18.3
+version: 0.18.4
 appVersion: "0.1.0"
 
 # Dependencies
@@ -32,15 +32,15 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
-    - kind: removed
-      description: "Removed prometheus, opencost, and gpu-operator dependencies"
     - kind: changed
-      description: "Agent now uses Kubernetes API directly via kubeadapt-agent (no Prometheus required)"
+      description: "Bump agent v2.0.1 to v2.0.2 (correct default backend URL)"
     - kind: changed
-      description: "Simplified chart configuration and reduced values.yaml surface area"
-    - kind: changed
-      description: "Updated RBAC to support kubeadapt-agent resource requirements"
-  artifacthub.io/containsSecurityUpdates: "false"
+      description: "Bump upgrader v0.1.1 to v0.1.3 (node-based platform detection, health probes, dep security fixes)"
+    - kind: added
+      description: "Add liveness/readiness probes to upgrader sidecar container"
+    - kind: security
+      description: "Upgrader deps bumped: helm v3.20.1, containerd v1.7.29, crypto v0.49.0"
+  artifacthub.io/containsSecurityUpdates: "true"
   artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0
   artifacthub.io/platforms: |

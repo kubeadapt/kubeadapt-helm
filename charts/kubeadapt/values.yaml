@@ -9,7 +9,7 @@ agent:
   image:
     # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
     repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
-    tag: "v2.0.1" # Defaults to .Chart.AppVersion
+    tag: "v2.0.2"
     pullPolicy: IfNotPresent
   # ============================================================
   # Service Account Configuration
@@ -127,7 +127,7 @@ agent:
     image:
       # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader
       repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader
-      tag: "v0.1.1"
+      tag: "v0.1.3"
       pullPolicy: IfNotPresent
 
     # Resource limits for the upgrader sidecar
@@ -153,7 +153,7 @@ agent:
     # Options:
     #   - "stable": Production-ready releases (recommended)
     #   - "fast": Early access releases (may have bugs)
-    # Pre-release phase - all charts published to fast channel only
+    # All releases use fast channel until first stable (v1) release
     channel: "fast"
 
     # Upgrade timeout - how long to wait for helm upgrade to complete
