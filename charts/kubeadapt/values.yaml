@@ -161,7 +161,7 @@ agent:
 
     # Helm image for upgrade Job
     # Contains helm binary for performing upgrades
-    jobImage: "alpine/helm:3.14.3"
+    jobImage: "alpine/helm:4.1.3"
 
     # Chart repository URL for Helm upgrades
     # Leave empty to use the default OCI registry (production default)
