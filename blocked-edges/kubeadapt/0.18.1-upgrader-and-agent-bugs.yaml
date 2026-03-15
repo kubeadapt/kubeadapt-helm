@@ -1,0 +1,13 @@
+to: "0.18.1"
+from: "0\\.17\\..*|0\\.16\\..*"
+name: Upgrader-Env-Mismatch-And-Agent-CloudAccount-Bug
+message: |
+  Upgrader sidecar (v0.1.0) expects KUBEADAPT_BACKEND_API_ENDPOINT
+  but chart sends KUBEADAPT_BACKEND_URL. CrashLoopBackOff on startup.
+  Agent image (v2.0.0) missing cloud account ID wiring (fixed in v2.0.1).
+  Upgrade to 0.18.3.
+
+matchingRules:
+  - type: Always
+
+redirect_to: "0.18.3"

@@ -66,10 +66,8 @@ jobs:
 
             # 4. 'from' regex validation
             FROM_REGEX=$(yq '.from' "$file" | tr -d '"')
-            # Try to compile the regex - capture exit code before conditional
-            echo "0.15.0" | grep -E "$FROM_REGEX" > /dev/null 2>&1
-            GREP_EXIT=$?
-            # Exit code 2 means regex syntax error (1 just means no match)
+            GREP_EXIT=0
+            echo "0.15.0" | grep -E "$FROM_REGEX" > /dev/null 2>&1 || GREP_EXIT=$?
             if [ $GREP_EXIT -eq 2 ]; then
               echo "ERROR: Invalid regex in 'from' field: $FROM_REGEX"
               exit 1
