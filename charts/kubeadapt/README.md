@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 0.18.2](https://img.shields.io/badge/Version-0.18.2-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.18.3](https://img.shields.io/badge/Version-0.18.3-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -44,14 +44,14 @@ helm delete my-release
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | agent.affinity | object | `{}` |  |
-| agent.autoUpgrade.channel | string | `"stable"` |  |
+| agent.autoUpgrade.channel | string | `"fast"` |  |
 | agent.autoUpgrade.chartRepo | string | `""` |  |
-| agent.autoUpgrade.checkInterval | string | `"6h"` |  |
+| agent.autoUpgrade.checkInterval | string | `"24h"` |  |
 | agent.autoUpgrade.dryRun | bool | `false` |  |
 | agent.autoUpgrade.enabled | bool | `false` |  |
 | agent.autoUpgrade.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.autoUpgrade.image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader"` |  |
-| agent.autoUpgrade.image.tag | string | `""` |  |
+| agent.autoUpgrade.image.tag | string | `"v0.1.1"` |  |
 | agent.autoUpgrade.initialDelay | string | `"1m"` |  |
 | agent.autoUpgrade.jobImage | string | `"alpine/helm:3.14.3"` |  |
 | agent.autoUpgrade.policy | string | `"minor"` |  |

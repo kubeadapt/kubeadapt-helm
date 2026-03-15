@@ -127,7 +127,7 @@ agent:
     image:
       # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader
       repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader
-      tag: "" # Defaults to .Chart.AppVersion
+      tag: "v0.1.1"
       pullPolicy: IfNotPresent
 
     # Resource limits for the upgrader sidecar
@@ -140,8 +140,7 @@ agent:
         memory: 128Mi
 
     # How often to check for updates
-    # Recommended: 6h for production, 1h for testing
-    checkInterval: "6h"
+    checkInterval: "24h"
 
     # Upgrade policy - controls which versions to upgrade to
     # Options:
@@ -154,7 +153,8 @@ agent:
     # Options:
     #   - "stable": Production-ready releases (recommended)
     #   - "fast": Early access releases (may have bugs)
-    channel: "stable"
+    # Pre-release phase - all charts published to fast channel only
+    channel: "fast"
 
     # Upgrade timeout - how long to wait for helm upgrade to complete
     timeout: "15m"
@@ -169,11 +169,11 @@ agent:
     chartRepo: ""
 
     # Initial delay before the first upgrade check
-    # Default: 1m — matches production behavior
+    # Default: 1m
     # Set to 5s for faster tests
     initialDelay: "1m"
 
-    # Dry-run mode — detects updates and logs them but does NOT create a Helm upgrade Job.
+    # Dry-run mode - detects updates and logs them but does NOT create a Helm upgrade Job.
     # Useful for validating upgrade logic without performing actual upgrades.
     # Default: false
     dryRun: false

@@ -1,0 +1,12 @@
+to: "0.18.2"
+from: "0\\.17\\..*|0\\.18\\.0|0\\.18\\.1"
+name: Upgrader-Env-Mismatch
+message: |
+  Upgrader sidecar (v0.1.0) expects KUBEADAPT_BACKEND_API_ENDPOINT
+  but chart sends KUBEADAPT_BACKEND_URL. CrashLoopBackOff on startup.
+  Upgrade to 0.18.3.
+
+matchingRules:
+  - type: Always
+
+redirect_to: "0.18.3"

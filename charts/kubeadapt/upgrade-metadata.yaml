@@ -2,10 +2,11 @@
 # Defines explicit upgrade paths for this chart version.
 # This file is embedded in the chart package and used by KubeAdapt auto-upgrade system.
 
-chartVersion: "0.18.2"
+chartVersion: "0.18.3"
 
 # Versions that can upgrade to this version
 upgradeFrom:
+  - "0.18.2"
   - "0.18.1"
   - "0.18.0"
   - "0.17.0"
@@ -19,7 +20,4 @@ metadata:
   releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases"
   containsSecurityUpdates: false
   minKubernetesVersion: "1.24.0"
-  breakingChanges:
-    - "Removed prometheus, opencost, and gpu-operator dependencies (resources auto-cleaned by helm upgrade)"
-    - "Agent now uses kubeadapt-agent image with new env vars (KUBEADAPT_AGENT_TOKEN, KUBEADAPT_BACKEND_URL, etc.)"
-    - "gpu-operator CRDs may remain after upgrade and can be safely removed manually if not needed"
+  breakingChanges: []
