@@ -1,0 +1,13 @@
+to: "0.18.4"
+from: "0\\.17\\..*|0\\.18\\.0|0\\.18\\.1|0\\.18\\.2|0\\.18\\.3"
+name: Reuse-Values-Overrides-Chart-Defaults
+message: |
+  Upgrader v0.1.3 uses --reuse-values which carries old computed values
+  into new chart version, overriding new defaults (e.g. image tag bumps).
+  Auto-upgrades from older charts keep stale image tags causing crash loops.
+  Upgrade to 0.18.5.
+
+matchingRules:
+  - type: Always
+
+redirect_to: "0.18.5"

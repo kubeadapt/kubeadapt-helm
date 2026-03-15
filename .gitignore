@@ -21,3 +21,4 @@ charts/*/Chart.lock
 *.tmp
 .env
 todo.md
+proposals/
