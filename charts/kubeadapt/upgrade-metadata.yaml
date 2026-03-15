@@ -2,10 +2,11 @@
 # Defines explicit upgrade paths for this chart version.
 # This file is embedded in the chart package and used by KubeAdapt auto-upgrade system.
 
-chartVersion: "0.18.3"
+chartVersion: "0.18.4"
 
 # Versions that can upgrade to this version
 upgradeFrom:
+  - "0.18.3"
   - "0.18.2"
   - "0.18.1"
   - "0.18.0"
@@ -18,6 +19,6 @@ channels:
 # Optional metadata
 metadata:
   releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases"
-  containsSecurityUpdates: false
+  containsSecurityUpdates: true
   minKubernetesVersion: "1.24.0"
   breakingChanges: []
