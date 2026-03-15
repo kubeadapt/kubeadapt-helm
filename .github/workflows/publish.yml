@@ -83,6 +83,27 @@ jobs:
         env:
           CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set prerelease flag
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+          shopt -s nullglob
+          for pkg in .cr-release-packages/*.tgz; do
+            if [ -z "${pkg:-}" ]; then
+              break
+            fi
+            chart_name=$(tar -xf "$pkg" -O '*/Chart.yaml' | yq '.name')
+            version=$(tar -xf "$pkg" -O '*/Chart.yaml' | yq '.version')
+            is_prerelease=$(tar -xf "$pkg" -O '*/Chart.yaml' | yq '.annotations."artifacthub.io/prerelease"')
+
+            if [ "$is_prerelease" = "true" ]; then
+              gh release edit "${chart_name}-${version}" --prerelease --latest=false
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Login to GHCR
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:

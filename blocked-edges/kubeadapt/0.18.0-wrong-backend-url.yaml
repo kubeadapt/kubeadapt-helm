@@ -1,0 +1,14 @@
+to: "0.18.0"
+from: "0\\.17\\..*|0\\.16\\..*"
+name: Wrong-Backend-URL
+message: |
+  Version 0.18.0 ships with backendUrl defaulting to api.kubeadapt.io
+  instead of agent.kubeadapt.io. The agent connects to the wrong service
+  and all snapshot sends fail with HTTP 422.
+
+  Upgrade to 0.18.1 which has the correct backend URL.
+
+matchingRules:
+  - type: Always
+
+redirect_to: "0.18.1"
