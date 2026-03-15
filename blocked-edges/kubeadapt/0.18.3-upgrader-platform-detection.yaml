@@ -1,0 +1,13 @@
+to: "0.18.3"
+from: "0\\.17\\..*|0\\.18\\.0|0\\.18\\.1|0\\.18\\.2"
+name: Upgrader-IMDS-Platform-Detection-And-Missing-Health-Probes
+message: |
+  Upgrader v0.1.1 uses IMDS HTTP checks for platform detection which fails
+  on IMDSv2-only clusters (EKS). Misdetects as on-premise, skipping
+  platform-specific blocked edges. Also missing health/readiness probes.
+  Upgrade to 0.18.4.
+
+matchingRules:
+  - type: Always
+
+redirect_to: "0.18.4"

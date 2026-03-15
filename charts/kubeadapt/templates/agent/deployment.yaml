@@ -111,6 +111,22 @@ spec:
         - name: upgrader
           image: "{{ .Values.agent.autoUpgrade.image.repository }}:{{ .Values.agent.autoUpgrade.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.agent.autoUpgrade.image.pullPolicy }}
+          ports:
+            - name: upgrader-health
+              containerPort: 8081
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: upgrader-health
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: upgrader-health
+            initialDelaySeconds: 5
+            periodSeconds: 10
           env:
             # Required: Backend API endpoint (ingestion-api)
             - name: KUBEADAPT_BACKEND_URL
