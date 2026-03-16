@@ -47,6 +47,12 @@ agent:
     # This is provided when you create a cluster in the Kubeadapt platform.
     token: ""
 
+    # Use an existing Kubernetes Secret instead of creating one from config.token.
+    # The Secret must contain a key named "token" with the agent token value.
+    # When set, config.token is ignored and no Secret is created by the chart.
+    # Example: existingSecret: "kubeadapt-agent"
+    existingSecret: ""
+
     # Backend API endpoint
     backendUrl: "https://agent.kubeadapt.io"
 

@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 0.18.5
+version: 0.18.6
 appVersion: "0.1.0"
 
 # Dependencies
@@ -32,11 +32,11 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
+    - kind: added
+      description: "Support existingSecret for agent token (skip chart-managed Secret when set)"
     - kind: fixed
-      description: "Bump upgrader v0.1.3 to v0.1.4 (fix --reuse-values overriding new chart defaults)"
-    - kind: fixed
-      description: "Drain stale ticker ticks after long-running upgrades to prevent burst retries"
-  artifacthub.io/containsSecurityUpdates: "true"
+      description: "Fix missing liveness and readiness probes on agent container"
+  artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0
   artifacthub.io/platforms: |
