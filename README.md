@@ -53,7 +53,7 @@ helm verify path/to/chart.tgz
 
 ## Resources
 
-- [Deployment Reference](https://kubeadapt.io/docs/v1/helm-chart/overview/) - Full values documentation
+- [Deployment Reference](https://kubeadapt.io/docs/v1/configuration/overview/) - Full values documentation
 - [Getting Started](https://kubeadapt.io/docs/v1/getting-started/quick-start/) - Installation walkthrough
 - [ArtifactHub](https://artifacthub.io/packages/helm/kubeadapt/kubeadapt) - Browse charts
 - [Contributing](https://github.com/kubeadapt/kubeadapt-helm/blob/main/CONTRIBUTING.md)
