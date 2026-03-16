@@ -37,7 +37,7 @@ Get a token from [app.kubeadapt.io](https://app.kubeadapt.io) under **Clusters >
 
 See [charts/kubeadapt/values.yaml](./charts/kubeadapt/values.yaml) for all configuration options.
 
-Full documentation: [kubeadapt.io/docs/v1/helm-chart/overview](https://kubeadapt.io/docs/v1/helm-chart/overview/)
+Full documentation: [kubeadapt.io/docs/v1/configuration/overview](https://kubeadapt.io/docs/v1/configuration/overview/)
 
 ## Chart Signing & Verification
 
