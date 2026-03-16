@@ -60,7 +60,7 @@ Any breaking changes to a chart (backwards incompatible) require:
 
 ### New Application Versions
 
-Helm charts are intended to be created for all non-patch releases of Kubeadapt Agent. External dependencies (Prometheus and OpenCost) will use versions that have been tested with the corresponding release.
+Helm charts are intended to be created for all non-patch releases of Kubeadapt Agent.
 
 When updating application versions ensure you make the following changes:
 * `values.yaml`: Bump all instances of the container image versions
@@ -124,12 +124,13 @@ annotations:
 Before reporting issues, please test with both minimal and full configurations:
 ```shell
 # Test with default values
-helm install kubeadapt ./charts/kubeadapt --dry-run
+helm install kubeadapt ./charts/kubeadapt --dry-run --set agent.config.token=test
 
 # Test with all components
 helm install kubeadapt ./charts/kubeadapt \
-  --set prometheus.enabled=true \
-  --set opencost.enabled=true \
+  --set agent.config.token=test \
+  --set agent.autoUpgrade.enabled=true \
+  --set ebpf-agent.enabled=true \
   --dry-run
 ```
 

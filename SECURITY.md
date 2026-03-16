@@ -4,8 +4,8 @@
 
 Each Helm chart currently supports the designated application version in the Chart.yaml. There is a chance a security issue you've discovered may not be with the Helm chart but with the upstream application. Please visit that application's Security policy document to find out how to report the security issue.
 
-* [Security Policy for Prometheus](https://github.com/prometheus/prometheus/blob/main/SECURITY.md)
-* [Security Policy for OpenCost](https://github.com/opencost/opencost/blob/develop/SECURITY.md)
+* [Security Policy for Kubeadapt Agent](https://github.com/kubeadapt/kubeadapt-agent/blob/main/SECURITY.md)
+* [Security Policy for eBPF Agent](https://github.com/kubeadapt/ebpf-agent/blob/main/SECURITY.md)
 
 ## Reporting a Vulnerability
 

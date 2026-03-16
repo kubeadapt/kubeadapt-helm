@@ -24,7 +24,7 @@ fi
 
 chart_yaml_path="charts/${chart}/Chart.yaml"
 # Split dependency by '/' and only use last element
-# This way we can drop prefixes like "kubeadapt/..." , "prometheus-community/..." , "opencost/..."
+# This way we can drop prefixes like "kubeadapt/..." from dependency names
 dependency_name="${dependency_name##*/}"
 
 # For core components (agent), determine version bump type based on semver change

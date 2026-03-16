@@ -17,26 +17,30 @@
 
 #### Amazon EKS
 
-- **IRSA (IAM Roles for Service Accounts)**: Recommended for OpenCost integration
+- Discount pricing (RI/SP): Requires [cloud account connection](/docs/v1/how-to-guides/integrations/aws) via cross-account IAM role
+- EKS cluster auto-discovery included with the cloud account connection
 
 #### Azure AKS
 
-- **Managed Identity**: Recommended for OpenCost integration
+- On-demand and spot pricing works without any setup
+- RI/SP discount integration: [Planned](https://feedback.kubeadapt.io/features/azure-reserved-vm-instances-savings-plans-6n8jg2)
 
 #### Google GKE
 
-- **Workload Identity**: Recommended for OpenCost integration
+- On-demand and spot pricing works without any setup
+- CUD discount integration: [Planned](https://feedback.kubeadapt.io/features/gcp-committed-use-discounts-cuds-igjr9r)
 
 #### On-Premise
 
-- **Limitations**: Cloud cost integration requires manual pricing provided as configuration
+- On-demand pricing works without any setup
+- Custom pricing configuration available for non-cloud environments
 
 ## Feature Support Matrix
 
 | Feature                           | EKS | AKS | GKE | On-Premise |
 | --------------------------------- | --- | --- | --- | ---------- |
 | Basic Metrics Collection          | ✓   | ✓   | ✓   | ✓          |
-| Cloud Cost Integration (OpenCost) | ✓   | ✓   | ✓   | Custom     |
+| Cloud Cost Integration            | ✓   | ✓   | ✓   | Custom     |
 | GPU Monitoring                    | ✓   | ✓   | ✓   | ✓          |
 | Network Cost Monitoring           | ✓   | ✓   | ✓   | -          |
 | Persistent Storage                | ✓   | ✓   | ✓   | ✓          |
