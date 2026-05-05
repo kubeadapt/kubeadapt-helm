@@ -73,9 +73,9 @@ jobs:
         run: |
           cd charts/kubeadapt
           helm dependency build
-          if [ $(find charts/ -name "ebpf-agent-*.tgz" | wc -l) -eq 0 ]; then
+          if [ $(find charts/ -name "kubeadapt-k8s-pulse-*.tgz" | wc -l) -eq 0 ]; then
             echo "Dependencies not correctly resolved"
-            echo "Expected to find ebpf-agent-*.tgz in charts directory"
+            echo "Expected to find kubeadapt-k8s-pulse-*.tgz in charts directory"
             ls -la charts/
             exit 1
           fi
@@ -96,7 +96,7 @@ jobs:
 
       # Ensure BPF filesystem is mounted (required for eBPF agent)
       - name: Setup BPF filesystem
-        if: steps.list-changed.outputs.changed == 'true' && contains(steps.list-changed.outputs.changed_charts, 'ebpf-agent')
+        if: steps.list-changed.outputs.changed == 'true' && contains(steps.list-changed.outputs.changed_charts, 'kubeadapt-k8s-pulse')
         run: |
           # Check if bpf filesystem is mounted
           if ! mount | grep -q "type bpf"; then
@@ -122,10 +122,10 @@ jobs:
             --set agent.config.token=ci-test-key \
             --dry-run
 
-          # Test with eBPF agent enabled
+          # Test with eBPF agent enabled (kubeadapt-k8s-pulse subchart)
           helm install kubeadapt-test-ebpf ./charts/kubeadapt \
             --set agent.config.token=ci-test-key \
-            --set ebpf-agent.enabled=true \
+            --set kubeadapt-k8s-pulse.enabled=true \
             --dry-run
 
           # Test template rendering

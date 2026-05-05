@@ -7,9 +7,9 @@ global:
 agent:
   enabled: true
   image:
-    # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
-    repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent
-    tag: "v2.0.2"
+    # renovate: datasource=docker depName=public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
+    repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
+    tag: "v3.0.1"
     pullPolicy: IfNotPresent
   # ============================================================
   # Service Account Configuration
@@ -54,7 +54,7 @@ agent:
     existingSecret: ""
 
     # Backend API endpoint
-    backendUrl: "https://agent.kubeadapt.io"
+    backendUrl: "https://ingest.kubeadapt.io"
 
     # ============================================================
     # Collection Settings
@@ -131,9 +131,9 @@ agent:
 
     # Upgrader sidecar image
     image:
-      # renovate: datasource=docker depName=public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader
-      repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader
-      tag: "v0.1.4"
+      # renovate: datasource=docker depName=public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-upgrader
+      repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-upgrader
+      tag: "v3.0.1"
       pullPolicy: IfNotPresent
 
     # Resource limits for the upgrader sidecar
@@ -220,12 +220,12 @@ agent:
 # - Linux kernel >= 5.8 (required for TC eBPF support)
 # - Privileged container access
 #
-# For full configuration options, see: charts/ebpf-agent/values.yaml
-ebpf-agent:
+# For full configuration options, see: charts/kubeadapt-k8s-pulse/values.yaml
+kubeadapt-k8s-pulse:
   # Set to true to deploy the eBPF agent DaemonSet for network cost tracking
   enabled: false
 
-  # Override defaults if needed - see charts/ebpf-agent/values.yaml for all options
+  # Override defaults if needed - see charts/kubeadapt-k8s-pulse/values.yaml for all options
   # config:
   #   logLevel: "info"
   #   collectionInterval: "25s"
