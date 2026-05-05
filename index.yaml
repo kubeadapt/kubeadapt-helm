@@ -2801,4 +2801,69 @@ entries:
     urls:
     - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-0.1.0/kubeadapt-0.1.0.tgz
     version: 0.1.0
-generated: "2026-03-16T10:09:44.742166415Z"
+  kubeadapt-k8s-pulse:
+  - annotations:
+      artifacthub.io/changes: |
+        - kind: removed
+          description: NETNS filter removed due to re-designed targeted architecture
+      artifacthub.io/compatibility: |
+        kubernetes:
+          versions: ["1.24-1.34"]
+          tested: true
+        linux:
+          kernel:
+            minimum: "5.10"
+            recommended: "5.10+"
+            note: "Full IPv4+IPv6 dual-stack support on kernel 5.10+"
+      artifacthub.io/containsSecurityUpdates: "false"
+      artifacthub.io/images: |
+        - name: kubeadapt-k8s-pulse
+          image: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse:v3.0.1
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: Documentation
+          url: https://github.com/kubeadapt/kubeadapt-k8s-pulse/blob/main/README.md
+        - name: Architecture
+          url: https://github.com/kubeadapt/kubeadapt-k8s-pulse/blob/main/docs/ARCHITECTURE.md
+        - name: Source Code
+          url: https://github.com/kubeadapt/kubeadapt-k8s-pulse
+      artifacthub.io/operator: "false"
+      artifacthub.io/platforms: |
+        - eks
+        - aks
+        - gke
+        - on-premise
+      artifacthub.io/prerelease: "false"
+      artifacthub.io/signKey: |
+        fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
+        url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
+    apiVersion: v2
+    appVersion: 3.0.1
+    created: "2026-05-05T10:38:34.221793039Z"
+    description: High-performance eBPF-based network metrics agent for Kubernetes
+    digest: a2d6f4a3d7cf504f23f37ee6501700801c4c2e71b2deb571ea38d73355c990d7
+    home: https://github.com/kubeadapt/kubeadapt-k8s-pulse
+    keywords:
+    - kubernetes
+    - ebpf
+    - network
+    - monitoring
+    - metrics
+    - prometheus
+    - observability
+    - bandwidth
+    - traffic
+    - daemonset
+    maintainers:
+    - email: ugurcan@kubeadapt.io
+      name: ugurcancaykara
+    - email: authors@kubeadapt.io
+      name: Kubeadapt
+    name: kubeadapt-k8s-pulse
+    sources:
+    - https://github.com/kubeadapt/kubeadapt-k8s-pulse
+    type: application
+    urls:
+    - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-k8s-pulse-1.0.0/kubeadapt-k8s-pulse-1.0.0.tgz
+    version: 1.0.0
+generated: "2026-05-05T10:38:34.221902594Z"
