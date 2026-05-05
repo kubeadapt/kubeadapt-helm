@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 0.18.6](https://img.shields.io/badge/Version-0.18.6-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 1.0.0](https://img.shields.io/badge/Version-1.0.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -37,7 +37,7 @@ helm delete my-release
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/kubeadapt/kubeadapt-helm | ebpf-agent | 0.2.0 |
+| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.0.0 |
 
 ## Values
 
@@ -50,8 +50,8 @@ helm delete my-release
 | agent.autoUpgrade.dryRun | bool | `false` |  |
 | agent.autoUpgrade.enabled | bool | `false` |  |
 | agent.autoUpgrade.image.pullPolicy | string | `"IfNotPresent"` |  |
-| agent.autoUpgrade.image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-upgrader"` |  |
-| agent.autoUpgrade.image.tag | string | `"v0.1.4"` |  |
+| agent.autoUpgrade.image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-upgrader"` |  |
+| agent.autoUpgrade.image.tag | string | `"v3.0.1"` |  |
 | agent.autoUpgrade.initialDelay | string | `"1m"` |  |
 | agent.autoUpgrade.jobImage | string | `"alpine/helm:3.14.3"` |  |
 | agent.autoUpgrade.policy | string | `"minor"` |  |
@@ -64,7 +64,7 @@ helm delete my-release
 | agent.autoUpgrade.serviceAccount.create | bool | `true` |  |
 | agent.autoUpgrade.serviceAccount.name | string | `""` |  |
 | agent.autoUpgrade.timeout | string | `"15m"` |  |
-| agent.config.backendUrl | string | `"https://agent.kubeadapt.io"` |  |
+| agent.config.backendUrl | string | `"https://ingest.kubeadapt.io"` |  |
 | agent.config.bufferMaxBytes | string | `"52428800"` |  |
 | agent.config.compressionLevel | int | `3` |  |
 | agent.config.dcgmEndpoints | string | `""` |  |
@@ -83,8 +83,8 @@ helm delete my-release
 | agent.enabled | bool | `true` |  |
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
-| agent.image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-agent"` |  |
-| agent.image.tag | string | `"v2.0.2"` |  |
+| agent.image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent"` |  |
+| agent.image.tag | string | `"v3.0.1"` |  |
 | agent.nodeSelector | object | `{}` |  |
 | agent.rbac.create | bool | `true` |  |
 | agent.resources.limits.cpu | string | `"1000m"` |  |
@@ -97,11 +97,11 @@ helm delete my-release
 | agent.serviceAccount.name | string | `""` |  |
 | agent.tolerations | list | `[]` |  |
 | agent.topologySpreadConstraints | list | `[]` |  |
-| ebpf-agent.affinity | object | `{}` |  |
-| ebpf-agent.enabled | bool | `false` |  |
-| ebpf-agent.nodeSelector | object | `{}` |  |
-| ebpf-agent.tolerations | list | `[]` |  |
-| ebpf-agent.topologySpreadConstraints | list | `[]` |  |
 | global.fullnameOverride | string | `""` |  |
 | global.name | string | `"kubeadapt"` |  |
 | global.nameOverride | string | `""` |  |
+| kubeadapt-k8s-pulse.affinity | object | `{}` |  |
+| kubeadapt-k8s-pulse.enabled | bool | `false` |  |
+| kubeadapt-k8s-pulse.nodeSelector | object | `{}` |  |
+| kubeadapt-k8s-pulse.tolerations | list | `[]` |  |
+| kubeadapt-k8s-pulse.topologySpreadConstraints | list | `[]` |  |
