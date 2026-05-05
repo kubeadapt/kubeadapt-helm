@@ -2,15 +2,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "ebpf-agent.fullname" . }}
+  name: {{ include "kubeadapt-k8s-pulse.fullname" . }}
   labels:
-    {{- include "ebpf-agent.labels" . | nindent 4 }}
+    {{- include "kubeadapt-k8s-pulse.labels" . | nindent 4 }}
 spec:
   # Headless service for per-pod Prometheus scraping
   # Each DaemonSet pod is scraped individually
   clusterIP: None
   selector:
-    {{- include "ebpf-agent.selectorLabels" . | nindent 4 }}
+    {{- include "kubeadapt-k8s-pulse.selectorLabels" . | nindent 4 }}
   ports:
     - name: metrics
       port: {{ .Values.config.metricsPort }}

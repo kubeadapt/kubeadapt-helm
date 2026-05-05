@@ -2,13 +2,13 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "ebpf-agent.fullname" . }}
+  name: {{ include "kubeadapt-k8s-pulse.fullname" . }}
   labels:
-    {{- include "ebpf-agent.labels" . | nindent 4 }}
+    {{- include "kubeadapt-k8s-pulse.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "ebpf-agent.selectorLabels" . | nindent 6 }}
+      {{- include "kubeadapt-k8s-pulse.selectorLabels" . | nindent 6 }}
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -16,19 +16,19 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "ebpf-agent.selectorLabels" . | nindent 8 }}
+        {{- include "kubeadapt-k8s-pulse.selectorLabels" . | nindent 8 }}
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: {{ .Values.config.metricsPort | quote }}
         prometheus.io/path: "/metrics"
     spec:
-      serviceAccountName: {{ include "ebpf-agent.serviceAccountName" . }}
+      serviceAccountName: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
       # Required for eBPF: access to host network namespace
       hostNetwork: true
       # Required for eBPF: access to host PID namespace for process tracking
       hostPID: true
       containers:
-        - name: ebpf-agent
+        - name: kubeadapt-k8s-pulse
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:

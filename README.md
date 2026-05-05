@@ -3,7 +3,7 @@
 This repository contains the Helm charts for deploying Kubeadapt into Kubernetes clusters:
 
 - **kubeadapt** - Main chart. Deploys the Kubeadapt agent (cluster metrics collection), with optional auto-upgrade sidecar and eBPF network agent subchart.
-- **ebpf-agent** - Standalone chart for the eBPF network metrics DaemonSet. Usually installed as a dependency of the main chart, but can be deployed independently.
+- **kubeadapt-k8s-pulse** - Standalone chart for the eBPF network metrics DaemonSet. Usually installed as a dependency of the main chart, but can be deployed independently.
 
 ## Platform Support
 

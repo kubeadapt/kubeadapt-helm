@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "ebpf-agent.name" -}}
+{{- define "kubeadapt-k8s-pulse.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "ebpf-agent.fullname" -}}
+{{- define "kubeadapt-k8s-pulse.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,16 +24,16 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "ebpf-agent.chart" -}}
+{{- define "kubeadapt-k8s-pulse.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "ebpf-agent.labels" -}}
-helm.sh/chart: {{ include "ebpf-agent.chart" . }}
-{{ include "ebpf-agent.selectorLabels" . }}
+{{- define "kubeadapt-k8s-pulse.labels" -}}
+helm.sh/chart: {{ include "kubeadapt-k8s-pulse.chart" . }}
+{{ include "kubeadapt-k8s-pulse.selectorLabels" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
@@ -43,18 +43,18 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{/*
 Selector labels
 */}}
-{{- define "ebpf-agent.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "ebpf-agent.name" . }}
+{{- define "kubeadapt-k8s-pulse.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "kubeadapt-k8s-pulse.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
-app.kubernetes.io/component: ebpf-agent
+app.kubernetes.io/component: kubeadapt-k8s-pulse
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "ebpf-agent.serviceAccountName" -}}
+{{- define "kubeadapt-k8s-pulse.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "ebpf-agent.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "kubeadapt-k8s-pulse.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
