@@ -1,12 +1,12 @@
-# Default CI values for ebpf-agent chart testing
+# Default CI values for kubeadapt-k8s-pulse chart testing
 # Used by chart-testing (ct) for lint and install validation
 
 # Enable the agent for CI testing
 enabled: true
 
 image:
-  repository: public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-ebpf-agent
-  tag: "v0.1.1"
+  repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
+  tag: "v3.0.1"
   pullPolicy: Always  # Always pull to avoid stale cache in CI
 
 serviceAccount:

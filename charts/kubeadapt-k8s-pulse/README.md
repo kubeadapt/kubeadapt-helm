@@ -1,6 +1,6 @@
-# ebpf-agent
+# kubeadapt-k8s-pulse
 
-![Version: 0.2.1](https://img.shields.io/badge/Version-0.2.1-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.2.0](https://img.shields.io/badge/AppVersion-0.2.0-informational?style=flat-square)
+![Version: 1.0.0](https://img.shields.io/badge/Version-1.0.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.0.1](https://img.shields.io/badge/AppVersion-3.0.1-informational?style=flat-square)
 
 High-performance eBPF-based network metrics agent for Kubernetes
 
@@ -33,31 +33,31 @@ helm repo update
 Or use OCI registry:
 
 ```console
-helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/ebpf-agent --version 0.2.1
+helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.0.0
 ```
 
 ## Installing the Chart
 
-To install the chart with the release name `kubeadapt-ebpf-agent`:
+To install the chart with the release name `kubeadapt-k8s-pulse`:
 
 ```console
-helm install kubeadapt-ebpf-agent kubeadapt/ebpf-agent -n kubeadapt --create-namespace
+helm install kubeadapt-k8s-pulse kubeadapt/kubeadapt-k8s-pulse -n kubeadapt --create-namespace
 ```
 
 Or via OCI:
 
 ```console
-helm install kubeadapt-ebpf-agent oci://ghcr.io/kubeadapt/kubeadapt-helm/ebpf-agent -n kubeadapt --create-namespace
+helm install kubeadapt-k8s-pulse oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse -n kubeadapt --create-namespace
 ```
 
-> **Note:** Using `kubeadapt-ebpf-agent` as release name ensures the service name matches Prometheus scrape configurations.
+> **Note:** Using `kubeadapt-k8s-pulse` as release name ensures the service name matches Prometheus scrape configurations.
 
 ## Uninstalling the Chart
 
 To uninstall/delete the deployment:
 
 ```console
-helm delete kubeadapt-ebpf-agent -n kubeadapt
+helm delete kubeadapt-k8s-pulse -n kubeadapt
 ```
 
 ## Security Requirements
@@ -118,8 +118,8 @@ Additionally requires:
 | enabled | bool | `true` |  |
 | env | list | `[]` |  |
 | image.pullPolicy | string | `"Always"` |  |
-| image.repository | string | `"public.ecr.aws/w3l5x6r6/kubeadapt/app/kubeadapt-ebpf-agent"` |  |
-| image.tag | string | `"v0.2.0"` |  |
+| image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse"` |  |
+| image.tag | string | `"v3.0.1"` |  |
 | nodeSelector | object | `{}` |  |
 | resources.limits.cpu | string | `"500m"` |  |
 | resources.limits.memory | string | `"384Mi"` |  |
@@ -153,7 +153,7 @@ sudo bpftool map list | grep connection_flows
 
 Via **kubectl**:
 ```bash
-kubectl logs -n kubeadapt -l app.kubernetes.io/name=ebpf-agent --tail=50
-kubectl port-forward -n kubeadapt daemonset/kubeadapt-ebpf-agent 9090:9090
+kubectl logs -n kubeadapt -l app.kubernetes.io/name=kubeadapt-k8s-pulse --tail=50
+kubectl port-forward -n kubeadapt daemonset/kubeadapt-k8s-pulse 9090:9090
 curl http://localhost:9090/metrics | grep kubeadapt
 ```
