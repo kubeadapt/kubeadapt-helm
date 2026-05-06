@@ -196,6 +196,70 @@ entries:
   kubeadapt:
   - annotations:
       artifacthub.io/changes: |
+        - kind: fixed
+          description: "Allow installing the chart in multiple namespaces simultaneously by suffixing cluster-scoped resource names (ClusterRole, ClusterRoleBinding) with the release namespace when it differs from the default 'kubeadapt' namespace. Existing installs in the default namespace are preserved unchanged."
+      artifacthub.io/compatibility: |
+        kubernetes:
+          platforms:
+            eks:
+              versions: ["1.24-1.35"]
+              tested: true
+            aks:
+              versions: ["1.24-1.35"]
+              tested: true
+            gke:
+              versions: ["1.24-1.35"]
+              tested: true
+            on-premise:
+              versions: ["1.24-1.35"]
+              tested: true
+      artifacthub.io/containsSecurityUpdates: "false"
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: Documentation
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/README.md
+        - name: Compatibility Matrix
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/COMPATIBILITY.md
+        - name: Security Policy
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/SECURITY.md
+      artifacthub.io/platforms: |
+        - eks
+        - aks
+        - gke
+        - on-premise
+      artifacthub.io/prerelease: "true"
+      artifacthub.io/signKey: |
+        fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
+        url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
+    apiVersion: v2
+    appVersion: 0.1.0
+    created: "2026-05-06T10:43:33.902938905Z"
+    dependencies:
+    - condition: kubeadapt-k8s-pulse.enabled
+      name: kubeadapt-k8s-pulse
+      repository: oci://ghcr.io/kubeadapt/kubeadapt-helm
+      version: 1.0.0
+    description: A Helm chart for Kubeadapt
+    digest: 91e8b8b6c2bade8599aa6d3831b881e3c706dd62b5642caacf2cf30c8f44af3f
+    keywords:
+    - kubernetes
+    - resource optimization
+    - cost optimization
+    - monitoring
+    - cloud native
+    - multi-cloud
+    maintainers:
+    - email: ugurcan@kubeadapt.io
+      name: ugurcancaykara
+    - email: authors@kubeadapt.io
+      name: Kubeadapt
+    name: kubeadapt
+    type: application
+    urls:
+    - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-1.0.1/kubeadapt-1.0.1.tgz
+    version: 1.0.1
+  - annotations:
+      artifacthub.io/changes: |
         - kind: changed
           description: "BREAKING: image registry alias migrated; old registry will become unavailable"
         - kind: changed
@@ -2936,4 +3000,4 @@ entries:
     urls:
     - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-k8s-pulse-1.0.0/kubeadapt-k8s-pulse-1.0.0.tgz
     version: 1.0.0
-generated: "2026-05-05T12:45:04.591422279Z"
+generated: "2026-05-06T10:43:33.903174694Z"
