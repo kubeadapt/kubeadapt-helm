@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 1.0.0
+version: 1.0.1
 appVersion: "0.1.0"
 
 # Dependencies
@@ -32,14 +32,8 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
-    - kind: changed
-      description: "BREAKING: image registry alias migrated; old registry will become unavailable"
-    - kind: changed
-      description: "BREAKING: subchart dependency renamed (ebpf-agent → kubeadapt-k8s-pulse). Move existing values overrides accordingly."
-    - kind: changed
-      description: "Image binaries renamed (kubeadapt-agent → kubeadapt-k8s-agent, kubeadapt-upgrader → kubeadapt-k8s-upgrader)"
-    - kind: changed
-      description: "Bumped images to v3.0.1 (agent, upgrader, kubeadapt-k8s-pulse)"
+    - kind: fixed
+      description: "Allow installing the chart in multiple namespaces simultaneously by suffixing cluster-scoped resource names (ClusterRole, ClusterRoleBinding) with the release namespace when it differs from the default 'kubeadapt' namespace. Existing installs in the default namespace are preserved unchanged."
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0

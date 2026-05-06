@@ -92,7 +92,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kubeadapt.name" . }}-upgrader
+  name: {{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}
   labels:
     {{- include "kubeadapt.labels" . | nindent 4 }}
     app.kubernetes.io/component: upgrader
@@ -105,8 +105,8 @@ rules:
       - clusterroles
       - clusterrolebindings
     resourceNames:
-      - "{{ include "kubeadapt.name" . }}-agent"
-      - "{{ include "kubeadapt.name" . }}-upgrader"
+      - "{{ include "kubeadapt.name" . }}-agent{{ include "kubeadapt.clusterResourceSuffix" . }}"
+      - "{{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}"
     verbs: ["get", "list", "update", "patch", "delete", "escalate"]
   # Separate rule for create (resourceNames constraint not supported)
   - apiGroups: ["rbac.authorization.k8s.io"]
@@ -195,14 +195,14 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "kubeadapt.name" . }}-upgrader
+  name: {{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}
   labels:
     {{- include "kubeadapt.labels" . | nindent 4 }}
     app.kubernetes.io/component: upgrader
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "kubeadapt.name" . }}-upgrader
+  name: {{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "kubeadapt.name" . }}-upgrader
