@@ -2,10 +2,11 @@
 # Defines explicit upgrade paths for this chart version.
 # This file is embedded in the chart package and used by KubeAdapt auto-upgrade system.
 
-chartVersion: "1.0.0"
+chartVersion: "1.0.1"
 
-# Versions that can upgrade to this version (manual upgrade only — see breakingChanges)
+# Versions that can upgrade to this version
 upgradeFrom:
+  - "1.0.0"
   - "0.18.6"
   - "0.18.5"
   - "0.18.4"
@@ -21,10 +22,7 @@ channels:
 
 # Optional metadata
 metadata:
-  releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-1.0.0"
+  releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-1.0.1"
   containsSecurityUpdates: false
   minKubernetesVersion: "1.24.0"
-  breakingChanges:
-    - "Image registry alias migrated; the previous registry will become unavailable"
-    - "Subchart dependency renamed: ebpf-agent → kubeadapt-k8s-pulse. Existing values overrides under 'ebpf-agent:' must be moved to 'kubeadapt-k8s-pulse:'."
-    - "Image binaries renamed: kubeadapt-agent → kubeadapt-k8s-agent, kubeadapt-upgrader → kubeadapt-k8s-upgrader"
+  breakingChanges: []

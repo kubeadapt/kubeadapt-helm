@@ -47,3 +47,22 @@ Selector labels
 app.kubernetes.io/name: {{ include "kubeadapt.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+Suffix appended to cluster-scoped resource names (ClusterRole, ClusterRoleBinding)
+so multiple chart installs in different namespaces don't collide on the cluster-wide
+namespace. Cluster-scoped resources have no namespace and would otherwise share a
+single global name across all installs.
+
+Behaviour:
+  - When .Release.Namespace == kubeadapt.name (the chart's default namespace),
+    returns "" → resource names stay unchanged for backward compatibility with
+    existing installs (no resource renames on `helm upgrade`).
+  - Otherwise returns "-<release-namespace>" so each install in a non-default
+    namespace gets a unique cluster-scoped resource name.
+*/}}
+{{- define "kubeadapt.clusterResourceSuffix" -}}
+{{- if ne .Release.Namespace (include "kubeadapt.name" .) -}}
+-{{ .Release.Namespace }}
+{{- end -}}
+{{- end }}
