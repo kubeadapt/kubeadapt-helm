@@ -124,7 +124,7 @@ Additionally requires:
 | resources.limits.cpu | string | `"500m"` |  |
 | resources.limits.memory | string | `"384Mi"` |  |
 | resources.requests.cpu | string | `"100m"` |  |
-| resources.requests.memory | string | `"128Mi"` |  |
+| resources.requests.memory | string | `"256Mi"` |  |
 | serviceAccount.annotations | object | `{}` |  |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |

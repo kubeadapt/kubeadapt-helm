@@ -90,7 +90,7 @@ helm delete my-release
 | agent.resources.limits.cpu | string | `"1000m"` |  |
 | agent.resources.limits.memory | string | `"1Gi"` |  |
 | agent.resources.requests.cpu | string | `"100m"` |  |
-| agent.resources.requests.memory | string | `"128Mi"` |  |
+| agent.resources.requests.memory | string | `"256Mi"` |  |
 | agent.service.type | string | `"ClusterIP"` |  |
 | agent.serviceAccount.annotations | object | `{}` |  |
 | agent.serviceAccount.create | bool | `true` |  |
