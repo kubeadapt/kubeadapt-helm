@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 1.0.3
+version: 1.0.4
 appVersion: "0.1.0"
 
 # Dependencies
@@ -32,8 +32,8 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
-    - kind: fixed
-      description: "Allow installing the chart in multiple namespaces simultaneously by suffixing cluster-scoped resource names (ClusterRole, ClusterRoleBinding) with the release namespace when it differs from the default 'kubeadapt' namespace. Existing installs in the default namespace are preserved unchanged."
+    - kind: changed
+      description: "Raise agent resource limits to 2000m CPU / 16Gi memory (from 1000m / 1Gi). The agent is a single Deployment per cluster, so its memory scales with total cluster size; the previous 1Gi limit bound at roughly 1000 nodes. A limit is a ceiling rather than a reservation, so the added headroom is not consumed on smaller clusters. Requests are unchanged at 100m / 256Mi so the chart still schedules on small clusters. See the sizing table in values.yaml."
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0
