@@ -2,13 +2,13 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 1.0.2
+version: 1.0.3
 appVersion: "0.1.0"
 
 # Dependencies
 dependencies:
   - name: kubeadapt-k8s-pulse
-    version: "1.0.0"
+    version: "1.0.1"
     repository: "oci://ghcr.io/kubeadapt/kubeadapt-helm"
     condition: kubeadapt-k8s-pulse.enabled
 
