@@ -30,8 +30,11 @@ agent:
     type: ClusterIP
   resources:
     requests:
+      # 141Mi measured on 3 nodes/208 pods (110% of the old 128Mi request).
+      # Scales with CLUSTER size - one Deployment merges all nodes - so this
+      # is a floor, not a validated 5000-node value.
       cpu: 100m
-      memory: 128Mi
+      memory: 256Mi
     limits:
       cpu: 1000m
       memory: 1Gi

@@ -2,10 +2,11 @@
 # Defines explicit upgrade paths for this chart version.
 # This file is embedded in the chart package and used by KubeAdapt auto-upgrade system.
 
-chartVersion: "1.0.1"
+chartVersion: "1.0.2"
 
 # Versions that can upgrade to this version
 upgradeFrom:
+  - "1.0.1"
   - "1.0.0"
   - "0.18.6"
   - "0.18.5"

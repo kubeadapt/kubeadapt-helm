@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 1.0.1](https://img.shields.io/badge/Version-1.0.1-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 1.0.2](https://img.shields.io/badge/Version-1.0.2-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -90,7 +90,7 @@ helm delete my-release
 | agent.resources.limits.cpu | string | `"1000m"` |  |
 | agent.resources.limits.memory | string | `"1Gi"` |  |
 | agent.resources.requests.cpu | string | `"100m"` |  |
-| agent.resources.requests.memory | string | `"128Mi"` |  |
+| agent.resources.requests.memory | string | `"256Mi"` |  |
 | agent.service.type | string | `"ClusterIP"` |  |
 | agent.serviceAccount.annotations | object | `{}` |  |
 | agent.serviceAccount.create | bool | `true` |  |
