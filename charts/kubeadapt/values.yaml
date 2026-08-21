@@ -28,16 +28,31 @@ agent:
     create: true
   service:
     type: ClusterIP
+  # ONE Deployment per cluster, so memory scales with TOTAL cluster size - a
+  # DaemonSet's stays flat per node. Peak is the network-flow merge, measured at
+  # ~1550 B per inbound flow row plus ~300 MB of caches at 5000 nodes. At 500
+  # flows per node per 60s window:
+  #
+  #     nodes    inbound rows    modelled peak
+  #       500            250k          ~0.44 GB
+  #      1000            500k          ~0.88 GB
+  #      2000              1M          ~1.7 GB
+  #      5000            2.5M          ~4.2 GB
+  #
+  # 16Gi carries 5000 nodes at ~4x headroom, and covers flow-heavy clusters
+  # (high pod fan-out, many distinct external destinations) where the per-node
+  # flow count runs 2-4x the 500 assumed above. A limit is a ceiling, not a
+  # reservation, so the unused headroom costs nothing on smaller clusters.
+  #
+  # Requests are deliberately NOT scaled with the limit: they are a scheduling
+  # floor and must keep the chart installable on small clusters.
   resources:
     requests:
-      # 141Mi measured on 3 nodes/208 pods (110% of the old 128Mi request).
-      # Scales with CLUSTER size - one Deployment merges all nodes - so this
-      # is a floor, not a validated 5000-node value.
       cpu: 100m
       memory: 256Mi
     limits:
-      cpu: 1000m
-      memory: 1Gi
+      cpu: 2000m
+      memory: 16Gi
 
   # ============================================================
   # Agent Configuration
