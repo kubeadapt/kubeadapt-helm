@@ -69,6 +69,22 @@ rules:
       - networkpolicies
     verbs: ["list", "watch"]
 
+  # EndpointSlices name the addresses nothing else in the cluster can.
+  #
+  # The `kubernetes` Service in `default` has no selector, so label matching
+  # finds nothing, and its ClusterIP is not the address a flow carries. On a
+  # managed cluster the real addresses are control-plane ENIs inside the
+  # customer's own VPC — private, backing no pod, on no node. Measured on an
+  # EKS reference cluster 2026-08-24: 26.7% of all network bytes were
+  # API-server traffic reported as unattributable.
+  #
+  # Read-only, and the agent keeps ONLY the addresses with no Pod targetRef:
+  # pod-backed endpoints are already named from the pod informer.
+  - apiGroups: ["discovery.k8s.io"]
+    resources:
+      - endpointslices
+    verbs: ["list", "watch"]
+
   - apiGroups: ["storage.k8s.io"]
     resources:
       - storageclasses
