@@ -2,10 +2,11 @@
 # Defines explicit upgrade paths for this chart version.
 # This file is embedded in the chart package and used by KubeAdapt auto-upgrade system.
 
-chartVersion: "1.0.1"
+chartVersion: "1.1.0"
 
 # Versions that can upgrade to this version
 upgradeFrom:
+  - "1.0.1"
   - "1.0.0"
   - "0.2.0"
   - "0.1.1"
@@ -21,7 +22,11 @@ channels:
 
 # Optional metadata
 metadata:
+  # This release drops privileged: true for an explicit four-capability set
+  # (BPF, PERFMON, NET_ADMIN, SYS_PTRACE) and narrows /sys/fs/bpf mount
+  # propagation from Bidirectional to HostToContainer. security.privileged=true
+  # restores the previous posture if a kernel or distribution needs it.
   releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-k8s-pulse-1.0.0"
-  containsSecurityUpdates: false
+  containsSecurityUpdates: true
   minKubernetesVersion: "1.24.0"
   minKernelVersion: "5.10"
