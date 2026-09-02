@@ -69,6 +69,16 @@ rules:
       - networkpolicies
     verbs: ["list", "watch"]
 
+  # The Kubernetes API server Service has no selector, so it publishes no
+  # Endpoints through any other resource: EndpointSlices are the only way to
+  # learn which addresses belong to it. Without this rule the agent's service
+  # informer never syncs, every Service-owned address falls back to
+  # `__unresolved__`, and API-server traffic is billed as an external domain.
+  - apiGroups: ["discovery.k8s.io"]
+    resources:
+      - endpointslices
+    verbs: ["list", "watch"]
+
   - apiGroups: ["storage.k8s.io"]
     resources:
       - storageclasses
