@@ -72,3 +72,30 @@ topologySpreadConstraints: []
 
 # Additional environment variables
 env: []
+
+# Security posture for the pulse DaemonSet.
+#
+# The defaults below are the LEAST-PRIVILEGE posture, which was verified against
+# a live Talos 6.18 node rather than inferred. See the securityContext comment
+# in templates/daemonset.yaml for the measurement.
+security:
+  # privileged: true restores the previous posture (39 capabilities). Kept as an
+  # escape hatch for a kernel or distribution where the capability set below
+  # turns out to be insufficient; if you need it, that is a bug worth reporting
+  # rather than a setting worth keeping.
+  privileged: false
+
+  # The four capabilities every privileged operation the agent performs was
+  # measured to need. CAP_SYS_RESOURCE is absent on purpose (memlock moved to
+  # the memory cgroup in 5.11); CAP_DAC_READ_SEARCH does not substitute for
+  # CAP_SYS_PTRACE, because /proc/<pid>/exe is gated by ptrace_may_access.
+  capabilities:
+    - BPF
+    - PERFMON
+    - NET_ADMIN
+    - SYS_PTRACE
+
+  # hostPID defaults to true so a chart upgrade ahead of an image upgrade cannot
+  # silently empty the container inventory. Set to false once the running image
+  # includes the fingerprint scanner's /host/proc preference.
+  hostPID: true
