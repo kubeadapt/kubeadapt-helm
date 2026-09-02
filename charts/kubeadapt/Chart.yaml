@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 1.0.4
+version: 1.0.5
 appVersion: "0.1.0"
 
 # Dependencies
