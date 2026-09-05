@@ -86,6 +86,23 @@ rules:
       - nodes
     verbs: ["list", "watch"]
 
+  # The kubelet Summary API, reached through the API server's node proxy:
+  # GET /api/v1/nodes/{node}/proxy/stats/summary. It is the ONLY source of
+  # per-pod network byte counters — metrics.k8s.io above carries CPU and
+  # memory and nothing else — so without this rule
+  # container_metrics.network_rx_bytes and network_tx_bytes stay empty and
+  # every ratio that divides measured bytes by kubelet bytes is unmeasurable.
+  #
+  # `get` on the proxy subresource, and nothing more: it grants no write, no
+  # exec and no other node subresource. The agent's alternative transport
+  # (KUBEADAPT_KUBELET_STATS_TRANSPORT=kubelet, which dials each kubelet on
+  # 10250) would need `nodes/stats` instead and is deliberately NOT granted
+  # here — an operator who switches transports must add that rule knowingly.
+  - apiGroups: [""]
+    resources:
+      - nodes/proxy
+    verbs: ["get"]
+
   # VPA (optional, if installed)
   - apiGroups: ["autoscaling.k8s.io"]
     resources:
