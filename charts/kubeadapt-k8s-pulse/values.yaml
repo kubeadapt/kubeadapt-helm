@@ -6,7 +6,7 @@ enabled: true
 
 image:
   repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
-  tag: "v3.0.1"
+  tag: "v3.1.0"
   pullPolicy: Always
 
 serviceAccount:
