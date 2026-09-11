@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 1.0.4](https://img.shields.io/badge/Version-1.0.4-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -37,7 +37,7 @@ helm delete my-release
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.0.1 |
+| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.1.0 |
 
 ## Values
 
@@ -100,7 +100,9 @@ helm delete my-release
 | global.fullnameOverride | string | `""` |  |
 | global.name | string | `"kubeadapt"` |  |
 | global.nameOverride | string | `""` |  |
+| global.pulseListenPort | int | `9091` |  |
 | kubeadapt-k8s-pulse.affinity | object | `{}` |  |
+| kubeadapt-k8s-pulse.config.export.enabled | bool | `true` |  |
 | kubeadapt-k8s-pulse.enabled | bool | `false` |  |
 | kubeadapt-k8s-pulse.nodeSelector | object | `{}` |  |
 | kubeadapt-k8s-pulse.tolerations | list | `[]` |  |
