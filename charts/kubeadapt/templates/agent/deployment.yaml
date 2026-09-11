@@ -1,3 +1,4 @@
+{{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict }}
 {{- if .Values.agent.enabled }}
 apiVersion: apps/v1
 kind: Deployment
@@ -27,6 +28,11 @@ spec:
             - name: health
               containerPort: {{ .Values.agent.config.healthPort }}
               protocol: TCP
+            {{- if $pulse.enabled }}
+            - name: pulse
+              containerPort: {{ .Values.global.pulseListenPort }}
+              protocol: TCP
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -96,6 +102,14 @@ spec:
             # GPU Metrics (Optional)
             - name: KUBEADAPT_GPU_METRICS_ENABLED
               value: {{ .Values.agent.config.gpuMetricsEnabled | quote }}
+
+            {{- if $pulse.enabled }}
+            # Network flows, received from the eBPF collector DaemonSet
+            - name: KUBEADAPT_PULSE_ENABLED
+              value: "true"
+            - name: KUBEADAPT_PULSE_LISTEN_PORT
+              value: {{ .Values.global.pulseListenPort | quote }}
+            {{- end }}
             {{- if .Values.agent.config.dcgmPort }}
             - name: KUBEADAPT_DCGM_PORT
               value: {{ .Values.agent.config.dcgmPort | quote }}
