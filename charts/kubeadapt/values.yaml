@@ -3,6 +3,10 @@ global:
   name: "kubeadapt"
   nameOverride: ""
   fullnameOverride: ""
+  # Port the agent listens on for network flows from the eBPF collector.
+  # Read by the agent Deployment, the agent Service and the collector
+  # subchart, so the listener and the sender cannot be configured apart.
+  pulseListenPort: 9091
 
 agent:
   enabled: true
@@ -260,8 +264,17 @@ agent:
 #
 # For full configuration options, see: charts/kubeadapt-k8s-pulse/values.yaml
 kubeadapt-k8s-pulse:
-  # Set to true to deploy the eBPF agent DaemonSet for network cost tracking
+  # Set to true to deploy the eBPF agent DaemonSet for network cost tracking.
+  # This is the only flag network telemetry needs: it also opens the agent's
+  # flow listener and points the DaemonSet at it (see config.export below).
   enabled: false
+
+  # Send measured flows to the agent, which resolves them to pods, workloads
+  # and nodes and ships them to KubeAdapt. Without this the DaemonSet only
+  # exposes Prometheus metrics and Network Intelligence stays empty.
+  config:
+    export:
+      enabled: true
 
   # Override defaults if needed - see charts/kubeadapt-k8s-pulse/values.yaml for all options
   # config:
