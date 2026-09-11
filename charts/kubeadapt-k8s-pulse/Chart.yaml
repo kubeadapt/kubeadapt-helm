@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt-k8s-pulse
 description: High-performance eBPF-based network metrics agent for Kubernetes
 type: application
-version: 1.0.1
+version: 1.1.0
 appVersion: "3.0.1"
 
 home: https://github.com/kubeadapt/kubeadapt-k8s-pulse
@@ -33,8 +33,8 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
-    - kind: removed
-      description: NETNS filter removed due to re-designed targeted architecture
+    - kind: added
+      description: "config.export lets the DaemonSet send flow batches to the KubeAdapt agent. Off by default, so a standalone install behaves exactly as before; the kubeadapt umbrella chart turns it on. The endpoint defaults to the agent Service in the release namespace and can be overridden with config.export.agentEndpoint."
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/license: Apache-2.0

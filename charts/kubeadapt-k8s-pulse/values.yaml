@@ -37,6 +37,22 @@ config:
   connectionTracking: true
 
   # ============================================================
+  # Flow export to the KubeAdapt agent
+  # ============================================================
+  # This agent measures traffic; the KubeAdapt agent is what resolves it to
+  # pods, workloads and nodes and ships it. Without export the DaemonSet runs
+  # and only exposes Prometheus metrics, which is why it is off by default:
+  # a standalone install has no agent to send to.
+  #
+  # The kubeadapt umbrella chart turns this on for you.
+  export:
+    enabled: false
+    # Where to send flow batches. Empty means the agent Service the umbrella
+    # chart installs, in this release's namespace. Set it explicitly when the
+    # agent runs somewhere else.
+    agentEndpoint: ""
+
+  # ============================================================
   # Debug Options (use with caution in production)
   # ============================================================
   # Enable pprof profiling endpoints
