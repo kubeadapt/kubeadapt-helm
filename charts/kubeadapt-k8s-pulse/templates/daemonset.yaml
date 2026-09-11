@@ -73,6 +73,14 @@ spec:
             - name: EBPF_CONNECTION_TRACKING
               value: {{ .Values.config.connectionTracking | quote }}
 
+            {{- if .Values.config.export.enabled }}
+            # Flow export to the KubeAdapt agent
+            - name: EBPF_EXPORT_ENABLED
+              value: "true"
+            - name: EBPF_AGENT_ENDPOINT
+              value: {{ include "kubeadapt-k8s-pulse.agentEndpoint" . | quote }}
+            {{- end }}
+
             # Debug options
             {{- if .Values.config.enableProfiling }}
             - name: EBPF_ENABLE_PROFILING

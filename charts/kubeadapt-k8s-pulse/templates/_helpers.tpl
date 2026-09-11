@@ -50,6 +50,23 @@ app.kubernetes.io/component: kubeadapt-k8s-pulse
 {{- end }}
 
 {{/*
+Where flow batches are sent.
+
+Defaults to the agent Service the kubeadapt umbrella chart installs, in this
+release's namespace. The port comes from the umbrella's global value so the
+listener and the sender cannot be configured apart.
+*/}}
+{{- define "kubeadapt-k8s-pulse.agentEndpoint" -}}
+{{- if .Values.config.export.agentEndpoint -}}
+{{- .Values.config.export.agentEndpoint -}}
+{{- else -}}
+{{- $global := .Values.global | default dict -}}
+{{- $name := default "kubeadapt" $global.nameOverride -}}
+{{- printf "%s-agent.%s.svc.cluster.local:%v" $name .Release.Namespace (default 9091 $global.pulseListenPort) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "kubeadapt-k8s-pulse.serviceAccountName" -}}
