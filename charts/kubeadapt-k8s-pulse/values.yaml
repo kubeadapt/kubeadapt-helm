@@ -72,16 +72,21 @@ topologySpreadConstraints: []
 
 # Additional environment variables
 env:
-  # Retry-buffer capacity, in sub-batches; pulse's own default is 60. Pulse has
-  # retried RESOURCE_EXHAUSTED since kubeadapt-k8s-pulse#89, and the agent
-  # answers RESOURCE_EXHAUSTED whenever its intake is full, so agent
-  # back-pressure now queues here instead of being counted as a drop. At the
-  # exporter's 60s push cadence a node at the modelled busy density (~750 flow
-  # rows per node per minute, well under the 10,000-row sub-batch split) emits
-  # one sub-batch per window, so 120 buys roughly two hours of sustained agent
-  # refusals per node before drop-oldest evicts anything; a node busy enough to
-  # split a window into several sub-batches burns that budget proportionally
-  # faster. The buffer's 32 MiB byte backstop still applies and is not reached
-  # at these batch sizes.
+  # Retry-buffer capacity, in sub-batches; pulse's built-in default is 60.
+  #
+  # Chart-side plumbing. No released pulse image reads this variable yet, so
+  # setting it here is inert until a release that reads EBPF_RETRY_BUFFER_SIZE
+  # and retries RESOURCE_EXHAUSTED is pinned in image.tag above; older images
+  # ignore an unknown environment variable.
+  #
+  # From that release on: the agent answers RESOURCE_EXHAUSTED whenever its
+  # intake is full, so agent back-pressure queues in this buffer instead of
+  # being counted as a drop. At the exporter's 60s push cadence a node at the
+  # modelled busy density (~750 flow rows per node per minute, well under the
+  # 10,000-row sub-batch split) emits one sub-batch per window, so 120 buys
+  # roughly two hours of sustained agent refusals per node before drop-oldest
+  # evicts anything; a node busy enough to split a window into several
+  # sub-batches burns that budget proportionally faster. The buffer's 32 MiB
+  # byte backstop still applies and is not reached at these batch sizes.
   - name: EBPF_RETRY_BUFFER_SIZE
     value: "120"

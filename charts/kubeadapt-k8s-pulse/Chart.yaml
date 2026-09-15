@@ -34,7 +34,7 @@ annotations:
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
     - kind: changed
-      description: "Raise the export retry buffer to 120 sub-batches (from the built-in default of 60) by setting EBPF_RETRY_BUFFER_SIZE. Pulse now retries RESOURCE_EXHAUSTED, which the agent returns when its intake is full, so agent back-pressure queues in this buffer rather than being dropped; the larger buffer doubles how long a node rides out that back-pressure before the oldest sub-batch is evicted. Resource requests and limits are unchanged."
+      description: "Set EBPF_RETRY_BUFFER_SIZE to 120, raising the export retry buffer to 120 sub-batches from the built-in default of 60. This is chart-side plumbing: it takes effect once a pulse release that reads the variable and retries RESOURCE_EXHAUSTED - which the agent returns when its intake is full - ships, and earlier images ignore it. From that release on, agent back-pressure queues in this buffer instead of being counted as a drop, and the larger buffer doubles how long a node rides it out before the oldest sub-batch is evicted. Resource requests and limits are unchanged."
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/license: Apache-2.0

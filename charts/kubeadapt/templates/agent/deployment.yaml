@@ -128,7 +128,7 @@ spec:
 
             # Write-ahead spool for network telemetry (emptyDir volume below)
             - name: KUBEADAPT_SPOOL_DIR
-              value: {{ printf "%s/netspool" (trimSuffix "/" .Values.agent.spool.mountPath) | quote }}
+              value: {{ printf "%s/netspool" (trimSuffix "/" (required "agent.spool.mountPath must be set" .Values.agent.spool.mountPath)) | quote }}
             - name: KUBEADAPT_SPOOL_MAX_BYTES
               value: {{ .Values.agent.spool.maxBytes | quote }}
             {{- end }}
@@ -142,7 +142,7 @@ spec:
           {{- if .Values.agent.spool.enabled }}
           volumeMounts:
             - name: spool
-              mountPath: {{ .Values.agent.spool.mountPath | quote }}
+              mountPath: {{ required "agent.spool.mountPath must be set" .Values.agent.spool.mountPath | quote }}
           {{- end }}
       {{- if .Values.agent.autoUpgrade.enabled }}
         - name: upgrader
@@ -215,15 +215,15 @@ spec:
             {{- toYaml .Values.agent.autoUpgrade.resources | nindent 12 }}
       {{- end }}
       {{- if .Values.agent.spool.enabled }}
-      # The agent drains its spool on SIGTERM before exiting; give it room to
-      # finish so a pod replacement does not strand undelivered telemetry.
+      # Room for the agent to drain its spool on SIGTERM before it exits, so a
+      # pod replacement does not strand undelivered telemetry.
       terminationGracePeriodSeconds: 120
       volumes:
         # emptyDir, never a PersistentVolume: the spool has to survive a
         # container restart and an ingestion outage, not a pod replacement.
         - name: spool
           emptyDir:
-            sizeLimit: {{ .Values.agent.spool.sizeLimit }}
+            sizeLimit: {{ .Values.agent.spool.sizeLimit | quote }}
       {{- end }}
       {{- with .Values.agent.nodeSelector }}
       nodeSelector:
