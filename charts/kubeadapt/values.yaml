@@ -55,6 +55,26 @@ agent:
       memory: 16Gi
 
   # ============================================================
+  # Network Telemetry Spool
+  # ============================================================
+  spool:
+    # Write-ahead spool for network telemetry: it is meant to survive container
+    # restarts and ingestion outages, and a pod replacement drains it during the
+    # termination grace period. No PersistentVolume is ever created.
+    #
+    # Chart-side plumbing. The volume and the KUBEADAPT_SPOOL_* variables below
+    # take effect once an agent release that writes to the spool ships; agent
+    # images that predate it ignore them and leave the volume empty.
+    enabled: true
+    # Ceiling the kubelet enforces on the emptyDir itself. Kept above maxBytes
+    # so the agent's own bound is what evicts, not a pod eviction.
+    sizeLimit: 2Gi
+    # KUBEADAPT_SPOOL_MAX_BYTES, 1 GiB - the agent's own cap on spool contents.
+    maxBytes: "1073741824"
+    # Mount point for the volume; the spool itself lives in <mountPath>/netspool.
+    mountPath: /var/lib/kubeadapt
+
+  # ============================================================
   # Agent Configuration
   # ============================================================
   config:

@@ -1,6 +1,6 @@
 # kubeadapt-k8s-pulse
 
-![Version: 1.0.1](https://img.shields.io/badge/Version-1.0.1-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.0.1](https://img.shields.io/badge/AppVersion-3.0.1-informational?style=flat-square)
+![Version: 1.0.2](https://img.shields.io/badge/Version-1.0.2-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.0.1](https://img.shields.io/badge/AppVersion-3.0.1-informational?style=flat-square)
 
 High-performance eBPF-based network metrics agent for Kubernetes
 
@@ -33,7 +33,7 @@ helm repo update
 Or use OCI registry:
 
 ```console
-helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.0.1
+helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.0.2
 ```
 
 ## Installing the Chart
@@ -116,7 +116,8 @@ Additionally requires:
 | config.metricsPort | int | `9090` |  |
 | config.profilingPort | int | `6060` |  |
 | enabled | bool | `true` |  |
-| env | list | `[]` |  |
+| env[0].name | string | `"EBPF_RETRY_BUFFER_SIZE"` |  |
+| env[0].value | string | `"120"` |  |
 | image.pullPolicy | string | `"Always"` |  |
 | image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse"` |  |
 | image.tag | string | `"v3.0.1"` |  |
