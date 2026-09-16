@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt-k8s-pulse
 description: High-performance eBPF-based network metrics agent for Kubernetes
 type: application
-version: 1.0.1
+version: 1.0.2
 appVersion: "3.0.1"
 
 home: https://github.com/kubeadapt/kubeadapt-k8s-pulse
@@ -33,8 +33,8 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
-    - kind: removed
-      description: NETNS filter removed due to re-designed targeted architecture
+    - kind: changed
+      description: "Set EBPF_RETRY_BUFFER_SIZE to 120, raising the export retry buffer to 120 sub-batches from the built-in default of 60. This is chart-side plumbing: it takes effect once a pulse release that reads the variable and retries RESOURCE_EXHAUSTED - which the agent returns when its intake is full - ships, and earlier images ignore it. From that release on, agent back-pressure queues in this buffer instead of being counted as a drop, and the larger buffer doubles how long a node rides it out before the oldest sub-batch is evicted. Resource requests and limits are unchanged."
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/license: Apache-2.0
