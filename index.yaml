@@ -197,6 +197,74 @@ entries:
   - annotations:
       artifacthub.io/changes: |
         - kind: added
+          description: "Grant the agent ClusterRole get on nodes/proxy and nodes/stats so the kubelet Summary API can be read. It is the only source of per-pod network byte counters: metrics.k8s.io, already granted, carries CPU and memory and nothing else, so without this rule container_metrics.network_rx_bytes and network_tx_bytes are always zero. nodes/proxy serves the api_proxy transport and nodes/stats the direct kubelet transport. The verb is get alone, so the agent gets read-only access to the kubelet API through those two subresources, with no write and no exec."
+        - kind: added
+          description: "Add the chart-side plumbing for an agent write-ahead spool for network telemetry: an emptyDir volume mounted at agent.spool.mountPath (default /var/lib/kubeadapt), bounded by agent.spool.sizeLimit (2Gi) and agent.spool.maxBytes (1 GiB), the matching KUBEADAPT_SPOOL_DIR and KUBEADAPT_SPOOL_MAX_BYTES environment variables, and a 120s pod termination grace period. This is chart-side only: the volume and settings take effect once an agent release that writes to the spool ships, and agent images that predate it ignore the environment variables and leave the volume empty. No PersistentVolume or PersistentVolumeClaim is created; set agent.spool.enabled=false to opt out."
+        - kind: added
+          description: "Set GOMEMLIMIT on the agent container from its own memory limit via the Downward API. The Go runtime otherwise sizes its heap against the node's memory and the agent is OOMKilled at the container limit instead of collecting more aggressively. Resource requests and limits are unchanged."
+      artifacthub.io/compatibility: |
+        kubernetes:
+          platforms:
+            eks:
+              versions: ["1.24-1.35"]
+              tested: true
+            aks:
+              versions: ["1.24-1.35"]
+              tested: true
+            gke:
+              versions: ["1.24-1.35"]
+              tested: true
+            on-premise:
+              versions: ["1.24-1.35"]
+              tested: true
+      artifacthub.io/containsSecurityUpdates: "false"
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: Documentation
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/README.md
+        - name: Compatibility Matrix
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/COMPATIBILITY.md
+        - name: Security Policy
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/SECURITY.md
+      artifacthub.io/platforms: |
+        - eks
+        - aks
+        - gke
+        - on-premise
+      artifacthub.io/prerelease: "true"
+      artifacthub.io/signKey: |
+        fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
+        url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
+    apiVersion: v2
+    appVersion: 0.1.0
+    created: "2026-09-17T07:44:06.880139519Z"
+    dependencies:
+    - condition: kubeadapt-k8s-pulse.enabled
+      name: kubeadapt-k8s-pulse
+      repository: oci://ghcr.io/kubeadapt/kubeadapt-helm
+      version: 1.0.1
+    description: A Helm chart for Kubeadapt
+    digest: e322fd85e1bd6f0b7fdfe6ecaf27c1cf1c42be71da4e20e7ec3cc105ff74b6c8
+    keywords:
+    - kubernetes
+    - resource optimization
+    - cost optimization
+    - monitoring
+    - cloud native
+    - multi-cloud
+    maintainers:
+    - email: ugurcan@kubeadapt.io
+      name: ugurcancaykara
+    - email: authors@kubeadapt.io
+      name: Kubeadapt
+    name: kubeadapt
+    type: application
+    urls:
+    - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-1.0.7/kubeadapt-1.0.7.tgz
+    version: 1.0.7
+  - annotations:
+      artifacthub.io/changes: |
+        - kind: added
           description: "Add the chart-side plumbing for an agent write-ahead spool for network telemetry: an emptyDir volume mounted at agent.spool.mountPath (default /var/lib/kubeadapt), bounded by agent.spool.sizeLimit (2Gi) and agent.spool.maxBytes (1 GiB), the matching KUBEADAPT_SPOOL_DIR and KUBEADAPT_SPOOL_MAX_BYTES environment variables, and a 120s pod termination grace period. This is chart-side only: the volume and settings take effect once an agent release that writes to the spool ships, and agent images that predate it ignore the environment variables and leave the volume empty. No PersistentVolume or PersistentVolumeClaim is created; set agent.spool.enabled=false to opt out."
         - kind: added
           description: "Set GOMEMLIMIT on the agent container from its own memory limit via the Downward API. The Go runtime otherwise sizes its heap against the node's memory and the agent is OOMKilled at the container limit instead of collecting more aggressively. Resource requests and limits are unchanged."
@@ -3386,4 +3454,4 @@ entries:
     urls:
     - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-k8s-pulse-1.0.0/kubeadapt-k8s-pulse-1.0.0.tgz
     version: 1.0.0
-generated: "2026-09-16T15:37:27.822727938Z"
+generated: "2026-09-17T07:44:06.880439326Z"
