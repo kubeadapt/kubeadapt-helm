@@ -86,6 +86,23 @@ rules:
       - nodes
     verbs: ["list", "watch"]
 
+  # kubelet /stats/summary - the only source of per-pod network bytes.
+  # metrics.k8s.io above carries CPU and memory and nothing else, so without
+  # this rule container_metrics.network_rx_bytes and network_tx_bytes stay 0.
+  # nodes/proxy serves the api_proxy transport (the API server's node proxy,
+  # GET /api/v1/nodes/{node}/proxy/stats/summary); nodes/stats serves the
+  # direct kubelet transport (dialing each kubelet on 10250). The agent uses
+  # one of them per KUBEADAPT_KUBELET_STATS_TRANSPORT and warns once if the
+  # rule is missing. The verb is "get" alone: read-only access to the kubelet
+  # API through these two subresources, with no write and no exec. RBAC cannot
+  # narrow it further - "get" on nodes/proxy allows a GET against any kubelet
+  # path reached through the API server proxy, not only /stats/summary.
+  - apiGroups: [""]
+    resources:
+      - nodes/proxy
+      - nodes/stats
+    verbs: ["get"]
+
   # VPA (optional, if installed)
   - apiGroups: ["autoscaling.k8s.io"]
     resources:
