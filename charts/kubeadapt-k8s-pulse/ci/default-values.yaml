@@ -38,12 +38,8 @@ resources:
     cpu: 200m
     memory: 256Mi
 
-# Tolerations for Kind cluster nodes
-tolerations:
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/master
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/control-plane
+# tolerations left at the chart default (operator: Exists), which is what lets
+# the DaemonSet schedule onto Kind's tainted control-plane node.
 
 nodeSelector: {}
 

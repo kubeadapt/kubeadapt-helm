@@ -87,8 +87,13 @@ resources:
 # ============================================================
 # Scheduling Configuration
 # ============================================================
-# Default tolerations to run on all nodes including masters
-tolerations: []
+# A node the DaemonSet does not run on has no traffic measured at all, and the
+# gap does not show: the DaemonSet's desired count already leaves the node out.
+# The default therefore tolerates every taint, so control-plane, GPU, spot and
+# other dedicated pools are covered. Replace the list to narrow it; set it to
+# [] to tolerate nothing beyond what the DaemonSet controller adds on its own.
+tolerations:
+  - operator: Exists
 
 nodeSelector: {}
 
