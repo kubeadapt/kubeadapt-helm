@@ -83,6 +83,10 @@ affinity: {}
 
 topologySpreadConstraints: []
 
+# Required with hostNetwork for the pod to resolve cluster Service names, such
+# as the agent endpoint config.export dials by default.
+dnsPolicy: ClusterFirstWithHostNet
+
 # Additional environment variables
 env:
   # Retry-buffer capacity, in sub-batches; pulse's built-in default is 60.

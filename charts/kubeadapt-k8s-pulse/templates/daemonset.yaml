@@ -25,7 +25,10 @@ spec:
       serviceAccountName: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
       # Required for eBPF: access to host network namespace
       hostNetwork: true
-      # Required for eBPF: access to host PID namespace for process tracking
+      # With hostNetwork the pod's default ClusterFirst policy falls back to the
+      # node's resolver, which cannot resolve *.svc.cluster.local -- including
+      # the agent Service that config.export dials by default.
+      dnsPolicy: {{ .Values.dnsPolicy }}
       # hostPID places the agent in the host's PID namespace, where it can see
       # and signal every process on the node and every process can see it. It
       # was needed because the ELF fingerprint scanner read "/proc".
