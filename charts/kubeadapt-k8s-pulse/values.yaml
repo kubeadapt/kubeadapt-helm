@@ -6,7 +6,7 @@ enabled: true
 
 image:
   repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
-  tag: "v3.0.1"
+  tag: "v3.1.0"
   pullPolicy: Always
 
 serviceAccount:
@@ -116,12 +116,12 @@ updateStrategy:
 env:
   # Retry-buffer capacity, in sub-batches; pulse's built-in default is 60.
   #
-  # Chart-side plumbing. No released pulse image reads this variable yet, so
-  # setting it here is inert until a release that reads EBPF_RETRY_BUFFER_SIZE
-  # and retries RESOURCE_EXHAUSTED is pinned in image.tag above; older images
-  # ignore an unknown environment variable.
+  # The default image (v3.1.0) reads this variable and sizes its retry buffer
+  # from it. Retrying RESOURCE_EXHAUSTED rather than counting it as a drop
+  # comes in a later pulse release; until that is pinned in image.tag above,
+  # agent back-pressure is still counted as a drop.
   #
-  # From that release on: the agent answers RESOURCE_EXHAUSTED whenever its
+  # With that release: the agent answers RESOURCE_EXHAUSTED whenever its
   # intake is full, so agent back-pressure queues in this buffer instead of
   # being counted as a drop. At the exporter's 60s push cadence a node at the
   # modelled busy density (~750 flow rows per node per minute, well under the
@@ -156,6 +156,6 @@ security:
     - SYS_PTRACE
 
   # hostPID defaults to true so a chart upgrade ahead of an image upgrade cannot
-  # silently empty the container inventory. Set to false once the running image
-  # includes the fingerprint scanner's /host/proc preference.
+  # silently empty the container inventory. The default image (v3.1.0) includes
+  # the fingerprint scanner's /host/proc preference, so false works with it.
   hostPID: true

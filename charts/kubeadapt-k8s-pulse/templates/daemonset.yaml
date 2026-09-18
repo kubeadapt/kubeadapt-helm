@@ -40,8 +40,9 @@ spec:
       #
       # Defaults to true so that a chart upgrade in front of an older image --
       # one whose scanner still reads "/proc" -- does not silently empty the
-      # container inventory. Set security.hostPID=false once the agent image is
-      # at or past the release that added the /host/proc preference.
+      # container inventory. The default image (v3.1.0) has the /host/proc
+      # preference, so security.hostPID=false is safe with it; the default
+      # stays true until that is validated on a live cluster.
       hostPID: {{ .Values.security.hostPID }}
       containers:
         - name: kubeadapt-k8s-pulse
