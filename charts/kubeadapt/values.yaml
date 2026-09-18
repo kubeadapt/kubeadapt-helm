@@ -59,6 +59,38 @@ agent:
       memory: 16Gi
 
   # ============================================================
+  # Security Context
+  # ============================================================
+  # With these defaults the pod meets the "restricted" Pod Security Standard,
+  # with or without the upgrader sidecar.
+  #
+  # Pod level, so it covers the upgrader sidecar too. The agent image is
+  # distroless and declares USER nonroot:nonroot, a NAME the kubelet cannot
+  # check against runAsNonRoot, so the numeric UID/GID of that user (65532) is
+  # set explicitly; without runAsUser, runAsNonRoot: true fails the container
+  # with CreateContainerConfigError. The upgrader image already runs as 65532.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+
+  # The agent container. It needs no capabilities, and the only place it
+  # writes is the spool volume at agent.spool.mountPath (the spool, and the
+  # state files agent releases that read KUBEADAPT_STATE_DIR keep beside it),
+  # plus an emptyDir at /tmp. With agent.spool.enabled=false the agent logs
+  # that the spool and state directory are unavailable and runs without them.
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+  # ============================================================
   # Network Telemetry Spool
   # ============================================================
   spool:
@@ -186,6 +218,17 @@ agent:
       limits:
         cpu: 100m
         memory: 128Mi
+
+    # Container securityContext for the upgrader sidecar; the pod-level
+    # agent.podSecurityContext also applies. readOnlyRootFilesystem is not set:
+    # the sidecar embeds Helm's client libraries, and whether they write caches
+    # under $HOME has not been checked.
+    securityContext:
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
 
     # How often to check for updates
     checkInterval: "24h"

@@ -20,10 +20,18 @@ spec:
         app.kubernetes.io/component: agent
     spec:
       serviceAccountName: {{ include "kubeadapt.name" . }}-agent
+      {{- with .Values.agent.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: agent
           image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          {{- with .Values.agent.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - name: health
               containerPort: {{ .Values.agent.config.healthPort }}
@@ -153,15 +161,24 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.agent.resources | nindent 12 }}
-          {{- if .Values.agent.spool.enabled }}
           volumeMounts:
+            # Writable scratch space under a read-only root filesystem. Nothing
+            # in the agent writes here today; the mount keeps a library that
+            # falls back to os.TempDir() working instead of failing on EROFS.
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.agent.spool.enabled }}
             - name: spool
               mountPath: {{ required "agent.spool.mountPath must be set" .Values.agent.spool.mountPath | quote }}
-          {{- end }}
+            {{- end }}
       {{- if .Values.agent.autoUpgrade.enabled }}
         - name: upgrader
           image: "{{ .Values.agent.autoUpgrade.image.repository }}:{{ .Values.agent.autoUpgrade.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.agent.autoUpgrade.image.pullPolicy }}
+          {{- with .Values.agent.autoUpgrade.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - name: upgrader-health
               containerPort: 8081
@@ -232,13 +249,17 @@ spec:
       # Room for the agent to drain its spool on SIGTERM before it exits, so a
       # pod replacement does not strand undelivered telemetry.
       terminationGracePeriodSeconds: 120
+      {{- end }}
       volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.agent.spool.enabled }}
         # emptyDir, never a PersistentVolume: the spool has to survive a
         # container restart and an ingestion outage, not a pod replacement.
         - name: spool
           emptyDir:
             sizeLimit: {{ .Values.agent.spool.sizeLimit | quote }}
-      {{- end }}
+        {{- end }}
       {{- with .Values.agent.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
