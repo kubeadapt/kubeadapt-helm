@@ -10,9 +10,7 @@ spec:
     matchLabels:
       {{- include "kubeadapt-k8s-pulse.selectorLabels" . | nindent 6 }}
   updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
+    {{- toYaml .Values.updateStrategy | nindent 4 }}
   template:
     metadata:
       labels:
@@ -25,8 +23,27 @@ spec:
       serviceAccountName: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
       # Required for eBPF: access to host network namespace
       hostNetwork: true
-      # Required for eBPF: access to host PID namespace for process tracking
-      hostPID: true
+      # With hostNetwork the pod's default ClusterFirst policy falls back to the
+      # node's resolver, which cannot resolve *.svc.cluster.local -- including
+      # the agent Service that config.export dials by default.
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      # hostPID places the agent in the host's PID namespace, where it can see
+      # and signal every process on the node and every process can see it. It
+      # was needed because the ELF fingerprint scanner read "/proc".
+      #
+      # Since the scanner prefers the read-only /host/proc bind mount, the
+      # namespace is no longer required for the data. Measured on a Talos 6.18
+      # node with hostPID: false: all 583 host PIDs were visible under
+      # /host/proc and all 304 userspace processes had their ELF opened
+      # successfully, 0 failures (the remaining 279 are kernel threads, which
+      # have no exe link under any configuration).
+      #
+      # Defaults to true so that a chart upgrade in front of an older image --
+      # one whose scanner still reads "/proc" -- does not silently empty the
+      # container inventory. The default image (v3.1.0) has the /host/proc
+      # preference, so security.hostPID=false is safe with it; the default
+      # stays true until that is validated on a live cluster.
+      hostPID: {{ .Values.security.hostPID }}
       containers:
         - name: kubeadapt-k8s-pulse
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -68,10 +85,16 @@ spec:
               value: {{ .Values.config.logFormat | quote }}
             - name: EBPF_METRICS_PORT
               value: {{ .Values.config.metricsPort | quote }}
-            - name: EBPF_COLLECTION_INTERVAL
-              value: {{ .Values.config.collectionInterval | quote }}
             - name: EBPF_CONNECTION_TRACKING
               value: {{ .Values.config.connectionTracking | quote }}
+
+            {{- if .Values.config.export.enabled }}
+            # Flow export to the KubeAdapt agent
+            - name: EBPF_EXPORT_ENABLED
+              value: "true"
+            - name: EBPF_AGENT_ENDPOINT
+              value: {{ include "kubeadapt-k8s-pulse.agentEndpoint" . | quote }}
+            {{- end }}
 
             # Debug options
             {{- if .Values.config.enableProfiling }}
@@ -91,11 +114,50 @@ spec:
             {{- end }}
 
           securityContext:
-            # eBPF agents require privileged mode for:
-            # - BPF syscalls and map operations
-            # - Bidirectional mount propagation for BPF maps
-            # - Kernel tracepoint attachment
+            # Four capabilities instead of privileged mode.
+            #
+            # `privileged: true` granted 39 capabilities (CapEff
+            # 000001ffffbeffff on a Talos 6.18 node), including CAP_SYS_MODULE,
+            # CAP_SYS_RAWIO and CAP_DAC_OVERRIDE, none of which this agent uses.
+            #
+            # The set below was determined by MEASUREMENT, not by reading docs:
+            # a probe performing every privileged operation the agent actually
+            # performs was run on a live node under each candidate set on
+            # 2026-09-01. With these four (CapEff 000000c000081000) all fifteen
+            # succeeded -- BPF map creation, program load and verification,
+            # pinning to bpffs, TCX attach on both hooks at the Head anchor, the
+            # classic-TC clsact fallback, conntrack netlink subscribe and
+            # full-table dump, netlink link subscribe, and reading
+            # /proc/<pid>/exe for the container inventory.
+            #
+            #   CAP_BPF + CAP_PERFMON  map creation, program load, the verifier
+            #   CAP_NET_ADMIN          TCX/TC attach, netlink, conntrack events
+            #   CAP_SYS_PTRACE         /proc/<pid>/exe for the ELF fingerprint
+            #
+            # CAP_SYS_RESOURCE is deliberately absent: memlock accounting moved
+            # to the memory cgroup in kernel 5.11, and rlimit.RemoveMemlock
+            # succeeds without it on every kernel this agent supports.
+            #
+            # CAP_DAC_READ_SEARCH does NOT substitute for CAP_SYS_PTRACE, which
+            # is worth stating because it looks like it should: /proc/<pid>/exe
+            # is gated by ptrace_may_access rather than by file permissions, and
+            # the measured result with DAC_READ_SEARCH was EACCES.
+            #
+            # seccompProfile is left unset (the kubelet default). The
+            # RuntimeDefault profile of older container runtimes allows bpf()
+            # and perf_event_open() only with CAP_SYS_ADMIN, and RuntimeDefault
+            # was not part of the measured configuration.
+            {{- if .Values.security.privileged }}
             privileged: true
+            {{- else }}
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                {{- toYaml .Values.security.capabilities | nindent 16 }}
+            {{- end }}
             readOnlyRootFilesystem: true
             runAsNonRoot: false
             runAsUser: 0
@@ -112,7 +174,22 @@ spec:
               readOnly: true
             - name: bpf-maps
               mountPath: /sys/fs/bpf
-              mountPropagation: Bidirectional
+              # HostToContainer, not Bidirectional.
+              #
+              # Bidirectional exists so mounts CREATED INSIDE the container
+              # propagate back to the host, and the agent creates none: it never
+              # calls mount(). It does MkdirAll and BPF_OBJ_PIN into a bpffs the
+              # host already mounted, which are file operations on an existing
+              # mount. Verified by grep -- there is no mount syscall anywhere in
+              # the agent.
+              #
+              # It is also what blocked least privilege. Kubernetes rejects
+              # Bidirectional propagation outright for a non-privileged
+              # container ("Bidirectional mount propagation is available only to
+              # privileged containers"), so this line, not any capability, was
+              # the thing keeping privileged: true. That was found by the API
+              # server refusing the patch on a live cluster.
+              mountPropagation: HostToContainer
             - name: cgroup
               mountPath: /sys/fs/cgroup
               readOnly: true

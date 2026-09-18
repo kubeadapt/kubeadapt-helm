@@ -1,0 +1,50 @@
+{{- if and .Values.enabled .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubeadapt-k8s-pulse.clusterRoleName" . }}
+  labels:
+    {{- include "kubeadapt-k8s-pulse.labels" . | nindent 4 }}
+rules:
+  # Pod identity resolver: a node-scoped pod informer (field selector
+  # spec.nodeName=<this node>), which lists and watches and never gets. RBAC
+  # cannot narrow a rule by field selector, so the grant is cluster-wide even
+  # though each pod only ever reads the pods on its own node.
+  - apiGroups: [""]
+    resources:
+      - pods
+    verbs: ["list", "watch"]
+
+  # Node identity: one Get of this pod's own Node at startup, for its UID and
+  # topology zone label.
+  - apiGroups: [""]
+    resources:
+      - nodes
+    verbs: ["get"]
+  {{- if .Values.rbac.ciliumEnvoyConfigs }}
+
+  # L7 detector: one cluster-wide List of CiliumEnvoyConfig at startup, to tell
+  # whether an east-west Envoy dataplane hides backend pod IPs. On a cluster
+  # without Cilium the rule matches nothing and the detector reports
+  # "inconclusive".
+  - apiGroups: ["cilium.io"]
+    resources:
+      - ciliumenvoyconfigs
+    verbs: ["list"]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "kubeadapt-k8s-pulse.clusterRoleName" . }}
+  labels:
+    {{- include "kubeadapt-k8s-pulse.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "kubeadapt-k8s-pulse.clusterRoleName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

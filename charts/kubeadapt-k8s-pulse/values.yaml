@@ -6,13 +6,26 @@ enabled: true
 
 image:
   repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
-  tag: "v3.0.1"
+  tag: "v3.1.0"
   pullPolicy: Always
 
 serviceAccount:
   create: true
   annotations: {}
   name: ""
+
+# ClusterRole + ClusterRoleBinding for the ServiceAccount above. Every call the
+# DaemonSet makes to the Kubernetes API is read-only:
+#   - pods list/watch: the node-scoped pod informer behind pod identity
+#   - nodes get: this pod's own Node, for its UID and zone
+#   - cilium.io ciliumenvoyconfigs list: the L7 detector (ciliumEnvoyConfigs)
+# Without them each call is denied and the DaemonSet keeps running with the
+# feature switched off, so flows lose their pod and node attribution with
+# nothing louder than a log line.
+rbac:
+  create: true
+  # The CiliumEnvoyConfig rule. Harmless on a cluster without Cilium.
+  ciliumEnvoyConfigs: true
 
 # ============================================================
 # eBPF Agent Configuration
@@ -21,9 +34,6 @@ config:
   # Metrics server port for Prometheus scraping
   # Exposes: /metrics, /health/live, /health/ready
   metricsPort: 9090
-
-  # Collection interval for BPF map reads, leave it as is, unless you have specific needs
-  collectionInterval: "25s"
 
   # Log level for agent
   # Options: "debug", "info", "warn", "error"
@@ -35,6 +45,22 @@ config:
 
   # Enable connection tracking (read-then-delete pattern with overflow ringbuffer)
   connectionTracking: true
+
+  # ============================================================
+  # Flow export to the KubeAdapt agent
+  # ============================================================
+  # This agent measures traffic; the KubeAdapt agent is what resolves it to
+  # pods, workloads and nodes and ships it. Without export the DaemonSet runs
+  # and only exposes Prometheus metrics, which is why it is off by default:
+  # a standalone install has no agent to send to.
+  #
+  # The kubeadapt umbrella chart turns this on for you.
+  export:
+    enabled: false
+    # Where to send flow batches. Empty means the agent Service the umbrella
+    # chart installs, in this release's namespace. Set it explicitly when the
+    # agent runs somewhere else.
+    agentEndpoint: ""
 
   # ============================================================
   # Debug Options (use with caution in production)
@@ -61,8 +87,13 @@ resources:
 # ============================================================
 # Scheduling Configuration
 # ============================================================
-# Default tolerations to run on all nodes including masters
-tolerations: []
+# A node the DaemonSet does not run on has no traffic measured at all, and the
+# gap does not show: the DaemonSet's desired count already leaves the node out.
+# The default therefore tolerates every taint, so control-plane, GPU, spot and
+# other dedicated pools are covered. Replace the list to narrow it; set it to
+# [] to tolerate nothing beyond what the DaemonSet controller adds on its own.
+tolerations:
+  - operator: Exists
 
 nodeSelector: {}
 
@@ -70,16 +101,27 @@ affinity: {}
 
 topologySpreadConstraints: []
 
+# Required with hostNetwork for the pod to resolve cluster Service names, such
+# as the agent endpoint config.export dials by default.
+dnsPolicy: ClusterFirstWithHostNet
+
+# Rollout pace across nodes. maxUnavailable also accepts a percentage, such as
+# "10%", for large clusters.
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+
 # Additional environment variables
 env:
   # Retry-buffer capacity, in sub-batches; pulse's built-in default is 60.
   #
-  # Chart-side plumbing. No released pulse image reads this variable yet, so
-  # setting it here is inert until a release that reads EBPF_RETRY_BUFFER_SIZE
-  # and retries RESOURCE_EXHAUSTED is pinned in image.tag above; older images
-  # ignore an unknown environment variable.
+  # The default image (v3.1.0) reads this variable and sizes its retry buffer
+  # from it. Retrying RESOURCE_EXHAUSTED rather than counting it as a drop
+  # comes in a later pulse release; until that is pinned in image.tag above,
+  # agent back-pressure is still counted as a drop.
   #
-  # From that release on: the agent answers RESOURCE_EXHAUSTED whenever its
+  # With that release: the agent answers RESOURCE_EXHAUSTED whenever its
   # intake is full, so agent back-pressure queues in this buffer instead of
   # being counted as a drop. At the exporter's 60s push cadence a node at the
   # modelled busy density (~750 flow rows per node per minute, well under the
@@ -90,3 +132,30 @@ env:
   # byte backstop still applies and is not reached at these batch sizes.
   - name: EBPF_RETRY_BUFFER_SIZE
     value: "120"
+
+# Security posture for the pulse DaemonSet.
+#
+# The defaults below are the LEAST-PRIVILEGE posture, which was verified against
+# a live Talos 6.18 node rather than inferred. See the securityContext comment
+# in templates/daemonset.yaml for the measurement.
+security:
+  # privileged: true restores the previous posture (39 capabilities). Kept as an
+  # escape hatch for a kernel or distribution where the capability set below
+  # turns out to be insufficient; if you need it, that is a bug worth reporting
+  # rather than a setting worth keeping.
+  privileged: false
+
+  # The four capabilities every privileged operation the agent performs was
+  # measured to need. CAP_SYS_RESOURCE is absent on purpose (memlock moved to
+  # the memory cgroup in 5.11); CAP_DAC_READ_SEARCH does not substitute for
+  # CAP_SYS_PTRACE, because /proc/<pid>/exe is gated by ptrace_may_access.
+  capabilities:
+    - BPF
+    - PERFMON
+    - NET_ADMIN
+    - SYS_PTRACE
+
+  # hostPID defaults to true so a chart upgrade ahead of an image upgrade cannot
+  # silently empty the container inventory. The default image (v3.1.0) includes
+  # the fingerprint scanner's /host/proc preference, so false works with it.
+  hostPID: true

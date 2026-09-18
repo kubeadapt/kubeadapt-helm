@@ -6,7 +6,7 @@ enabled: true
 
 image:
   repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
-  tag: "v3.0.1"
+  tag: "v3.1.0"
   pullPolicy: Always  # Always pull to avoid stale cache in CI
 
 serviceAccount:
@@ -17,9 +17,6 @@ serviceAccount:
 config:
   # Metrics port
   metricsPort: 9090
-
-  # Use shorter collection interval for CI tests
-  collectionInterval: "15s"
 
   # Debug logging for CI
   logLevel: "debug"
@@ -41,12 +38,8 @@ resources:
     cpu: 200m
     memory: 256Mi
 
-# Tolerations for Kind cluster nodes
-tolerations:
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/master
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/control-plane
+# tolerations left at the chart default (operator: Exists), which is what lets
+# the DaemonSet schedule onto Kind's tainted control-plane node.
 
 nodeSelector: {}
 
