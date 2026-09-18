@@ -2,8 +2,8 @@ apiVersion: v2
 name: kubeadapt-k8s-pulse
 description: High-performance eBPF-based network metrics agent for Kubernetes
 type: application
-version: 1.0.2
-appVersion: "3.0.1"
+version: 1.1.0
+appVersion: "3.1.0"
 
 home: https://github.com/kubeadapt/kubeadapt-k8s-pulse
 sources:
@@ -33,9 +33,23 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
+    - kind: security
+      description: "Run the DaemonSet with four capabilities instead of privileged: true. The container drops ALL and adds BPF, PERFMON, NET_ADMIN and SYS_PTRACE, with allowPrivilegeEscalation: false; the set was measured on a live node to cover every privileged operation the agent performs. /sys/fs/bpf mount propagation narrows from Bidirectional to HostToContainer, which Kubernetes requires for a non-privileged container. security.privileged=true restores the previous posture, security.capabilities changes the set, and security.hostPID (default true) makes the host PID namespace configurable."
+    - kind: added
+      description: "config.export lets the DaemonSet send flow batches to the KubeAdapt agent. Off by default, so a standalone install behaves as before; the kubeadapt umbrella chart turns it on. The endpoint defaults to the agent Service in the release namespace and can be overridden with config.export.agentEndpoint."
+    - kind: added
+      description: "A read-only ClusterRole and ClusterRoleBinding for the pulse ServiceAccount (rbac.create): list and watch on pods for the node-scoped pod informer, get on nodes for the node's own UID and zone, and list on cilium.io CiliumEnvoyConfig for the L7 detector (rbac.ciliumEnvoyConfigs). Without them every Kubernetes API call was denied and flows lost their pod and node attribution without any error."
+    - kind: fixed
+      description: "Set dnsPolicy: ClusterFirstWithHostNet. With hostNetwork the default policy uses the node's resolver, which cannot resolve the agent Service the export endpoint points at."
     - kind: changed
-      description: "Set EBPF_RETRY_BUFFER_SIZE to 120, raising the export retry buffer to 120 sub-batches from the built-in default of 60. This is chart-side plumbing: it takes effect once a pulse release that reads the variable and retries RESOURCE_EXHAUSTED - which the agent returns when its intake is full - ships, and earlier images ignore it. From that release on, agent back-pressure queues in this buffer instead of being counted as a drop, and the larger buffer doubles how long a node rides it out before the oldest sub-batch is evicted. Resource requests and limits are unchanged."
-  artifacthub.io/containsSecurityUpdates: "false"
+      description: "tolerations now defaults to a single { operator: Exists }, so the DaemonSet runs on control-plane, GPU, spot and other tainted nodes instead of silently skipping them. Set tolerations to [] for the previous behaviour."
+    - kind: added
+      description: "updateStrategy is a value; the default (RollingUpdate, maxUnavailable: 1) is unchanged."
+    - kind: removed
+      description: "config.collectionInterval and the EBPF_COLLECTION_INTERVAL variable it set. pulse does not read it."
+    - kind: changed
+      description: "Pulse image v3.0.1 -> v3.1.0 (distroless runtime; the fingerprint scanner reads the read-only /host/proc mount). v3.1.0 reads EBPF_RETRY_BUFFER_SIZE; retrying RESOURCE_EXHAUSTED from a full agent comes in a later pulse release."
+  artifacthub.io/containsSecurityUpdates: "true"
   artifacthub.io/prerelease: "false"
   artifacthub.io/license: Apache-2.0
   artifacthub.io/operator: "false"
@@ -62,4 +76,4 @@ annotations:
       url: https://github.com/kubeadapt/kubeadapt-k8s-pulse
   artifacthub.io/images: |
     - name: kubeadapt-k8s-pulse
-      image: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse:v3.0.1
+      image: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse:v3.1.0

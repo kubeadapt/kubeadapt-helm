@@ -1,6 +1,6 @@
 # kubeadapt-k8s-pulse
 
-![Version: 1.0.2](https://img.shields.io/badge/Version-1.0.2-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.0.1](https://img.shields.io/badge/AppVersion-3.0.1-informational?style=flat-square)
+![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.1.0](https://img.shields.io/badge/AppVersion-3.1.0-informational?style=flat-square)
 
 High-performance eBPF-based network metrics agent for Kubernetes
 
@@ -33,7 +33,7 @@ helm repo update
 Or use OCI registry:
 
 ```console
-helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.0.2
+helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.1.0
 ```
 
 ## Installing the Chart
@@ -62,21 +62,38 @@ helm delete kubeadapt-k8s-pulse -n kubeadapt
 
 ## Security Requirements
 
-The eBPF agent requires privileged access:
+The DaemonSet does not run privileged. It drops every capability and adds back
+four, the set measured to cover every privileged operation the agent performs:
 
 ```yaml
 securityContext:
-  privileged: true
+  privileged: false
+  allowPrivilegeEscalation: false
   capabilities:
+    drop:
+      - ALL
     add:
-      - SYS_ADMIN    # Load/attach eBPF programs
-      - SYS_RESOURCE # Lock memory for BPF maps
-      - NET_ADMIN    # Network namespace operations
+      - BPF         # map creation, program load, the verifier
+      - PERFMON     # with BPF: program load and verification
+      - NET_ADMIN   # TCX/TC attach, netlink, conntrack events
+      - SYS_PTRACE  # /proc/<pid>/exe for the container inventory
+  readOnlyRootFilesystem: true
+  runAsUser: 0
 ```
 
+`security.capabilities` changes the set, and `security.privileged=true` restores
+`privileged: true` if a kernel or distribution turns out to need it.
+`/sys/fs/bpf` is mounted with `HostToContainer` propagation.
+
 Additionally requires:
-- `hostNetwork: true` - Access host network namespace
+- `hostNetwork: true` - Access host network namespace, with
+  `dnsPolicy: ClusterFirstWithHostNet` so cluster Service names still resolve
 - `hostPID: true` - Track processes for connection attribution
+  (`security.hostPID`; the default image also works with `false`)
+
+The chart also creates a read-only ClusterRole for its ServiceAccount
+(`rbac.create`): `list`/`watch` on pods, `get` on nodes, and `list` on
+`cilium.io` CiliumEnvoyConfig (`rbac.ciliumEnvoyConfigs`).
 
 ## Exported Metrics
 
@@ -107,30 +124,42 @@ Additionally requires:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` |  |
-| config.collectionInterval | string | `"25s"` |  |
 | config.connectionTracking | bool | `true` |  |
 | config.dumpBPFMaps | bool | `false` |  |
 | config.enableProfiling | bool | `false` |  |
+| config.export.agentEndpoint | string | `""` |  |
+| config.export.enabled | bool | `false` |  |
 | config.logFormat | string | `"json"` |  |
 | config.logLevel | string | `"info"` |  |
 | config.metricsPort | int | `9090` |  |
 | config.profilingPort | int | `6060` |  |
+| dnsPolicy | string | `"ClusterFirstWithHostNet"` |  |
 | enabled | bool | `true` |  |
 | env[0].name | string | `"EBPF_RETRY_BUFFER_SIZE"` |  |
 | env[0].value | string | `"120"` |  |
 | image.pullPolicy | string | `"Always"` |  |
 | image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse"` |  |
-| image.tag | string | `"v3.0.1"` |  |
+| image.tag | string | `"v3.1.0"` |  |
 | nodeSelector | object | `{}` |  |
+| rbac.ciliumEnvoyConfigs | bool | `true` |  |
+| rbac.create | bool | `true` |  |
 | resources.limits.cpu | string | `"500m"` |  |
 | resources.limits.memory | string | `"384Mi"` |  |
 | resources.requests.cpu | string | `"100m"` |  |
 | resources.requests.memory | string | `"256Mi"` |  |
+| security.capabilities[0] | string | `"BPF"` |  |
+| security.capabilities[1] | string | `"PERFMON"` |  |
+| security.capabilities[2] | string | `"NET_ADMIN"` |  |
+| security.capabilities[3] | string | `"SYS_PTRACE"` |  |
+| security.hostPID | bool | `true` |  |
+| security.privileged | bool | `false` |  |
 | serviceAccount.annotations | object | `{}` |  |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
-| tolerations | list | `[]` |  |
+| tolerations[0].operator | string | `"Exists"` |  |
 | topologySpreadConstraints | list | `[]` |  |
+| updateStrategy.rollingUpdate.maxUnavailable | int | `1` |  |
+| updateStrategy.type | string | `"RollingUpdate"` |  |
 
 ## Troubleshooting
 
