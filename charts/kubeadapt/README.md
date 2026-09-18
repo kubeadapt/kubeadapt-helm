@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 1.0.7](https://img.shields.io/badge/Version-1.0.7-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -37,7 +37,7 @@ helm delete my-release
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.0.1 |
+| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.1.0 |
 
 ## Values
 
@@ -60,6 +60,9 @@ helm delete my-release
 | agent.autoUpgrade.resources.limits.memory | string | `"128Mi"` |  |
 | agent.autoUpgrade.resources.requests.cpu | string | `"10m"` |  |
 | agent.autoUpgrade.resources.requests.memory | string | `"32Mi"` |  |
+| agent.autoUpgrade.securityContext.allowPrivilegeEscalation | bool | `false` |  |
+| agent.autoUpgrade.securityContext.capabilities.drop[0] | string | `"ALL"` |  |
+| agent.autoUpgrade.securityContext.runAsNonRoot | bool | `true` |  |
 | agent.autoUpgrade.serviceAccount.annotations | object | `{}` |  |
 | agent.autoUpgrade.serviceAccount.create | bool | `true` |  |
 | agent.autoUpgrade.serviceAccount.name | string | `""` |  |
@@ -84,13 +87,22 @@ helm delete my-release
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent"` |  |
-| agent.image.tag | string | `"v3.0.1"` |  |
+| agent.image.tag | string | `"v3.1.0"` |  |
 | agent.nodeSelector | object | `{}` |  |
+| agent.podSecurityContext.fsGroup | int | `65532` |  |
+| agent.podSecurityContext.runAsGroup | int | `65532` |  |
+| agent.podSecurityContext.runAsNonRoot | bool | `true` |  |
+| agent.podSecurityContext.runAsUser | int | `65532` |  |
+| agent.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
 | agent.rbac.create | bool | `true` |  |
 | agent.resources.limits.cpu | string | `"2000m"` |  |
 | agent.resources.limits.memory | string | `"16Gi"` |  |
 | agent.resources.requests.cpu | string | `"100m"` |  |
 | agent.resources.requests.memory | string | `"256Mi"` |  |
+| agent.securityContext.allowPrivilegeEscalation | bool | `false` |  |
+| agent.securityContext.capabilities.drop[0] | string | `"ALL"` |  |
+| agent.securityContext.readOnlyRootFilesystem | bool | `true` |  |
+| agent.securityContext.runAsNonRoot | bool | `true` |  |
 | agent.service.type | string | `"ClusterIP"` |  |
 | agent.serviceAccount.annotations | object | `{}` |  |
 | agent.serviceAccount.create | bool | `true` |  |
@@ -104,8 +116,10 @@ helm delete my-release
 | global.fullnameOverride | string | `""` |  |
 | global.name | string | `"kubeadapt"` |  |
 | global.nameOverride | string | `""` |  |
+| global.pulseListenPort | int | `9091` |  |
 | kubeadapt-k8s-pulse.affinity | object | `{}` |  |
+| kubeadapt-k8s-pulse.config.export.enabled | bool | `true` |  |
 | kubeadapt-k8s-pulse.enabled | bool | `false` |  |
 | kubeadapt-k8s-pulse.nodeSelector | object | `{}` |  |
-| kubeadapt-k8s-pulse.tolerations | list | `[]` |  |
+| kubeadapt-k8s-pulse.tolerations[0].operator | string | `"Exists"` |  |
 | kubeadapt-k8s-pulse.topologySpreadConstraints | list | `[]` |  |

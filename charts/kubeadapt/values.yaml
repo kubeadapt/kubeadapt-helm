@@ -3,13 +3,17 @@ global:
   name: "kubeadapt"
   nameOverride: ""
   fullnameOverride: ""
+  # Port the agent listens on for network flows from the eBPF collector.
+  # Read by the agent Deployment, the agent Service and the collector
+  # subchart, so the listener and the sender cannot be configured apart.
+  pulseListenPort: 9091
 
 agent:
   enabled: true
   image:
     # renovate: datasource=docker depName=public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
     repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
-    tag: "v3.0.1"
+    tag: "v3.1.0"
     pullPolicy: IfNotPresent
   # ============================================================
   # Service Account Configuration
@@ -53,6 +57,38 @@ agent:
     limits:
       cpu: 2000m
       memory: 16Gi
+
+  # ============================================================
+  # Security Context
+  # ============================================================
+  # With these defaults the pod meets the "restricted" Pod Security Standard,
+  # with or without the upgrader sidecar.
+  #
+  # Pod level, so it covers the upgrader sidecar too. The agent image is
+  # distroless and declares USER nonroot:nonroot, a NAME the kubelet cannot
+  # check against runAsNonRoot, so the numeric UID/GID of that user (65532) is
+  # set explicitly; without runAsUser, runAsNonRoot: true fails the container
+  # with CreateContainerConfigError. The upgrader image already runs as 65532.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+
+  # The agent container. It needs no capabilities, and the only place it
+  # writes is the spool volume at agent.spool.mountPath (the spool, and the
+  # state files agent releases that read KUBEADAPT_STATE_DIR keep beside it),
+  # plus an emptyDir at /tmp. With agent.spool.enabled=false the agent logs
+  # that the spool and state directory are unavailable and runs without them.
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
 
   # ============================================================
   # Network Telemetry Spool
@@ -183,6 +219,17 @@ agent:
         cpu: 100m
         memory: 128Mi
 
+    # Container securityContext for the upgrader sidecar; the pod-level
+    # agent.podSecurityContext also applies. readOnlyRootFilesystem is not set:
+    # the sidecar embeds Helm's client libraries, and whether they write caches
+    # under $HOME has not been checked.
+    securityContext:
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+
     # How often to check for updates
     checkInterval: "24h"
 
@@ -255,21 +302,34 @@ agent:
 # Deploys a DaemonSet that uses eBPF to track pod-to-pod network traffic
 #
 # Prerequisites:
-# - Linux kernel >= 5.8 (required for TC eBPF support)
-# - Privileged container access
+# - Linux kernel >= 5.10
+# - A namespace that admits the privileged Pod Security level: the DaemonSet
+#   uses hostNetwork, hostPID and hostPath mounts. It does not run privileged;
+#   it adds four capabilities (BPF, PERFMON, NET_ADMIN, SYS_PTRACE).
 #
 # For full configuration options, see: charts/kubeadapt-k8s-pulse/values.yaml
 kubeadapt-k8s-pulse:
-  # Set to true to deploy the eBPF agent DaemonSet for network cost tracking
+  # Set to true to deploy the eBPF agent DaemonSet for network cost tracking.
+  # This is the only flag network telemetry needs: it also opens the agent's
+  # flow listener and points the DaemonSet at it (see config.export below).
   enabled: false
 
-  # Override defaults if needed - see charts/kubeadapt-k8s-pulse/values.yaml for all options
-  # config:
-  #   logLevel: "info"
-  #   collectionInterval: "25s"
+  # Send measured flows to the agent, which resolves them to pods, workloads
+  # and nodes and ships them to KubeAdapt. Without this the DaemonSet only
+  # exposes Prometheus metrics and Network Intelligence stays empty.
+  config:
+    export:
+      enabled: true
+    # Other options: see charts/kubeadapt-k8s-pulse/values.yaml, e.g.
+    # logLevel: "info"
 
-  # Scheduling - configure as needed for your cluster
-  tolerations: []
+  # Every taint is tolerated, so the DaemonSet also runs on control-plane, GPU,
+  # spot and other dedicated nodes. A node it skips has no traffic measured, and
+  # the DaemonSet's desired count leaves that node out, so the gap never shows.
+  # This repeats the subchart default; the previous [] here overrode it. Replace
+  # the list to narrow coverage.
+  tolerations:
+    - operator: Exists
 
   nodeSelector: {}
 

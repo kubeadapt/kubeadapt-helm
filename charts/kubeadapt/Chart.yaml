@@ -2,13 +2,13 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 1.0.7
+version: 1.1.0
 appVersion: "0.1.0"
 
 # Dependencies
 dependencies:
   - name: kubeadapt-k8s-pulse
-    version: "1.0.1"
+    version: "1.1.0"
     repository: "oci://ghcr.io/kubeadapt/kubeadapt-helm"
     condition: kubeadapt-k8s-pulse.enabled
 
@@ -32,13 +32,17 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
-    - kind: added
-      description: "Grant the agent ClusterRole get on nodes/proxy and nodes/stats so the kubelet Summary API can be read. It is the only source of per-pod network byte counters: metrics.k8s.io, already granted, carries CPU and memory and nothing else, so without this rule container_metrics.network_rx_bytes and network_tx_bytes are always zero. nodes/proxy serves the api_proxy transport and nodes/stats the direct kubelet transport. The verb is get alone, so the agent gets read-only access to the kubelet API through those two subresources, with no write and no exec."
-    - kind: added
-      description: "Add the chart-side plumbing for an agent write-ahead spool for network telemetry: an emptyDir volume mounted at agent.spool.mountPath (default /var/lib/kubeadapt), bounded by agent.spool.sizeLimit (2Gi) and agent.spool.maxBytes (1 GiB), the matching KUBEADAPT_SPOOL_DIR and KUBEADAPT_SPOOL_MAX_BYTES environment variables, and a 120s pod termination grace period. This is chart-side only: the volume and settings take effect once an agent release that writes to the spool ships, and agent images that predate it ignore the environment variables and leave the volume empty. No PersistentVolume or PersistentVolumeClaim is created; set agent.spool.enabled=false to opt out."
-    - kind: added
-      description: "Set GOMEMLIMIT on the agent container from its own memory limit via the Downward API. The Go runtime otherwise sizes its heap against the node's memory and the agent is OOMKilled at the container limit instead of collecting more aggressively. Resource requests and limits are unchanged."
-  artifacthub.io/containsSecurityUpdates: "false"
+    - kind: fixed
+      description: "kubeadapt-k8s-pulse.enabled=true now delivers network telemetry. It opens the agent's flow listener on global.pulseListenPort (9091), publishes that port on the agent Service, and switches the collector's export on, pointed at that Service. Previously the flag deployed the collector without connecting it to anything, so no network data reached KubeAdapt. Nothing new renders when the flag is false. The collector-to-agent channel is plaintext; the chart sets no TLS variables on either side."
+    - kind: security
+      description: "The agent pod now meets the restricted Pod Security Standard. Pod level (agent.podSecurityContext): runAsNonRoot with runAsUser/runAsGroup/fsGroup 65532 and seccompProfile RuntimeDefault. The numeric UID is required because the image declares the user by name (nonroot). Agent container (agent.securityContext): allowPrivilegeEscalation false, all capabilities dropped, read-only root filesystem, with emptyDir volumes at /tmp and at the spool mount path for the only paths the agent writes. Upgrader sidecar (agent.autoUpgrade.securityContext): allowPrivilegeEscalation false, all capabilities dropped. All three are overridable."
+    - kind: changed
+      description: "kubeadapt-k8s-pulse subchart 1.0.1 -> 1.1.0: the DaemonSet runs with four capabilities (BPF, PERFMON, NET_ADMIN, SYS_PTRACE) instead of privileged, gets a read-only ClusterRole for its pod, node and CiliumEnvoyConfig reads, uses dnsPolicy ClusterFirstWithHostNet so it can resolve the agent Service, and runs pulse v3.1.0."
+    - kind: fixed
+      description: "The collector DaemonSet now tolerates every taint. This chart used to set kubeadapt-k8s-pulse.tolerations to [], which overrode the subchart default and left control-plane, GPU, spot and other tainted nodes unmeasured, with nothing reporting the gap."
+    - kind: changed
+      description: "Agent image v3.0.1 -> v3.1.0. The upgrader stays at v3.0.1."
+  artifacthub.io/containsSecurityUpdates: "true"
   artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0
   artifacthub.io/platforms: |

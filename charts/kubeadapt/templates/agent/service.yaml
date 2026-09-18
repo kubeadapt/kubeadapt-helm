@@ -1,3 +1,4 @@
+{{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict }}
 {{- if .Values.agent.enabled }}
 apiVersion: v1
 kind: Service
@@ -13,6 +14,12 @@ spec:
       targetPort: health
       protocol: TCP
       name: health
+    {{- if $pulse.enabled }}
+    - port: {{ .Values.global.pulseListenPort }}
+      targetPort: pulse
+      protocol: TCP
+      name: pulse
+    {{- end }}
   selector:
     {{- include "kubeadapt.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: agent
