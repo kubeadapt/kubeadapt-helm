@@ -10,9 +10,7 @@ spec:
     matchLabels:
       {{- include "kubeadapt-k8s-pulse.selectorLabels" . | nindent 6 }}
   updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
+    {{- toYaml .Values.updateStrategy | nindent 4 }}
   template:
     metadata:
       labels:

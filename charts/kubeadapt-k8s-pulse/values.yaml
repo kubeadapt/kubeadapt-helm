@@ -105,6 +105,13 @@ topologySpreadConstraints: []
 # as the agent endpoint config.export dials by default.
 dnsPolicy: ClusterFirstWithHostNet
 
+# Rollout pace across nodes. maxUnavailable also accepts a percentage, such as
+# "10%", for large clusters.
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+
 # Additional environment variables
 env:
   # Retry-buffer capacity, in sub-batches; pulse's built-in default is 60.
