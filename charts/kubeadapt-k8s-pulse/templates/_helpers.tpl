@@ -67,6 +67,17 @@ listener and the sender cannot be configured apart.
 {{- end }}
 
 {{/*
+Name of the ClusterRole and ClusterRoleBinding.
+
+Cluster-scoped objects have no namespace, so the release namespace is part of
+the name: two installs in different namespaces would otherwise claim the same
+ClusterRole and the second install would fail.
+*/}}
+{{- define "kubeadapt-k8s-pulse.clusterRoleName" -}}
+{{- printf "%s-%s" (include "kubeadapt-k8s-pulse.fullname" .) .Release.Namespace | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "kubeadapt-k8s-pulse.serviceAccountName" -}}

@@ -14,6 +14,19 @@ serviceAccount:
   annotations: {}
   name: ""
 
+# ClusterRole + ClusterRoleBinding for the ServiceAccount above. Every call the
+# DaemonSet makes to the Kubernetes API is read-only:
+#   - pods list/watch: the node-scoped pod informer behind pod identity
+#   - nodes get: this pod's own Node, for its UID and zone
+#   - cilium.io ciliumenvoyconfigs list: the L7 detector (ciliumEnvoyConfigs)
+# Without them each call is denied and the DaemonSet keeps running with the
+# feature switched off, so flows lose their pod and node attribution with
+# nothing louder than a log line.
+rbac:
+  create: true
+  # The CiliumEnvoyConfig rule. Harmless on a cluster without Cilium.
+  ciliumEnvoyConfigs: true
+
 # ============================================================
 # eBPF Agent Configuration
 # ============================================================
