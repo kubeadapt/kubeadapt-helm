@@ -18,9 +18,6 @@ config:
   # Metrics port
   metricsPort: 9090
 
-  # Use shorter collection interval for CI tests
-  collectionInterval: "15s"
-
   # Debug logging for CI
   logLevel: "debug"
   logFormat: "json"

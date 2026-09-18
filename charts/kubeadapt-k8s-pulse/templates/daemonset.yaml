@@ -83,8 +83,6 @@ spec:
               value: {{ .Values.config.logFormat | quote }}
             - name: EBPF_METRICS_PORT
               value: {{ .Values.config.metricsPort | quote }}
-            - name: EBPF_COLLECTION_INTERVAL
-              value: {{ .Values.config.collectionInterval | quote }}
             - name: EBPF_CONNECTION_TRACKING
               value: {{ .Values.config.connectionTracking | quote }}
 

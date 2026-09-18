@@ -22,9 +22,6 @@ config:
   # Exposes: /metrics, /health/live, /health/ready
   metricsPort: 9090
 
-  # Collection interval for BPF map reads, leave it as is, unless you have specific needs
-  collectionInterval: "25s"
-
   # Log level for agent
   # Options: "debug", "info", "warn", "error"
   logLevel: "info"
