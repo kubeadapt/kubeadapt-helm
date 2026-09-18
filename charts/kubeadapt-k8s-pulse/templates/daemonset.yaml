@@ -142,6 +142,11 @@ spec:
             # is worth stating because it looks like it should: /proc/<pid>/exe
             # is gated by ptrace_may_access rather than by file permissions, and
             # the measured result with DAC_READ_SEARCH was EACCES.
+            #
+            # seccompProfile is left unset (the kubelet default). The
+            # RuntimeDefault profile of older container runtimes allows bpf()
+            # and perf_event_open() only with CAP_SYS_ADMIN, and RuntimeDefault
+            # was not part of the measured configuration.
             {{- if .Values.security.privileged }}
             privileged: true
             {{- else }}

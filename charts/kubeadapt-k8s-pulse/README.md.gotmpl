@@ -62,21 +62,38 @@ helm delete kubeadapt-k8s-pulse -n kubeadapt
 
 ## Security Requirements
 
-The eBPF agent requires privileged access:
+The DaemonSet does not run privileged. It drops every capability and adds back
+four, the set measured to cover every privileged operation the agent performs:
 
 ```yaml
 securityContext:
-  privileged: true
+  privileged: false
+  allowPrivilegeEscalation: false
   capabilities:
+    drop:
+      - ALL
     add:
-      - SYS_ADMIN    # Load/attach eBPF programs
-      - SYS_RESOURCE # Lock memory for BPF maps
-      - NET_ADMIN    # Network namespace operations
+      - BPF         # map creation, program load, the verifier
+      - PERFMON     # with BPF: program load and verification
+      - NET_ADMIN   # TCX/TC attach, netlink, conntrack events
+      - SYS_PTRACE  # /proc/<pid>/exe for the container inventory
+  readOnlyRootFilesystem: true
+  runAsUser: 0
 ```
 
+`security.capabilities` changes the set, and `security.privileged=true` restores
+`privileged: true` if a kernel or distribution turns out to need it.
+`/sys/fs/bpf` is mounted with `HostToContainer` propagation.
+
 Additionally requires:
-- `hostNetwork: true` - Access host network namespace
+- `hostNetwork: true` - Access host network namespace, with
+  `dnsPolicy: ClusterFirstWithHostNet` so cluster Service names still resolve
 - `hostPID: true` - Track processes for connection attribution
+  (`security.hostPID`; the default image also works with `false`)
+
+The chart also creates a read-only ClusterRole for its ServiceAccount
+(`rbac.create`): `list`/`watch` on pods, `get` on nodes, and `list` on
+`cilium.io` CiliumEnvoyConfig (`rbac.ciliumEnvoyConfigs`).
 
 ## Exported Metrics
 
