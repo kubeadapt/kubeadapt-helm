@@ -259,8 +259,10 @@ agent:
 # Deploys a DaemonSet that uses eBPF to track pod-to-pod network traffic
 #
 # Prerequisites:
-# - Linux kernel >= 5.8 (required for TC eBPF support)
-# - Privileged container access
+# - Linux kernel >= 5.10
+# - A namespace that admits the privileged Pod Security level: the DaemonSet
+#   uses hostNetwork, hostPID and hostPath mounts. It does not run privileged;
+#   it adds four capabilities (BPF, PERFMON, NET_ADMIN, SYS_PTRACE).
 #
 # For full configuration options, see: charts/kubeadapt-k8s-pulse/values.yaml
 kubeadapt-k8s-pulse:
@@ -275,14 +277,16 @@ kubeadapt-k8s-pulse:
   config:
     export:
       enabled: true
+    # Other options: see charts/kubeadapt-k8s-pulse/values.yaml, e.g.
+    # logLevel: "info"
 
-  # Override defaults if needed - see charts/kubeadapt-k8s-pulse/values.yaml for all options
-  # config:
-  #   logLevel: "info"
-  #   collectionInterval: "25s"
-
-  # Scheduling - configure as needed for your cluster
-  tolerations: []
+  # Every taint is tolerated, so the DaemonSet also runs on control-plane, GPU,
+  # spot and other dedicated nodes. A node it skips has no traffic measured, and
+  # the DaemonSet's desired count leaves that node out, so the gap never shows.
+  # This repeats the subchart default; the previous [] here overrode it. Replace
+  # the list to narrow coverage.
+  tolerations:
+    - operator: Exists
 
   nodeSelector: {}
 
