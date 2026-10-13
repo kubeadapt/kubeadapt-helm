@@ -13,6 +13,13 @@ spec:
       targetPort: health
       protocol: TCP
       name: health
+    {{- if include "kubeadapt.pulse.enabled" . }}
+    # Flow pushes from the pulse DaemonSet.
+    - port: {{ .Values.global.pulseChannel.port }}
+      targetPort: pulse
+      protocol: TCP
+      name: pulse
+    {{- end }}
   selector:
     {{- include "kubeadapt.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: agent

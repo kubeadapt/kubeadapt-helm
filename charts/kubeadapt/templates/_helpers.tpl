@@ -188,3 +188,38 @@ Every rule is read-only and matches an informer or client call in the agent.
     - nodepools
   verbs: ["list", "watch"]
 {{- end }}
+
+{{/*
+"true" when the kubeadapt-k8s-pulse subchart is enabled, "" otherwise.
+*/}}
+{{- define "kubeadapt.pulse.enabled" -}}
+{{- if (index .Values "kubeadapt-k8s-pulse" | default dict).enabled -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Secret holding the pulse -> agent bearer token (key "token"): the user's
+global.pulseChannel.existingSecret, or the one this chart generates. The
+kubeadapt-k8s-pulse subchart derives the same name from the same values.
+*/}}
+{{- define "kubeadapt.pulseChannel.secretName" -}}
+{{- default (printf "%s-pulse-token" (include "kubeadapt.name" .)) .Values.global.pulseChannel.existingSecret -}}
+{{- end }}
+
+{{/*
+The generated bearer token, base64-encoded.
+
+Generated once per render and cached, because the Secret and the agent's
+checksum annotation both need it and every randAlphaNum call returns a new
+value. On an upgrade the Secret already in the cluster is reused, so the token
+stays put; a render without cluster access (helm template, Argo CD) cannot see
+it and generates a new one, which is why global.pulseChannel.existingSecret
+exists.
+*/}}
+{{- define "kubeadapt.pulseChannel.token" -}}
+{{- if not (hasKey .Values "__kubeadaptPulseToken") -}}
+{{- $existing := (lookup "v1" "Secret" .Release.Namespace (include "kubeadapt.pulseChannel.secretName" .)) | default dict -}}
+{{- $token := get ((get $existing "data") | default dict) "token" -}}
+{{- $_ := set .Values "__kubeadaptPulseToken" (default (randAlphaNum 64 | b64enc) $token) -}}
+{{- end -}}
+{{- get .Values "__kubeadaptPulseToken" -}}
+{{- end }}

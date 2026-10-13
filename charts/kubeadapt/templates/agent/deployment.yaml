@@ -1,4 +1,5 @@
 {{- if .Values.agent.enabled }}
+{{- $pulse := include "kubeadapt.pulse.enabled" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -21,6 +22,12 @@ spec:
       labels:
         {{- include "kubeadapt.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: agent
+      {{- if and $pulse (not .Values.global.pulseChannel.existingSecret) }}
+      annotations:
+        # The agent reads the token once at startup, so a new generated token
+        # has to restart it.
+        checksum/pulse-token: {{ include "kubeadapt.pulseChannel.token" . | sha256sum }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "kubeadapt.name" . }}-agent
       {{- with .Values.agent.podSecurityContext }}
@@ -39,6 +46,11 @@ spec:
             - name: health
               containerPort: {{ .Values.agent.config.healthPort }}
               protocol: TCP
+            {{- if $pulse }}
+            - name: pulse
+              containerPort: {{ .Values.global.pulseChannel.port }}
+              protocol: TCP
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -143,6 +155,23 @@ spec:
               value: {{ printf "%s/netspool" (trimSuffix "/" (required "agent.spool.mountPath must be set" .Values.agent.spool.mountPath)) | quote }}
             - name: KUBEADAPT_SPOOL_MAX_BYTES
               value: {{ .Values.agent.spool.maxBytes | quote }}
+            {{- end }}
+
+            {{- if $pulse }}
+
+            # Flow intake from the pulse DaemonSet: a plaintext gRPC listener
+            # that rejects any push without the bearer token below. The token
+            # authenticates pulse; it travels UNENCRYPTED inside the cluster
+            # network, as do the flow batches.
+            - name: KUBEADAPT_PULSE_ENABLED
+              value: "true"
+            - name: KUBEADAPT_PULSE_LISTEN_PORT
+              value: {{ .Values.global.pulseChannel.port | quote }}
+            - name: KUBEADAPT_PULSE_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubeadapt.pulseChannel.secretName" . }}
+                  key: token
             {{- end }}
 
             {{- if .Values.agent.env }}
