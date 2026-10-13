@@ -114,66 +114,10 @@ rules:
       - clusterroles
       - clusterrolebindings
     verbs: ["create", "escalate"]
-  # All permissions the agent ClusterRole grants — upgrader must hold them to patch the ClusterRoleBinding
-  - apiGroups: [""]
-    resources:
-      - nodes
-      - namespaces
-      - persistentvolumes
-      - services
-      - pods
-      - persistentvolumeclaims
-      - resourcequotas
-      - limitranges
-      - replicationcontrollers
-    verbs: ["list", "watch"]
-  - apiGroups: ["apps"]
-    resources:
-      - deployments
-      - replicasets
-      - statefulsets
-      - daemonsets
-    verbs: ["list", "watch"]
-  - apiGroups: ["batch"]
-    resources:
-      - jobs
-      - cronjobs
-    verbs: ["list", "watch"]
-  - apiGroups: ["autoscaling"]
-    resources:
-      - horizontalpodautoscalers
-    verbs: ["list", "watch"]
-  - apiGroups: ["policy"]
-    resources:
-      - poddisruptionbudgets
-    verbs: ["list", "watch"]
-  - apiGroups: ["networking.k8s.io"]
-    resources:
-      - ingresses
-      - networkpolicies
-    verbs: ["list", "watch"]
-  - apiGroups: ["storage.k8s.io"]
-    resources:
-      - storageclasses
-    verbs: ["list", "watch"]
-  - apiGroups: ["scheduling.k8s.io"]
-    resources:
-      - priorityclasses
-    verbs: ["list", "watch"]
-  - apiGroups: ["metrics.k8s.io"]
-    resources:
-      - pods
-      - nodes
-    verbs: ["list", "watch"]
-  - apiGroups: ["autoscaling.k8s.io"]
-    resources:
-      - verticalpodautoscalers
-    verbs: ["list", "watch"]
-  - apiGroups: ["karpenter.sh"]
-    resources:
-      - nodepools
-      - nodeclaims
-    verbs: ["list", "watch"]
+  # Every permission the agent ClusterRole grants. Writing a ClusterRole, or
+  # binding one, requires holding its permissions; the list is the agent's
+  # own, so the two cannot drift.
+  {{- include "kubeadapt.agent.clusterRules" . | nindent 2 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

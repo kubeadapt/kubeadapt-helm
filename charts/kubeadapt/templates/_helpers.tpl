@@ -66,3 +66,125 @@ Behaviour:
 -{{ .Release.Namespace }}
 {{- end -}}
 {{- end }}
+
+{{/*
+Rules of the agent ClusterRole.
+
+The upgrader ClusterRole includes the same list, so it holds every permission
+it writes into the agent ClusterRole during an auto-upgrade. One definition
+keeps the two from drifting apart.
+
+Every rule is read-only and matches an informer or client call in the agent.
+*/}}
+{{- define "kubeadapt.agent.clusterRules" -}}
+- apiGroups: [""]
+  resources:
+    - nodes
+    - namespaces
+    - persistentvolumes
+    - services
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+    - pods
+    - persistentvolumeclaims
+    - resourcequotas
+    - limitranges
+  verbs: ["list", "watch"]
+
+- apiGroups: ["apps"]
+  resources:
+    - deployments
+    - replicasets
+    - statefulsets
+    - daemonsets
+  verbs: ["list", "watch"]
+
+- apiGroups: ["batch"]
+  resources:
+    - jobs
+    - cronjobs
+  verbs: ["list", "watch"]
+
+- apiGroups: ["autoscaling"]
+  resources:
+    - horizontalpodautoscalers
+  verbs: ["list", "watch"]
+
+- apiGroups: ["policy"]
+  resources:
+    - poddisruptionbudgets
+  verbs: ["list", "watch"]
+
+- apiGroups: ["networking.k8s.io"]
+  resources:
+    - ingresses
+  verbs: ["list", "watch"]
+
+# The Kubernetes API server Service has no selector, so it publishes no
+# Endpoints through any other resource: EndpointSlices are the only way to
+# learn which addresses belong to it. Without this rule the agent's service
+# informer never syncs, every Service-owned address falls back to
+# `__unresolved__`, and API-server traffic is billed as an external domain.
+- apiGroups: ["discovery.k8s.io"]
+  resources:
+    - endpointslices
+  verbs: ["list", "watch"]
+
+- apiGroups: ["storage.k8s.io"]
+  resources:
+    - storageclasses
+  verbs: ["list", "watch"]
+
+- apiGroups: ["scheduling.k8s.io"]
+  resources:
+    - priorityclasses
+  verbs: ["list", "watch"]
+
+# Metrics API (requires metrics-server). The agent lists on a timer;
+# metrics.k8s.io serves no watch, so the verb is "list" alone.
+- apiGroups: ["metrics.k8s.io"]
+  resources:
+    - pods
+    - nodes
+  verbs: ["list"]
+
+# kubelet /stats/summary - the only source of per-pod network bytes.
+# metrics.k8s.io above carries CPU and memory and nothing else.
+#
+# The agent reads it straight from each kubelet on port 10250 and verifies the
+# kubelet's serving certificate against the cluster CA. The kubelet authorises
+# /stats/* as `nodes/stats` and nothing else as `nodes/stats`, so this grant
+# reaches the stats endpoints only: no exec, attach, port-forward, run or logs.
+- apiGroups: [""]
+  resources:
+    - nodes/stats
+  verbs: ["get"]
+{{- if .Values.agent.rbac.kubeletProxyFallback }}
+
+# agent.rbac.kubeletProxyFallback: the API server's node proxy, for kubelets
+# whose serving certificate does not chain to the cluster CA (self-signed,
+# serverTLSBootstrap off). This grant is EXEC-CAPABLE. The kubelet authorises
+# exec, attach, port-forward and run as `nodes/proxy`, and a WebSocket upgrade
+# is an HTTP GET, so "get" on nodes/proxy lets the holder of the agent's token
+# run commands in every pod on every node. RBAC cannot narrow it to
+# /stats/summary.
+- apiGroups: [""]
+  resources:
+    - nodes/proxy
+  verbs: ["get"]
+{{- end }}
+
+# VPA (optional, if installed)
+- apiGroups: ["autoscaling.k8s.io"]
+  resources:
+    - verticalpodautoscalers
+  verbs: ["list", "watch"]
+
+# Karpenter (optional, if installed)
+- apiGroups: ["karpenter.sh"]
+  resources:
+    - nodepools
+  verbs: ["list", "watch"]
+{{- end }}
