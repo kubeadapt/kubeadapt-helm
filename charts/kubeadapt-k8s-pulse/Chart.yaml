@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeadapt-k8s-pulse
 description: High-performance eBPF-based network metrics agent for Kubernetes
 type: application
-version: 1.0.2
+version: 1.1.0
 appVersion: "3.0.1"
 
 home: https://github.com/kubeadapt/kubeadapt-k8s-pulse
@@ -33,9 +33,13 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
-    - kind: changed
-      description: "Set EBPF_RETRY_BUFFER_SIZE to 120, raising the export retry buffer to 120 sub-batches from the built-in default of 60. This is chart-side plumbing: it takes effect once a pulse release that reads the variable and retries RESOURCE_EXHAUSTED - which the agent returns when its intake is full - ships, and earlier images ignore it. From that release on, agent back-pressure queues in this buffer instead of being counted as a drop, and the larger buffer doubles how long a node rides it out before the oldest sub-batch is evicted. Resource requests and limits are unchanged."
-  artifacthub.io/containsSecurityUpdates: "false"
+    - kind: added
+      description: "Flow export to the Kubeadapt agent. Installed by the kubeadapt chart, pulse sends flows to that chart's agent Service and presents the agent's bearer token from a file (EBPF_AGENT_AUTH_TOKEN_FILE) mounted from the chart-generated Secret. The channel is plaintext gRPC: the token and the flows travel unencrypted inside the cluster network. Installed on its own, export stays off until config.export.agentEndpoint is set; config.export.tokenSecret names a Secret with the token. Needs a pulse release cut from main after the TLS client was removed; the default image (v3.0.1) does not export and v3.1.0 refuses a token without TLS."
+    - kind: added
+      description: "A read-only ClusterRole and ClusterRoleBinding (rbac.create): pods list/watch for the node-scoped pod identity informer, nodes get for this pod's own Node, and cilium.io ciliumenvoyconfigs list for the L7 detector. Before this the ServiceAccount had nothing bound, the pod informer never synced and flows carried no pod identity."
+    - kind: fixed
+      description: "dnsPolicy defaults to ClusterFirstWithHostNet. With hostNetwork and no dnsPolicy the pod used the node's resolver and could not resolve cluster Service names, including the agent endpoint."
+  artifacthub.io/containsSecurityUpdates: "true"
   artifacthub.io/prerelease: "false"
   artifacthub.io/license: Apache-2.0
   artifacthub.io/operator: "false"

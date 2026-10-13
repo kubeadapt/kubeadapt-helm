@@ -2,10 +2,11 @@
 # Defines explicit upgrade paths for this chart version.
 # This file is embedded in the chart package and used by KubeAdapt auto-upgrade system.
 
-chartVersion: "1.0.2"
+chartVersion: "1.1.0"
 
 # Versions that can upgrade to this version
 upgradeFrom:
+  - "1.0.2"
   - "1.0.1"
   - "1.0.0"
   - "0.2.0"
@@ -23,6 +24,6 @@ channels:
 # Optional metadata
 metadata:
   releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-k8s-pulse-1.0.0"
-  containsSecurityUpdates: false
+  containsSecurityUpdates: true
   minKubernetesVersion: "1.24.0"
   minKernelVersion: "5.10"
