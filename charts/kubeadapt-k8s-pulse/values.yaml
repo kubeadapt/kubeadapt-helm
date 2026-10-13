@@ -6,6 +6,10 @@ enabled: true
 
 image:
   repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
+  # TODO(release): pin the first pulse release cut from main after adb34bc
+  # (plaintext export with a bearer token from EBPF_AGENT_AUTH_TOKEN_FILE).
+  # v3.0.1 does not export at all, so the export settings below are inert with
+  # it; v3.1.0 refuses a token without TLS and must not be pinned with them.
   tag: "v3.0.1"
   pullPolicy: Always
 
@@ -13,6 +17,13 @@ serviceAccount:
   create: true
   annotations: {}
   name: ""
+
+# ClusterRole + ClusterRoleBinding for the ServiceAccount above, all reads:
+# pods list/watch (pod identity, node-scoped informer), nodes get (this pod's
+# own Node) and cilium.io ciliumenvoyconfigs list (L7 detector). Without them
+# the pod informer never syncs and flows carry no pod identity.
+rbac:
+  create: true
 
 # ============================================================
 # eBPF Agent Configuration
@@ -35,6 +46,25 @@ config:
 
   # Enable connection tracking (read-then-delete pattern with overflow ringbuffer)
   connectionTracking: true
+
+  # ============================================================
+  # Flow export to the Kubeadapt agent
+  # ============================================================
+  # Installed by the kubeadapt chart, both settings below fill themselves in:
+  # flows go to that chart's agent Service with the bearer token from the
+  # Secret it generates. Leave them empty there.
+  #
+  # The channel is plaintext gRPC. The token authenticates pulse to the agent
+  # but travels UNENCRYPTED inside the cluster network, and so do the flow
+  # batches (pod IPs, DNS names, HTTP routes).
+  #
+  # Installed on its own, export stays off until agentEndpoint is set.
+  export:
+    # host:port of the agent's flow listener.
+    agentEndpoint: ""
+    # Secret with the agent's bearer token under the key "token". Empty: no
+    # token is sent.
+    tokenSecret: ""
 
   # ============================================================
   # Debug Options (use with caution in production)
@@ -69,6 +99,10 @@ nodeSelector: {}
 affinity: {}
 
 topologySpreadConstraints: []
+
+# Required with hostNetwork for the pod to resolve cluster Service names, such
+# as the agent endpoint above.
+dnsPolicy: ClusterFirstWithHostNet
 
 # Additional environment variables
 env:
