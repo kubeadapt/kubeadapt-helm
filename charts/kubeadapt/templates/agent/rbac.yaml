@@ -25,35 +25,6 @@ rules:
   {{- include "kubeadapt.agent.clusterRules" . | nindent 2 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ include "kubeadapt.name" . }}-agent
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "kubeadapt.labels" . | nindent 4 }}
-    app.kubernetes.io/component: agent
-rules:
-  - apiGroups: ["batch"]
-    resources:
-      - jobs
-    verbs: ["get", "list", "create", "delete", "watch"]
-
-  - apiGroups: [""]
-    resources:
-      - configmaps
-    verbs: ["get", "list", "create", "update", "delete"]
-
-  - apiGroups: [""]
-    resources:
-      - serviceaccounts
-    verbs: ["get"]
-
-  - apiGroups: [""]
-    resources:
-      - secrets
-    verbs: ["get", "list"]
----
-apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: {{ include "kubeadapt.name" . }}-agent{{ include "kubeadapt.clusterResourceSuffix" . }}
@@ -64,23 +35,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: {{ include "kubeadapt.name" . }}-agent{{ include "kubeadapt.clusterResourceSuffix" . }}
-subjects:
-  - kind: ServiceAccount
-    name: {{ include "kubeadapt.name" . }}-agent
-    namespace: {{ .Release.Namespace }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ include "kubeadapt.name" . }}-agent
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "kubeadapt.labels" . | nindent 4 }}
-    app.kubernetes.io/component: agent
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ include "kubeadapt.name" . }}-agent
 subjects:
   - kind: ServiceAccount
     name: {{ include "kubeadapt.name" . }}-agent

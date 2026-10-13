@@ -17,6 +17,65 @@ metadata:
 {{- end }}
 ---
 {{- if .Values.agent.autoUpgrade.rbac.create }}
+# The upgrader SIDECAR's permissions. It runs in the agent pod, and a pod has
+# one service account, so this Role is bound to the agent's account - which
+# is why it exists only while auto-upgrade is on. The Helm upgrade itself runs
+# in a Job under the separate upgrader account below.
+#
+# Each rule matches a call in kubeadapt-k8s-upgrader:
+#   jobs create/get          create the upgrade Job, then poll it
+#   configmaps get/create/update/delete
+#                            the upgrade lock ConfigMap
+#   secrets get/list         Helm release history (rollback detection); Helm
+#                            stores releases as Secrets
+#   pods/log get             the Job's log when an upgrade fails
+# Listing its own pod and the Job's pods uses the agent ClusterRole's pods list.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "kubeadapt.name" . }}-upgrader-sidecar
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: upgrader
+rules:
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+    verbs: ["get", "create"]
+
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    verbs: ["get", "create", "update", "delete"]
+
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["get", "list"]
+
+  - apiGroups: [""]
+    resources:
+      - pods/log
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "kubeadapt.name" . }}-upgrader-sidecar
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: upgrader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "kubeadapt.name" . }}-upgrader-sidecar
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kubeadapt.name" . }}-agent
+    namespace: {{ .Release.Namespace }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
