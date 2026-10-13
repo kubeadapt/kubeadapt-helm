@@ -1,4 +1,6 @@
 {{- if .Values.enabled }}
+{{- $agentEndpoint := include "kubeadapt-k8s-pulse.agentEndpoint" . }}
+{{- $tokenSecret := include "kubeadapt-k8s-pulse.tokenSecret" . }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -25,6 +27,10 @@ spec:
       serviceAccountName: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
       # Required for eBPF: access to host network namespace
       hostNetwork: true
+      # With hostNetwork, the default ClusterFirst policy falls back to the
+      # node's resolver, which cannot resolve cluster Service names such as
+      # the agent endpoint below.
+      dnsPolicy: {{ .Values.dnsPolicy }}
       # Required for eBPF: access to host PID namespace for process tracking
       hostPID: true
       containers:
@@ -72,6 +78,25 @@ spec:
               value: {{ .Values.config.collectionInterval | quote }}
             - name: EBPF_CONNECTION_TRACKING
               value: {{ .Values.config.connectionTracking | quote }}
+
+            {{- if $agentEndpoint }}
+
+            # Flow export to the Kubeadapt agent
+            - name: EBPF_EXPORT_ENABLED
+              value: "true"
+            - name: EBPF_AGENT_ENDPOINT
+              value: {{ $agentEndpoint | quote }}
+            {{- if $tokenSecret }}
+            # Bearer token the agent checks on every push. The channel is
+            # plaintext gRPC, so the token travels UNENCRYPTED inside the
+            # cluster network: it proves the sender to the agent, it does not
+            # hide the flows or itself from anything that can observe node
+            # traffic. A file, not an env value, so it never appears in the pod
+            # spec.
+            - name: EBPF_AGENT_AUTH_TOKEN_FILE
+              value: /etc/kubeadapt/pulse-token/token
+            {{- end }}
+            {{- end }}
 
             # Debug options
             {{- if .Values.config.enableProfiling }}
@@ -121,6 +146,11 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            {{- if and $agentEndpoint $tokenSecret }}
+            - name: pulse-token
+              mountPath: /etc/kubeadapt/pulse-token
+              readOnly: true
+            {{- end }}
 
           livenessProbe:
             httpGet:
@@ -163,6 +193,15 @@ spec:
             type: DirectoryOrCreate
         - name: tmp
           emptyDir: {}
+        {{- if and $agentEndpoint $tokenSecret }}
+        - name: pulse-token
+          secret:
+            secretName: {{ $tokenSecret }}
+            defaultMode: 0400
+            items:
+              - key: token
+                path: token
+        {{- end }}
 
       {{- with .Values.nodeSelector }}
       nodeSelector:

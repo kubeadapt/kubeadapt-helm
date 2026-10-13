@@ -1,6 +1,6 @@
 # kubeadapt-k8s-pulse
 
-![Version: 1.0.2](https://img.shields.io/badge/Version-1.0.2-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.0.1](https://img.shields.io/badge/AppVersion-3.0.1-informational?style=flat-square)
+![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.0.1](https://img.shields.io/badge/AppVersion-3.0.1-informational?style=flat-square)
 
 High-performance eBPF-based network metrics agent for Kubernetes
 
@@ -33,7 +33,7 @@ helm repo update
 Or use OCI registry:
 
 ```console
-helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.0.2
+helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.1.0
 ```
 
 ## Installing the Chart
@@ -78,6 +78,21 @@ Additionally requires:
 - `hostNetwork: true` - Access host network namespace
 - `hostPID: true` - Track processes for connection attribution
 
+## Flow Export to the Kubeadapt Agent
+
+Installed by the `kubeadapt` chart (`kubeadapt-k8s-pulse.enabled=true`), pulse sends its flows to that chart's agent Service with no extra settings:
+
+- the endpoint is `<name>-agent.<namespace>.svc:9091`;
+- every push carries a bearer token, read from a file mounted from the Secret the `kubeadapt` chart generates, so it never appears in the pod spec.
+
+**The channel is plaintext gRPC.** The token authenticates pulse to the agent, but it travels unencrypted inside the cluster network, and so do the flow batches (pod IPs, DNS names, HTTP routes). Anything that can observe node traffic can read both.
+
+Installed on its own, export is off until `config.export.agentEndpoint` is set. `config.export.tokenSecret` names a Secret with the token under the key `token`; without it pulse sends no token.
+
+The DaemonSet runs with `hostNetwork`, so `dnsPolicy` defaults to `ClusterFirstWithHostNet`: without it the pod cannot resolve cluster Service names.
+
+Export needs a pulse image that sends the token over plaintext gRPC, which is a release cut from pulse main after the TLS client was removed. The default `image.tag` (v3.0.1) does not export; v3.1.0 refuses to send a token without TLS.
+
 ## Exported Metrics
 
 ### Pod-Level Traffic Metrics
@@ -111,10 +126,13 @@ Additionally requires:
 | config.connectionTracking | bool | `true` |  |
 | config.dumpBPFMaps | bool | `false` |  |
 | config.enableProfiling | bool | `false` |  |
+| config.export.agentEndpoint | string | `""` |  |
+| config.export.tokenSecret | string | `""` |  |
 | config.logFormat | string | `"json"` |  |
 | config.logLevel | string | `"info"` |  |
 | config.metricsPort | int | `9090` |  |
 | config.profilingPort | int | `6060` |  |
+| dnsPolicy | string | `"ClusterFirstWithHostNet"` |  |
 | enabled | bool | `true` |  |
 | env[0].name | string | `"EBPF_RETRY_BUFFER_SIZE"` |  |
 | env[0].value | string | `"120"` |  |
@@ -122,6 +140,7 @@ Additionally requires:
 | image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse"` |  |
 | image.tag | string | `"v3.0.1"` |  |
 | nodeSelector | object | `{}` |  |
+| rbac.create | bool | `true` |  |
 | resources.limits.cpu | string | `"500m"` |  |
 | resources.limits.memory | string | `"384Mi"` |  |
 | resources.requests.cpu | string | `"100m"` |  |
