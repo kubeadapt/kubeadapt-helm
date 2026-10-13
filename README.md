@@ -19,7 +19,7 @@ The agent is a single Deployment that reads the Kubernetes API and the metrics A
 | Red Hat OpenShift / ROSA | Supported (see below) | Requires the `privileged` SCC |
 | Self-managed (kubeadm, kops, Rancher, k3s, RKE2) | Supported, Kubernetes 1.24 - 1.35 | Supported |
 
-The network agent needs Linux kernel 5.10 or newer on every node it runs on, and runs privileged with `hostNetwork` and `hostPID`. It is disabled by default.
+The network agent needs Linux kernel 5.10 or newer on every node it runs on, and runs privileged with `hostNetwork` and `hostPID`. It is disabled by default. When enabled, it sends flows to the agent over plaintext gRPC with a chart-generated bearer token; the token and the flows travel unencrypted inside the cluster network.
 
 **Requirements:**
 - Kubernetes 1.24+
