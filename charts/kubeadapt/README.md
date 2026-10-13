@@ -57,7 +57,7 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | agent.autoUpgrade.enabled | bool | `false` |  |
 | agent.autoUpgrade.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.autoUpgrade.image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-upgrader"` |  |
-| agent.autoUpgrade.image.tag | string | `"v3.0.1"` |  |
+| agent.autoUpgrade.image.tag | string | `"v3.0.2"` |  |
 | agent.autoUpgrade.initialDelay | string | `"1m"` |  |
 | agent.autoUpgrade.jobImage | string | `"alpine/helm:3.14.3"` |  |
 | agent.autoUpgrade.policy | string | `"minor"` |  |

@@ -3,6 +3,7 @@
 - The agent pod meets the Kubernetes **restricted** Pod Security Standard by default: non-root (UID/GID 65532, the image's own user), RuntimeDefault seccomp, no privilege escalation, all capabilities dropped, read-only root filesystem. The agent writes only to its emptyDir volumes (the spool/state directory and a new 64Mi `/tmp`). Configure with `agent.podSecurityContext`, `agent.securityContext` and `agent.autoUpgrade.securityContext`.
 - **OpenShift:** the restricted-v2 SCC assigns UIDs from the namespace range. Install with `--set agent.podSecurityContext.runAsUser=null --set agent.podSecurityContext.runAsGroup=null --set agent.podSecurityContext.fsGroup=null`.
 - No longer marked as a pre-release; `appVersion` reports the deployed agent release (`v3.0.1`).
+- The auto-upgrade sidecar moves to `kubeadapt-k8s-upgrader:v3.0.2`: its upgrade Job now meets the restricted standard too and runs under the chart's upgrader service account (earlier releases referenced a service account the chart does not create, so upgrade Jobs could not start).
 - Documentation: one compatibility matrix, uninstall notes, and `existingSecret` as the recommended way to provide the agent token.
 
 ## 1.0.1

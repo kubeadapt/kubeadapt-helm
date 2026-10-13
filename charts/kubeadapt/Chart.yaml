@@ -36,6 +36,8 @@ annotations:
   artifacthub.io/changes: |
     - kind: changed
       description: "The agent pod now meets the Kubernetes restricted Pod Security Standard by default: it runs as the image's non-root user (UID/GID 65532) with a RuntimeDefault seccomp profile, no privilege escalation, every capability dropped and a read-only root filesystem. The agent writes only to its emptyDir volumes. Settings live in agent.podSecurityContext and agent.securityContext; the auto-upgrade sidecar uses agent.autoUpgrade.securityContext. On OpenShift, set agent.podSecurityContext.runAsUser, runAsGroup and fsGroup to null so the restricted-v2 SCC can assign them."
+    - kind: fixed
+      description: "The auto-upgrade sidecar moves to kubeadapt-k8s-upgrader v3.0.2. Its upgrade Job meets the restricted Pod Security Standard and runs under the chart's upgrader service account; earlier releases referenced a service account the chart does not create, so upgrade Jobs could not start."
     - kind: added
       description: "A small /tmp emptyDir (agent.tmpVolume.sizeLimit, default 64Mi) because the root filesystem is read-only."
     - kind: changed

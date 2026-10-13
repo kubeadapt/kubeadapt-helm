@@ -208,7 +208,7 @@ agent:
     image:
       # renovate: datasource=docker depName=public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-upgrader
       repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-upgrader
-      tag: "v3.0.1"
+      tag: "v3.0.2"
       pullPolicy: IfNotPresent
 
     # Resource limits for the upgrader sidecar
