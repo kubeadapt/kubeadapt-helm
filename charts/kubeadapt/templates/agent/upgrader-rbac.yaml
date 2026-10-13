@@ -1,5 +1,8 @@
 {{- if .Values.agent.enabled }}
 {{- if .Values.agent.autoUpgrade.enabled }}
+{{- $pulseValues := index .Values "kubeadapt-k8s-pulse" | default dict }}
+{{- $pulseRBAC := and (include "kubeadapt.pulse.enabled" .) ($pulseValues.rbac | default dict).create }}
+{{- $pulseCtx := dict "Values" $pulseValues "Release" .Release "Chart" (dict "Name" "kubeadapt-k8s-pulse") }}
 {{- if .Values.agent.autoUpgrade.serviceAccount.create }}
 ---
 apiVersion: v1
@@ -17,6 +20,65 @@ metadata:
 {{- end }}
 ---
 {{- if .Values.agent.autoUpgrade.rbac.create }}
+# The upgrader SIDECAR's permissions. It runs in the agent pod, and a pod has
+# one service account, so this Role is bound to the agent's account - which
+# is why it exists only while auto-upgrade is on. The Helm upgrade itself runs
+# in a Job under the separate upgrader account below.
+#
+# Each rule matches a call in kubeadapt-k8s-upgrader:
+#   jobs create/get          create the upgrade Job, then poll it
+#   configmaps get/create/update/delete
+#                            the upgrade lock ConfigMap
+#   secrets get/list         Helm release history (rollback detection); Helm
+#                            stores releases as Secrets
+#   pods/log get             the Job's log when an upgrade fails
+# Listing its own pod and the Job's pods uses the agent ClusterRole's pods list.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "kubeadapt.name" . }}-upgrader-sidecar
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: upgrader
+rules:
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+    verbs: ["get", "create"]
+
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    verbs: ["get", "create", "update", "delete"]
+
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["get", "list"]
+
+  - apiGroups: [""]
+    resources:
+      - pods/log
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "kubeadapt.name" . }}-upgrader-sidecar
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: upgrader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "kubeadapt.name" . }}-upgrader-sidecar
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kubeadapt.name" . }}-agent
+    namespace: {{ .Release.Namespace }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -54,11 +116,15 @@ rules:
       - replicasets
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
+  # No "escalate" or "bind": the API server then lets the upgrader write a
+  # Role, or a RoleBinding, only when it already holds every permission in it.
+  # It holds those of both Roles this chart renders, so a chart release can
+  # update them; it cannot grant anything beyond that.
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources:
       - roles
       - rolebindings
-    verbs: ["get", "list", "create", "update", "patch", "delete", "escalate"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
 
   - apiGroups: ["batch"]
     resources:
@@ -97,9 +163,31 @@ metadata:
     {{- include "kubeadapt.labels" . | nindent 4 }}
     app.kubernetes.io/component: upgrader
 rules:
-  # ClusterRole and ClusterRoleBinding management for KubeAdapt resources
-  # Note: resourceNames only works for get/list/update/patch/delete, not create
-  # Create is needed when upgrading to versions that add new cluster-scoped RBAC
+  # ClusterRole and ClusterRoleBinding management for this chart's own objects.
+  #
+  # No "escalate" and no "bind". With escalate the upgrader could rewrite its
+  # own ClusterRole to rules: [*]; with bind it could bind itself to
+  # cluster-admin. Either is cluster takeover. Without them the API server
+  # accepts a ClusterRole or ClusterRoleBinding write only when the upgrader
+  # already holds every permission it grants, so updating its own ClusterRole
+  # can keep or shrink its rights, never widen them. update/patch
+  # on its own name stays because every chart release changes the
+  # helm.sh/chart label, and an upgrade that cannot patch it rolls back.
+  #
+  # Consequence: a chart release that ADDS a permission to the agent or
+  # upgrader ClusterRole cannot be applied by the upgrader. The upgrade Job
+  # fails, Helm rolls back (--atomic), and that release needs a manual
+  # `helm upgrade`.
+  #
+  # get/list are not limited by name: Helm reads an object before it creates
+  # it, so a release that adds a cluster-scoped name (the pulse ClusterRole,
+  # for one) fails at that read when get is name-limited. Reading RBAC objects
+  # grants nothing.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - clusterroles
+      - clusterrolebindings
+    verbs: ["get", "list"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources:
       - clusterroles
@@ -107,73 +195,26 @@ rules:
     resourceNames:
       - "{{ include "kubeadapt.name" . }}-agent{{ include "kubeadapt.clusterResourceSuffix" . }}"
       - "{{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}"
-    verbs: ["get", "list", "update", "patch", "delete", "escalate"]
-  # Separate rule for create (resourceNames constraint not supported)
+      {{- if $pulseRBAC }}
+      - "{{ include "kubeadapt-k8s-pulse.clusterRoleName" $pulseCtx }}"
+      {{- end }}
+    verbs: ["update", "patch", "delete"]
+  # create cannot be limited by resourceNames; it is needed when a release adds
+  # a cluster-scoped name. It is bounded the same way: only rules the upgrader
+  # already holds.
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources:
       - clusterroles
       - clusterrolebindings
-    verbs: ["create", "escalate"]
-  # All permissions the agent ClusterRole grants — upgrader must hold them to patch the ClusterRoleBinding
-  - apiGroups: [""]
-    resources:
-      - nodes
-      - namespaces
-      - persistentvolumes
-      - services
-      - pods
-      - persistentvolumeclaims
-      - resourcequotas
-      - limitranges
-      - replicationcontrollers
-    verbs: ["list", "watch"]
-  - apiGroups: ["apps"]
-    resources:
-      - deployments
-      - replicasets
-      - statefulsets
-      - daemonsets
-    verbs: ["list", "watch"]
-  - apiGroups: ["batch"]
-    resources:
-      - jobs
-      - cronjobs
-    verbs: ["list", "watch"]
-  - apiGroups: ["autoscaling"]
-    resources:
-      - horizontalpodautoscalers
-    verbs: ["list", "watch"]
-  - apiGroups: ["policy"]
-    resources:
-      - poddisruptionbudgets
-    verbs: ["list", "watch"]
-  - apiGroups: ["networking.k8s.io"]
-    resources:
-      - ingresses
-      - networkpolicies
-    verbs: ["list", "watch"]
-  - apiGroups: ["storage.k8s.io"]
-    resources:
-      - storageclasses
-    verbs: ["list", "watch"]
-  - apiGroups: ["scheduling.k8s.io"]
-    resources:
-      - priorityclasses
-    verbs: ["list", "watch"]
-  - apiGroups: ["metrics.k8s.io"]
-    resources:
-      - pods
-      - nodes
-    verbs: ["list", "watch"]
-  - apiGroups: ["autoscaling.k8s.io"]
-    resources:
-      - verticalpodautoscalers
-    verbs: ["list", "watch"]
-  - apiGroups: ["karpenter.sh"]
-    resources:
-      - nodepools
-      - nodeclaims
-    verbs: ["list", "watch"]
+    verbs: ["create"]
+  # Every permission the agent ClusterRole grants. Writing a ClusterRole, or
+  # binding one, requires holding its permissions; the list is the agent's
+  # own, so the two cannot drift.
+  {{- include "kubeadapt.agent.clusterRules" . | nindent 2 }}
+  {{- if $pulseRBAC }}
+  # And every permission the pulse ClusterRole grants, for the same reason.
+  {{- include "kubeadapt-k8s-pulse.clusterRules" $pulseCtx | nindent 2 }}
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

@@ -3,6 +3,27 @@ global:
   name: "kubeadapt"
   nameOverride: ""
   fullnameOverride: ""
+  # The channel the pulse DaemonSet pushes flows over, to the agent. Used only
+  # when kubeadapt-k8s-pulse.enabled is true, and read by both charts, so the
+  # agent's listener and pulse's sender cannot be configured apart.
+  #
+  # The channel is PLAINTEXT gRPC with a bearer token. The token authenticates
+  # pulse to the agent, but it travels unencrypted inside the cluster network,
+  # and so do the flow batches (pod IPs, DNS names, HTTP routes): anything that
+  # can observe node or pod traffic can read both. The chart generates the
+  # token into a Secret (<name>-pulse-token) on install and reuses it on every
+  # upgrade.
+  pulseChannel:
+    # Port the agent listens on and publishes on its Service.
+    port: 9091
+    # Name of a Secret you manage instead, in the release namespace, with the
+    # token under the key "token".
+    #
+    # Required when the chart is rendered without access to the cluster
+    # (helm template, Argo CD): such a render cannot see the generated Secret,
+    # creates a new token each time, and pulse keeps the old one until it
+    # restarts.
+    existingSecret: ""
 
 agent:
   enabled: true
@@ -26,6 +47,18 @@ agent:
     name: ""
   rbac:
     create: true
+    # Grants `nodes/proxy` get so the agent can fall back to the API server's
+    # node proxy for kubelet stats on a node whose kubelet serving certificate
+    # does not chain to the cluster CA (a self-signed kubelet, serverTLSBootstrap
+    # off). Off by default: the agent reads stats straight from each kubelet
+    # with `nodes/stats` get, which reaches the stats endpoints and nothing else.
+    #
+    # WARNING: `nodes/proxy` get is EXEC-CAPABLE. The kubelet authorises exec,
+    # attach, port-forward and run as nodes/proxy, and a WebSocket upgrade is a
+    # GET, so anyone holding the agent's token could run commands in every pod
+    # on every node. Turn this on only if per-pod network bytes are missing and
+    # the agent logs that it cannot verify your kubelets' certificates.
+    kubeletProxyFallback: false
   service:
     type: ClusterIP
   # ONE Deployment per cluster, so memory scales with TOTAL cluster size - a
@@ -86,6 +119,42 @@ agent:
   # Writable scratch space, since the root filesystem is read-only.
   tmpVolume:
     sizeLimit: 64Mi
+
+  # Seconds Kubernetes waits after SIGTERM before killing the agent. Keep it
+  # above the agent's shutdown drain (KUBEADAPT_SHUTDOWN_DRAIN_TIMEOUT, 100s
+  # by default) so a rollout or node drain does not cut the final delivery of
+  # buffered network telemetry short.
+  terminationGracePeriodSeconds: 120
+
+  networkPolicy:
+    # Sources allowed to reach the agent's flow listener
+    # (global.pulseChannel.port), as NetworkPolicy peers. When set, and pulse is
+    # enabled, the chart adds a NetworkPolicy on the agent that allows the
+    # health port from anywhere and the flow port from these peers only.
+    #
+    # The bearer token is what authenticates pulse; this narrows who can even
+    # reach the port, and since the channel is plaintext it also narrows who
+    # can probe it. It has no default because pulse runs with hostNetwork and its
+    # traffic comes from node addresses, which network plugins classify
+    # differently:
+    #   - kindnet (kube-network-policies) matches a hostNetwork pod by its node
+    #     address, so a podSelector for pulse works (measured on kind: pulse
+    #     on another node delivered, an ordinary pod on 9091 was blocked).
+    #   - Calico and Cilium treat that traffic as node traffic, which a
+    #     podSelector never matches: use your nodes' address ranges (ipBlock)
+    #     on Calico. On Cilium, ipBlock does not match node addresses unless
+    #     policy-cidr-match-mode includes "nodes"; a CiliumNetworkPolicy with
+    #     fromEntities [host, remote-node] is the alternative.
+    # A list that does not match pulse on your plugin stops network telemetry.
+    # Examples:
+    #   pulseFrom:
+    #     - podSelector:
+    #         matchLabels:
+    #           app.kubernetes.io/name: kubeadapt-k8s-pulse
+    #   pulseFrom:
+    #     - ipBlock:
+    #         cidr: 10.0.0.0/16
+    pulseFrom: []
 
   # ============================================================
   # Network Telemetry Spool
@@ -305,9 +374,11 @@ agent:
 # - Privileged container access (hostNetwork, hostPID) - not available on
 #   GKE Autopilot or EKS Fargate; OpenShift needs the privileged SCC
 #
-# This chart version does not connect the DaemonSet to the agent, so on its own
-# it reports nothing to Kubeadapt. Leave it disabled unless Kubeadapt support
-# has set up network monitoring for your cluster.
+# Enabling it also opens the agent's flow listener (global.pulseChannel) and
+# connects the two over plaintext gRPC with a generated bearer token, which
+# travels unencrypted inside the cluster network. The pulse image must be a
+# release that sends the token without TLS (cut from pulse main after the TLS
+# client was removed); see kubeadapt-k8s-pulse.image.tag.
 #
 # For full configuration options, see: charts/kubeadapt-k8s-pulse/values.yaml
 kubeadapt-k8s-pulse:
