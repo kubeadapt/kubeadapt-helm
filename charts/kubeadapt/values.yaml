@@ -99,6 +99,12 @@ agent:
   tmpVolume:
     sizeLimit: 64Mi
 
+  # Seconds Kubernetes waits after SIGTERM before killing the agent. Keep it
+  # above the agent's shutdown drain (KUBEADAPT_SHUTDOWN_DRAIN_TIMEOUT, 100s
+  # by default) so a rollout or node drain does not cut the final delivery of
+  # buffered network telemetry short.
+  terminationGracePeriodSeconds: 120
+
   # ============================================================
   # Network Telemetry Spool
   # ============================================================
