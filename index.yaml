@@ -196,6 +196,79 @@ entries:
   kubeadapt:
   - annotations:
       artifacthub.io/changes: |
+        - kind: changed
+          description: "The agent pod now meets the Kubernetes restricted Pod Security Standard by default: it runs as the image's non-root user (UID/GID 65532) with a RuntimeDefault seccomp profile, no privilege escalation, every capability dropped and a read-only root filesystem. The agent writes only to its emptyDir volumes. Settings live in agent.podSecurityContext and agent.securityContext; the auto-upgrade sidecar uses agent.autoUpgrade.securityContext. On OpenShift, set agent.podSecurityContext.runAsUser, runAsGroup and fsGroup to null so the restricted-v2 SCC can assign them."
+        - kind: fixed
+          description: "The auto-upgrade sidecar moves to kubeadapt-k8s-upgrader v3.0.2. Its upgrade Job meets the restricted Pod Security Standard and runs under the chart's upgrader service account; earlier releases referenced a service account the chart does not create, so upgrade Jobs could not start."
+        - kind: added
+          description: "A small /tmp emptyDir (agent.tmpVolume.sizeLimit, default 64Mi) because the root filesystem is read-only."
+        - kind: changed
+          description: "The chart is no longer marked as a pre-release, and appVersion now reports the agent release the chart deploys (v3.0.1) instead of a placeholder."
+        - kind: changed
+          description: "One compatibility matrix across README.md, COMPATIBILITY.md and the chart annotations, including GKE Autopilot, EKS Fargate and OpenShift, which components run where, and what helm uninstall leaves behind. existingSecret is documented as the recommended way to provide the agent token."
+      artifacthub.io/compatibility: |
+        kubernetes:
+          platforms:
+            eks:
+              versions: ["1.24-1.35"]
+              tested: true
+            aks:
+              versions: ["1.24-1.35"]
+              tested: true
+            gke:
+              versions: ["1.24-1.35"]
+              tested: true
+            on-premise:
+              versions: ["1.24-1.35"]
+              tested: true
+      artifacthub.io/containsSecurityUpdates: "false"
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: Documentation
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/README.md
+        - name: Compatibility Matrix
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/COMPATIBILITY.md
+        - name: Security Policy
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/SECURITY.md
+      artifacthub.io/platforms: |
+        - eks
+        - aks
+        - gke
+        - openshift
+        - on-premise
+      artifacthub.io/prerelease: "false"
+      artifacthub.io/signKey: |
+        fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
+        url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
+    apiVersion: v2
+    appVersion: v3.0.1
+    created: "2026-10-13T19:59:10.266504403Z"
+    dependencies:
+    - condition: kubeadapt-k8s-pulse.enabled
+      name: kubeadapt-k8s-pulse
+      repository: oci://ghcr.io/kubeadapt/kubeadapt-helm
+      version: 1.0.1
+    description: A Helm chart for Kubeadapt
+    digest: 28350ec409f085455a54efce1d315ef15b5367049d5f10a415d9f6d1b3866b7d
+    keywords:
+    - kubernetes
+    - resource optimization
+    - cost optimization
+    - monitoring
+    - cloud native
+    - multi-cloud
+    maintainers:
+    - email: ugurcan@kubeadapt.io
+      name: ugurcancaykara
+    - email: authors@kubeadapt.io
+      name: Kubeadapt
+    name: kubeadapt
+    type: application
+    urls:
+    - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-1.0.8/kubeadapt-1.0.8.tgz
+    version: 1.0.8
+  - annotations:
+      artifacthub.io/changes: |
         - kind: added
           description: "Grant the agent ClusterRole get on nodes/proxy and nodes/stats so the kubelet Summary API can be read. It is the only source of per-pod network byte counters: metrics.k8s.io, already granted, carries CPU and memory and nothing else, so without this rule container_metrics.network_rx_bytes and network_tx_bytes are always zero. nodes/proxy serves the api_proxy transport and nodes/stats the direct kubelet transport. The verb is get alone, so the agent gets read-only access to the kubelet API through those two subresources, with no write and no exec."
         - kind: added
@@ -3454,4 +3527,4 @@ entries:
     urls:
     - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-k8s-pulse-1.0.0/kubeadapt-k8s-pulse-1.0.0.tgz
     version: 1.0.0
-generated: "2026-09-17T07:44:06.880439326Z"
+generated: "2026-10-13T19:59:10.267036505Z"
