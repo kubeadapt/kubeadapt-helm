@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 1.0.7](https://img.shields.io/badge/Version-1.0.7-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 1.0.8](https://img.shields.io/badge/Version-1.0.8-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: v3.0.1](https://img.shields.io/badge/AppVersion-v3.0.1-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -19,19 +19,25 @@ helm repo update
 
 ## Installing the Chart
 
-To install the chart with the release name `my-release`:
+Recommended: keep the agent token in a Secret, so it never appears on a command line or in `helm get values`.
 
 ```console
-helm install my-release kubeadapt/kubeadapt
+kubectl create namespace kubeadapt
+kubectl create secret generic kubeadapt-agent-token --namespace kubeadapt --from-literal=token='<your-token>'
+helm install kubeadapt kubeadapt/kubeadapt --namespace kubeadapt --set agent.config.existingSecret=kubeadapt-agent-token
 ```
+
+The agent pod meets the Kubernetes restricted Pod Security Standard by default. On OpenShift, add
+`--set agent.podSecurityContext.runAsUser=null --set agent.podSecurityContext.runAsGroup=null --set agent.podSecurityContext.fsGroup=null`
+so the restricted-v2 SCC can assign the user and group.
 
 ## Uninstalling the Chart
 
-To uninstall/delete the `my-release` deployment:
-
 ```console
-helm delete my-release
+helm uninstall kubeadapt --namespace kubeadapt
 ```
+
+The namespace and any token Secret you created yourself stay behind; delete them with `kubectl` if you no longer need them. Then delete the cluster on the **Clusters** page in Kubeadapt so its token stops working.
 
 ## Requirements
 
@@ -60,6 +66,9 @@ helm delete my-release
 | agent.autoUpgrade.resources.limits.memory | string | `"128Mi"` |  |
 | agent.autoUpgrade.resources.requests.cpu | string | `"10m"` |  |
 | agent.autoUpgrade.resources.requests.memory | string | `"32Mi"` |  |
+| agent.autoUpgrade.securityContext.allowPrivilegeEscalation | bool | `false` |  |
+| agent.autoUpgrade.securityContext.capabilities.drop[0] | string | `"ALL"` |  |
+| agent.autoUpgrade.securityContext.readOnlyRootFilesystem | bool | `true` |  |
 | agent.autoUpgrade.serviceAccount.annotations | object | `{}` |  |
 | agent.autoUpgrade.serviceAccount.create | bool | `true` |  |
 | agent.autoUpgrade.serviceAccount.name | string | `""` |  |
@@ -86,11 +95,19 @@ helm delete my-release
 | agent.image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent"` |  |
 | agent.image.tag | string | `"v3.0.1"` |  |
 | agent.nodeSelector | object | `{}` |  |
+| agent.podSecurityContext.fsGroup | int | `65532` |  |
+| agent.podSecurityContext.runAsGroup | int | `65532` |  |
+| agent.podSecurityContext.runAsNonRoot | bool | `true` |  |
+| agent.podSecurityContext.runAsUser | int | `65532` |  |
+| agent.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
 | agent.rbac.create | bool | `true` |  |
 | agent.resources.limits.cpu | string | `"2000m"` |  |
 | agent.resources.limits.memory | string | `"16Gi"` |  |
 | agent.resources.requests.cpu | string | `"100m"` |  |
 | agent.resources.requests.memory | string | `"256Mi"` |  |
+| agent.securityContext.allowPrivilegeEscalation | bool | `false` |  |
+| agent.securityContext.capabilities.drop[0] | string | `"ALL"` |  |
+| agent.securityContext.readOnlyRootFilesystem | bool | `true` |  |
 | agent.service.type | string | `"ClusterIP"` |  |
 | agent.serviceAccount.annotations | object | `{}` |  |
 | agent.serviceAccount.create | bool | `true` |  |
@@ -99,6 +116,7 @@ helm delete my-release
 | agent.spool.maxBytes | string | `"1073741824"` |  |
 | agent.spool.mountPath | string | `"/var/lib/kubeadapt"` |  |
 | agent.spool.sizeLimit | string | `"2Gi"` |  |
+| agent.tmpVolume.sizeLimit | string | `"64Mi"` |  |
 | agent.tolerations | list | `[]` |  |
 | agent.topologySpreadConstraints | list | `[]` |  |
 | global.fullnameOverride | string | `""` |  |

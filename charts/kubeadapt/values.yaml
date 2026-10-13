@@ -55,6 +55,39 @@ agent:
       memory: 16Gi
 
   # ============================================================
+  # Pod Security
+  # ============================================================
+  # Defaults meet the Kubernetes "restricted" Pod Security Standard: non-root,
+  # no privilege escalation, every capability dropped, RuntimeDefault seccomp
+  # and a read-only root filesystem. The agent writes only to its emptyDir
+  # volumes (the spool/state directory and /tmp).
+  #
+  # OpenShift: the restricted-v2 SCC assigns the UID and GID from the
+  # namespace's range, so drop the fixed IDs:
+  #   --set agent.podSecurityContext.runAsUser=null \
+  #   --set agent.podSecurityContext.runAsGroup=null \
+  #   --set agent.podSecurityContext.fsGroup=null
+  podSecurityContext:
+    runAsNonRoot: true
+    # 65532 is the distroless "nonroot" user the agent image runs as. A numeric
+    # UID is needed: the image names its user, and runAsNonRoot cannot verify a
+    # named user.
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  # Writable scratch space, since the root filesystem is read-only.
+  tmpVolume:
+    sizeLimit: 64Mi
+
+  # ============================================================
   # Network Telemetry Spool
   # ============================================================
   spool:
@@ -86,9 +119,13 @@ agent:
     token: ""
 
     # Use an existing Kubernetes Secret instead of creating one from config.token.
+    # Recommended for production: the token then never appears on a command
+    # line, in shell history or in `helm get values`.
     # The Secret must contain a key named "token" with the agent token value.
     # When set, config.token is ignored and no Secret is created by the chart.
-    # Example: existingSecret: "kubeadapt-agent"
+    #   kubectl create secret generic kubeadapt-agent-token \
+    #     --namespace kubeadapt --from-literal=token='<your-token>'
+    # Example: existingSecret: "kubeadapt-agent-token"
     existingSecret: ""
 
     # Backend API endpoint
@@ -183,6 +220,15 @@ agent:
         cpu: 100m
         memory: 128Mi
 
+    # Container security context for the upgrader sidecar (restricted Pod
+    # Security Standard). The pod-level settings come from agent.podSecurityContext.
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+
     # How often to check for updates
     checkInterval: "24h"
 
@@ -255,8 +301,13 @@ agent:
 # Deploys a DaemonSet that uses eBPF to track pod-to-pod network traffic
 #
 # Prerequisites:
-# - Linux kernel >= 5.8 (required for TC eBPF support)
-# - Privileged container access
+# - Linux kernel >= 5.10 on every node it runs on
+# - Privileged container access (hostNetwork, hostPID) - not available on
+#   GKE Autopilot or EKS Fargate; OpenShift needs the privileged SCC
+#
+# This chart version does not connect the DaemonSet to the agent, so on its own
+# it reports nothing to Kubeadapt. Leave it disabled unless Kubeadapt support
+# has set up network monitoring for your cluster.
 #
 # For full configuration options, see: charts/kubeadapt-k8s-pulse/values.yaml
 kubeadapt-k8s-pulse:

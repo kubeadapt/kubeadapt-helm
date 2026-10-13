@@ -2,8 +2,10 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 1.0.7
-appVersion: "0.1.0"
+version: 1.0.8
+# The agent release this chart deploys (agent.image.tag). Keep in step with
+# that tag; it is also the image tag used when agent.image.tag is empty.
+appVersion: "v3.0.1"
 
 # Dependencies
 dependencies:
@@ -32,19 +34,22 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
+    - kind: changed
+      description: "The agent pod now meets the Kubernetes restricted Pod Security Standard by default: it runs as the image's non-root user (UID/GID 65532) with a RuntimeDefault seccomp profile, no privilege escalation, every capability dropped and a read-only root filesystem. The agent writes only to its emptyDir volumes. Settings live in agent.podSecurityContext and agent.securityContext; the auto-upgrade sidecar uses agent.autoUpgrade.securityContext. On OpenShift, set agent.podSecurityContext.runAsUser, runAsGroup and fsGroup to null so the restricted-v2 SCC can assign them."
     - kind: added
-      description: "Grant the agent ClusterRole get on nodes/proxy and nodes/stats so the kubelet Summary API can be read. It is the only source of per-pod network byte counters: metrics.k8s.io, already granted, carries CPU and memory and nothing else, so without this rule container_metrics.network_rx_bytes and network_tx_bytes are always zero. nodes/proxy serves the api_proxy transport and nodes/stats the direct kubelet transport. The verb is get alone, so the agent gets read-only access to the kubelet API through those two subresources, with no write and no exec."
-    - kind: added
-      description: "Add the chart-side plumbing for an agent write-ahead spool for network telemetry: an emptyDir volume mounted at agent.spool.mountPath (default /var/lib/kubeadapt), bounded by agent.spool.sizeLimit (2Gi) and agent.spool.maxBytes (1 GiB), the matching KUBEADAPT_SPOOL_DIR and KUBEADAPT_SPOOL_MAX_BYTES environment variables, and a 120s pod termination grace period. This is chart-side only: the volume and settings take effect once an agent release that writes to the spool ships, and agent images that predate it ignore the environment variables and leave the volume empty. No PersistentVolume or PersistentVolumeClaim is created; set agent.spool.enabled=false to opt out."
-    - kind: added
-      description: "Set GOMEMLIMIT on the agent container from its own memory limit via the Downward API. The Go runtime otherwise sizes its heap against the node's memory and the agent is OOMKilled at the container limit instead of collecting more aggressively. Resource requests and limits are unchanged."
+      description: "A small /tmp emptyDir (agent.tmpVolume.sizeLimit, default 64Mi) because the root filesystem is read-only."
+    - kind: changed
+      description: "The chart is no longer marked as a pre-release, and appVersion now reports the agent release the chart deploys (v3.0.1) instead of a placeholder."
+    - kind: changed
+      description: "One compatibility matrix across README.md, COMPATIBILITY.md and the chart annotations, including GKE Autopilot, EKS Fargate and OpenShift, which components run where, and what helm uninstall leaves behind. existingSecret is documented as the recommended way to provide the agent token."
   artifacthub.io/containsSecurityUpdates: "false"
-  artifacthub.io/prerelease: "true"
+  artifacthub.io/prerelease: "false"
   artifacthub.io/license: Apache-2.0
   artifacthub.io/platforms: |
     - eks
     - aks
     - gke
+    - openshift
     - on-premise
   artifacthub.io/compatibility: |
     kubernetes:

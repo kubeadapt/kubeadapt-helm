@@ -6,12 +6,19 @@
 
 ### Supported Platforms
 
-| Platform   | Status      | Kubernetes Versions | Tested | Notes                                                                                |
-| ---------- | ----------- | ------------------- | ------ | ------------------------------------------------------------------------------------ |
-| Amazon EKS | ✓ Supported | 1.24 - 1.34         | ✓ Yes  | Full support with IRSA                                                               |
-| Azure AKS  | ✓ Supported | 1.24 - 1.34         | ✓ Yes  | Full support with Managed Identity                                                   |
-| Google GKE | ✓ Supported | 1.24 - 1.34         | ✓ Yes  | Full support with Workload Identity                                                  |
-| On-Premise | ✓ Supported | 1.24 - 1.34         | ✓ Yes  | Full support for On-premise environments and recommended for development and testing |
+| Platform                 | Kubernetes Versions | Agent (`kubeadapt`) | Network agent (`kubeadapt-k8s-pulse`) | Notes                                                                 |
+| ------------------------ | ------------------- | ------------------- | -------------------------------------- | --------------------------------------------------------------------- |
+| Amazon EKS (EC2 nodes)   | 1.24 - 1.35         | ✓                   | ✓                                      | Full support with IRSA                                                |
+| Amazon EKS on Fargate    | 1.24 - 1.35         | ✓                   | -                                      | Fargate runs no DaemonSets                                            |
+| Azure AKS                | 1.24 - 1.35         | ✓                   | ✓                                      | Full support with Managed Identity                                    |
+| Google GKE Standard      | 1.24 - 1.35         | ✓                   | ✓                                      | Full support with Workload Identity                                   |
+| Google GKE Autopilot     | 1.24 - 1.35         | ✓                   | -                                      | Autopilot does not allow privileged pods                              |
+| Red Hat OpenShift / ROSA | 1.24 - 1.35         | ✓                   | Privileged SCC required                | Unset the agent's fixed UID/GID (see README)                          |
+| On-Premise               | 1.24 - 1.35         | ✓                   | ✓                                      | kubeadm, kops, Rancher, k3s, RKE2                                     |
+
+**Agent:** one Deployment, restricted Pod Security Standard by default (non-root, read-only root filesystem, no capabilities). Needs [metrics-server](https://github.com/kubernetes-sigs/metrics-server) for CPU and memory usage.
+
+**Network agent:** a privileged DaemonSet (`hostNetwork`, `hostPID`), Linux kernel 5.10+ on every node it runs on. Disabled by default.
 
 ### Platform-Specific Requirements
 
@@ -43,6 +50,8 @@
 | Cloud Cost Integration            | ✓   | ✓   | ✓   | Custom     |
 | GPU Monitoring                    | ✓   | ✓   | ✓   | ✓          |
 | Network Cost Monitoring           | ✓   | ✓   | ✓   | -          |
+
+Network cost monitoring needs the network agent, so it is not available on EKS Fargate or GKE Autopilot.
 | Persistent Storage                | ✓   | ✓   | ✓   | ✓          |
 
 For issues or questions, please visit:
