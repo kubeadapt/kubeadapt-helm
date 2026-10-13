@@ -26,6 +26,18 @@ agent:
     name: ""
   rbac:
     create: true
+    # Grants `nodes/proxy` get so the agent can fall back to the API server's
+    # node proxy for kubelet stats on a node whose kubelet serving certificate
+    # does not chain to the cluster CA (a self-signed kubelet, serverTLSBootstrap
+    # off). Off by default: the agent reads stats straight from each kubelet
+    # with `nodes/stats` get, which reaches the stats endpoints and nothing else.
+    #
+    # WARNING: `nodes/proxy` get is EXEC-CAPABLE. The kubelet authorises exec,
+    # attach, port-forward and run as nodes/proxy, and a WebSocket upgrade is a
+    # GET, so anyone holding the agent's token could run commands in every pod
+    # on every node. Turn this on only if per-pod network bytes are missing and
+    # the agent logs that it cannot verify your kubelets' certificates.
+    kubeletProxyFallback: false
   service:
     type: ClusterIP
   # ONE Deployment per cluster, so memory scales with TOTAL cluster size - a
