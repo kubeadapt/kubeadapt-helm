@@ -1,5 +1,8 @@
 {{- if .Values.agent.enabled }}
 {{- if .Values.agent.autoUpgrade.enabled }}
+{{- $pulseValues := index .Values "kubeadapt-k8s-pulse" | default dict }}
+{{- $pulseRBAC := and (include "kubeadapt.pulse.enabled" .) ($pulseValues.rbac | default dict).create }}
+{{- $pulseCtx := dict "Values" $pulseValues "Release" .Release "Chart" (dict "Name" "kubeadapt-k8s-pulse") }}
 {{- if .Values.agent.autoUpgrade.serviceAccount.create }}
 ---
 apiVersion: v1
@@ -175,6 +178,16 @@ rules:
   # upgrader ClusterRole cannot be applied by the upgrader. The upgrade Job
   # fails, Helm rolls back (--atomic), and that release needs a manual
   # `helm upgrade`.
+  #
+  # get/list are not limited by name: Helm reads an object before it creates
+  # it, so a release that adds a cluster-scoped name (the pulse ClusterRole,
+  # for one) fails at that read when get is name-limited. Reading RBAC objects
+  # grants nothing.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - clusterroles
+      - clusterrolebindings
+    verbs: ["get", "list"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources:
       - clusterroles
@@ -182,7 +195,10 @@ rules:
     resourceNames:
       - "{{ include "kubeadapt.name" . }}-agent{{ include "kubeadapt.clusterResourceSuffix" . }}"
       - "{{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}"
-    verbs: ["get", "list", "update", "patch", "delete"]
+      {{- if $pulseRBAC }}
+      - "{{ include "kubeadapt-k8s-pulse.clusterRoleName" $pulseCtx }}"
+      {{- end }}
+    verbs: ["update", "patch", "delete"]
   # create cannot be limited by resourceNames; it is needed when a release adds
   # a cluster-scoped name. It is bounded the same way: only rules the upgrader
   # already holds.
@@ -195,6 +211,10 @@ rules:
   # binding one, requires holding its permissions; the list is the agent's
   # own, so the two cannot drift.
   {{- include "kubeadapt.agent.clusterRules" . | nindent 2 }}
+  {{- if $pulseRBAC }}
+  # And every permission the pulse ClusterRole grants, for the same reason.
+  {{- include "kubeadapt-k8s-pulse.clusterRules" $pulseCtx | nindent 2 }}
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
