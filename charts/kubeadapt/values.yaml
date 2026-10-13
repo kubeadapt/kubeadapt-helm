@@ -243,7 +243,7 @@ agent:
     # Options:
     #   - "stable": Production-ready releases (recommended)
     #   - "fast": Early access releases (may have bugs)
-    # All releases use fast channel until first stable (v1) release
+    # Releases from 1.0.8 on are published to both channels
     channel: "fast"
 
     # Upgrade timeout - how long to wait for helm upgrade to complete

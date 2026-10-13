@@ -24,8 +24,12 @@ upgradeFrom:
   - "0.17.0"
 
 # Channels this version is available in
+# - stable: Production-ready releases
+# - fast: Early access releases
 channels:
+  - stable
   - fast
+  # Note: In both channels because artifacthub.io/prerelease: "false"
 
 # Optional metadata
 metadata:
