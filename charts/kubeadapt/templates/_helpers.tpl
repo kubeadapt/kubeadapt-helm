@@ -70,9 +70,9 @@ Behaviour:
 {{/*
 Rules of the agent ClusterRole.
 
-The upgrader ClusterRole includes the same list, so it holds every permission
-it writes into the agent ClusterRole during an auto-upgrade. One definition
-keeps the two from drifting apart.
+The upgrader ClusterRole includes the same list: it has no `escalate`, so the
+API server lets it write the agent ClusterRole only while it holds every
+permission in it. One definition keeps the two from drifting apart.
 
 Every rule is read-only and matches an informer or client call in the agent.
 */}}
