@@ -1,0 +1,18 @@
+to: "1.0.3"
+from: "0\\.17\\..*|0\\.18\\..*"
+name: Pre-Major-Rebrand-Manual-Upgrade-Required
+url: https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-1.0.0
+message: |
+  1.0.3 is a 1.x release. Moving to it from 0.17.x or 0.18.x crosses the v1.0.0
+  breaking changes, which cannot be applied automatically:
+    - Image registry alias migrated.
+    - Image binaries renamed (kubeadapt-agent → kubeadapt-k8s-agent, kubeadapt-upgrader → kubeadapt-k8s-upgrader).
+    - Subchart renamed: ebpf-agent → kubeadapt-k8s-pulse. If you override subchart values under 'ebpf-agent:' in your values.yaml, rename it to 'kubeadapt-k8s-pulse:' before upgrading; otherwise the overrides will be silently ignored.
+
+  Customer action required:
+    1. Read the release notes: https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-1.0.0
+    2. Update your values overrides if you renamed the subchart key.
+    3. Run 'helm upgrade kubeadapt kubeadapt/kubeadapt --version 1.0.3' manually.
+
+matchingRules:
+  - type: Always
