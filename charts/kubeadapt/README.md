@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: v3.0.1](https://img.shields.io/badge/AppVersion-v3.0.1-informational?style=flat-square)
+![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: v3.2.0](https://img.shields.io/badge/AppVersion-v3.2.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -47,7 +47,7 @@ Rendering without cluster access (`helm template`, Argo CD) cannot see that Secr
 
 `agent.networkPolicy.pulseFrom` limits port 9091 to the sources you list. Read its comment in `values.yaml` first: the network agent runs with `hostNetwork`, and a list that does not match it on your network plugin stops network telemetry.
 
-The network agent image must be a release that sends the token without TLS (cut from pulse main after the TLS client was removed). Released v3.1.0 refuses to send a token without TLS.
+This needs agent v3.2.0 and pulse v3.2.0 or later, the chart defaults: the channel is plaintext, pulse v3.1.0 refuses to send the token without TLS, and agent v3.0.1 has no flow listener.
 
 ## Uninstalling the Chart
 
@@ -61,7 +61,7 @@ The namespace and any token Secret you created yourself stay behind; delete them
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.1.0 |
+| file://../kubeadapt-k8s-pulse | kubeadapt-k8s-pulse | 1.1.0 |
 
 ## Values
 
@@ -111,7 +111,7 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent"` |  |
-| agent.image.tag | string | `"v3.0.1"` |  |
+| agent.image.tag | string | `"v3.2.0"` |  |
 | agent.networkPolicy.pulseFrom | list | `[]` |  |
 | agent.nodeSelector | object | `{}` |  |
 | agent.podSecurityContext.fsGroup | int | `65532` |  |
@@ -120,7 +120,7 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | agent.podSecurityContext.runAsUser | int | `65532` |  |
 | agent.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
 | agent.rbac.create | bool | `true` |  |
-| agent.rbac.kubeletProxyFallback | bool | `false` |  |
+| agent.rbac.kubeletProxyFallback | bool | `true` |  |
 | agent.resources.limits.cpu | string | `"2000m"` |  |
 | agent.resources.limits.memory | string | `"16Gi"` |  |
 | agent.resources.requests.cpu | string | `"100m"` |  |
