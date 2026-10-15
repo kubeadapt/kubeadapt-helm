@@ -9,9 +9,14 @@ appVersion: "v3.0.1"
 
 # Dependencies
 dependencies:
+  # The pulse chart in this repository, packaged into this chart at release
+  # time. Pinning it from the OCI registry instead meant a pulse change needed
+  # a second PR and release to reach this chart, and twice that second step
+  # was missed (1.0.2 shipped pulse 1.0.0, 1.0.6-1.0.8 shipped pulse 1.0.1).
+  # Keep the version equal to charts/kubeadapt-k8s-pulse/Chart.yaml.
   - name: kubeadapt-k8s-pulse
     version: "1.1.0"
-    repository: "oci://ghcr.io/kubeadapt/kubeadapt-helm"
+    repository: "file://../kubeadapt-k8s-pulse"
     condition: kubeadapt-k8s-pulse.enabled
 
 maintainers:
