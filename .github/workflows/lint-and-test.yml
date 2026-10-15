@@ -136,3 +136,59 @@ jobs:
       - name: Run chart-testing (install)
         run: ct install --config ./.github/configs/ct-install.yaml
         if: steps.list-changed.outputs.changed == 'true'
+
+  release-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.47.2/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Validate release metadata
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: ./scripts/validate-release-metadata.sh
+
+  blocked-edges:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.47.2/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Validate blocked edges
+        run: ./scripts/validate-blocked-edges.sh
+
+  # The one required status check. Every job above runs on every pull
+  # request, so a required check never waits on a workflow that path
+  # filters skipped; a job that skips its own steps still passes.
+  gate:
+    if: always()
+    needs:
+      - linter-artifacthub
+      - chart-test
+      - release-metadata
+      - blocked-edges
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every check to pass
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -Eq '"(failure|cancelled)"'; then
+            echo "A required check failed."
+            exit 1
+          fi

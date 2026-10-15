@@ -8,7 +8,7 @@ This directory contains YAML files that define blocked upgrade paths. When a pro
 blocked-edges/
 ├── kubeadapt/           # Blocked edges for kubeadapt chart
 │   └── {version}-{issue-name}.yaml
-├── ebpf-agent/          # Blocked edges for ebpf-agent chart
+├── kubeadapt-k8s-pulse/ # Blocked edges for kubeadapt-k8s-pulse chart
 │   └── {version}-{issue-name}.yaml
 └── README.md
 ```
@@ -68,8 +68,11 @@ redirect_to: "0.16.1"
 
 ## Validation
 
-All blocked-edge files are validated by CI:
+All blocked-edge files are validated on every pull request by `scripts/validate-blocked-edges.sh` (the `blocked-edges` job, part of the required `gate` check):
 - YAML syntax check
 - Required fields validation
 - Regex validation for `from` field
-- Version existence check (warning only)
+- `to` and `redirect_to` must be exact versions that were released (a `<chart>-<version>` tag exists)
+- `redirect_to` chains must terminate (no cycles)
+
+ingestion-api reads this directory live from `main`, so a merged edge takes effect without a chart release. An edge blocks exactly one `to` version: to block a source range from several releases, add one file per target version.

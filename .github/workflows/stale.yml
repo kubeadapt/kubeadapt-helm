@@ -21,9 +21,13 @@ jobs:
         days-before-stale: 14
         # Number of days of inactivity before a stale issue is closed
         days-before-close: 7
+        # Pull requests are only marked stale, never closed: the bot closed
+        # active feature work (#90, #92, #93) that later had to be re-landed.
+        days-before-pr-close: -1
+        exempt-draft-pr: true
         # Issues with these labels will never be considered stale
         exempt-issue-labels: "security,pinned,bug"
-        exempt-pr-labels: "security,pinned,dependencies"
+        exempt-pr-labels: "security,pinned,dependencies,in-progress,release-blocker"
         # Comment to post when marking an issue as stale
         stale-issue-message: >
           This issue has been automatically marked as stale because it has not had
@@ -32,9 +36,8 @@ jobs:
           to keep it open. Thank you for your contributions to Kubeadapt.
         stale-pr-message: >
           This pull request has been automatically marked as stale because it has not had
-          recent activity in the last 14 days. It will be closed in 7 days if no
-          further activity occurs. If this PR is still relevant, please update it or
-          add a comment to keep it open. Thank you for your contributions to Kubeadapt.
+          recent activity in the last 14 days. It stays open; please update it, or
+          close it if it is no longer needed. Thank you for your contributions to Kubeadapt.
         # Labels to use when marking as stale
         stale-issue-label: 'no-issue-activity'
         stale-pr-label: 'no-pr-activity'
@@ -42,6 +45,3 @@ jobs:
         close-issue-message: >
           This issue has been automatically closed because it has not had any activity
           for 21 days. Feel free to reopen it if you believe it's still relevant.
-        close-pr-message: >
-          This pull request has been automatically closed because it has not had any
-          activity for 21 days. Feel free to reopen it if you believe it's still relevant.

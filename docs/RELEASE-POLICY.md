@@ -88,21 +88,29 @@ Follow these steps when cutting a release:
 1. **Update `Chart.yaml`**
    - Bump `version` to the new semver
    - Set `artifacthub.io/prerelease: "true"` for fast-only, `"false"` for stable
+   - Keep `appVersion` equal to the default image tag (a leading `v` is ignored) and `artifacthub.io/images` on that tag
+   - Replace `artifacthub.io/changes` with this release's changes only
 
 2. **Update `upgrade-metadata.yaml`**
    - Set `chartVersion` to match `Chart.yaml` version exactly
-   - Set `upgradeFrom` list (see policy above)
-   - Set `channels: [fast]` or `channels: [stable, fast]`
+   - Set `upgradeFrom` list (see policy above); the first entry is the latest release, and every entry was actually released
+   - Set `channels: [fast]` or `channels: [stable, fast]`; a new minor or major (`x.y.0`) is fast-only
+   - Set `metadata.releaseNotes` to `https://github.com/kubeadapt/kubeadapt-helm/releases/tag/<chart>-<version>`
 
-3. **Open a PR**
-   CI runs `validate-upgrade-metadata.yaml` which checks:
-   - `chartVersion` matches `Chart.yaml` version
-   - `channels` contains only `stable` or `fast`
-   - `artifacthub.io/prerelease` is consistent with channel (`true` for fast-only, `false` for stable)
-   - Required fields (`chartVersion`, `upgradeFrom`, `channels`) are present
+3. **Update the chart's `RELEASE_NOTES.md`**
+   Add a `## <version>` section at the top. chart-releaser publishes this file from the package as the GitHub Release body, and ingestion-api serves that body to the upgrader.
 
-4. **Merge to main**
-   `publish.yml` runs: packages the chart, pushes to GHCR, creates a GitHub Release, and sets the prerelease flag via `gh release edit`.
+4. **Pin subcharts at the version in this repository**
+   A chart that depends on a chart in `charts/` must pin that chart's current version, or the release ships a stale subchart.
 
-5. **Verify on GitHub**
+5. **Open a PR**
+   The required `gate` check passes only when every job in `lint-and-test.yml` passes. `release-metadata` runs `scripts/validate-release-metadata.sh` on every chart the PR changes and checks steps 1-4, plus:
+   - the version is not already released
+   - an `upgradeFrom` entry from another major has a blocked edge for this version
+   Run the script locally before pushing.
+
+6. **Merge to main**
+   `publish.yml` runs: packages the chart, pushes to GHCR, creates a GitHub Release, marks fast-only releases as pre-releases, and keeps "Latest" on the newest stable `kubeadapt` release.
+
+7. **Verify on GitHub**
    Confirm the release appears with the correct badge: "Pre-release" for fast-only, "Latest" for stable.

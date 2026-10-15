@@ -130,7 +130,7 @@ helm install kubeadapt ./charts/kubeadapt --dry-run --set agent.config.token=tes
 helm install kubeadapt ./charts/kubeadapt \
   --set agent.config.token=test \
   --set agent.autoUpgrade.enabled=true \
-  --set ebpf-agent.enabled=true \
+  --set kubeadapt-k8s-pulse.enabled=true \
   --dry-run
 ```
 
@@ -141,6 +141,12 @@ We use Helm's [Chart Testing](https://github.com/helm/chart-testing) tool in CI.
 Run linting locally:
 ```shell
 ./scripts/lint.sh
+```
+
+Validate release metadata and blocked edges the way CI does (needs `yq` v4 and fetched tags):
+```shell
+./scripts/validate-release-metadata.sh
+./scripts/validate-blocked-edges.sh
 ```
 
 ## Support Channels

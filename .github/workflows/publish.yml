@@ -15,6 +15,11 @@ permissions:
   id-token: write # For signing
   pages: write    # For gh-pages deployment
 
+# Two merges minutes apart would otherwise race on the gh-pages index.yaml.
+concurrency:
+  group: publish-charts
+  cancel-in-progress: false
+
 jobs:
   release:
     if: github.repository == 'kubeadapt/kubeadapt-helm'
@@ -83,24 +88,32 @@ jobs:
         env:
           CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set prerelease flag
+      - name: Set prerelease and latest flags
         run: |
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          set -euo pipefail
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.47.2/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
           shopt -s nullglob
           for pkg in .cr-release-packages/*.tgz; do
-            if [ -z "${pkg:-}" ]; then
-              break
-            fi
-            chart_name=$(tar -xf "$pkg" -O '*/Chart.yaml' | yq '.name')
-            version=$(tar -xf "$pkg" -O '*/Chart.yaml' | yq '.version')
-            is_prerelease=$(tar -xf "$pkg" -O '*/Chart.yaml' | yq '.annotations."artifacthub.io/prerelease"')
+            chart_yaml=$(helm show chart "$pkg")
+            chart_name=$(echo "$chart_yaml" | yq '.name')
+            version=$(echo "$chart_yaml" | yq '.version')
+            is_prerelease=$(echo "$chart_yaml" | yq '.annotations."artifacthub.io/prerelease"')
 
             if [ "$is_prerelease" = "true" ]; then
               gh release edit "${chart_name}-${version}" --prerelease --latest=false
+            elif [ "$chart_name" != "kubeadapt" ]; then
+              # A subchart release never takes "Latest" from the umbrella chart.
+              gh release edit "${chart_name}-${version}" --latest=false
             fi
           done
+
+          # Keep "Latest" on the newest stable umbrella release, whichever
+          # chart this push released last.
+          latest=$(gh release list --exclude-pre-releases --limit 100 --json tagName \
+            --jq '[.[].tagName | select(test("^kubeadapt-[0-9]"))] | first')
+          gh release edit "$latest" --latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
