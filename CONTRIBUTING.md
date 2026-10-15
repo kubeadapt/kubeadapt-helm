@@ -143,6 +143,12 @@ Run linting locally:
 ./scripts/lint.sh
 ```
 
+Validate release metadata and blocked edges the way CI does (needs `yq` v4 and fetched tags):
+```shell
+./scripts/validate-release-metadata.sh
+./scripts/validate-blocked-edges.sh
+```
+
 ## Support Channels
 
 * Chart Issues: GitHub Issues
