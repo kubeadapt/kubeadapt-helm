@@ -9,32 +9,26 @@ upgradeFrom:
   - "1.0.8"
   - "1.0.7"
   - "1.0.6"
-  - "1.0.5"
   - "1.0.4"
   - "1.0.3"
   - "1.0.2"
   - "1.0.1"
   - "1.0.0"
-  - "0.18.6"
-  - "0.18.5"
-  - "0.18.4"
-  - "0.18.3"
-  - "0.18.2"
-  - "0.18.1"
-  - "0.18.0"
-  - "0.17.0"
 
 # Channels this version is available in
 # - stable: Production-ready releases
 # - fast: Early access releases
 channels:
-  - stable
   - fast
-  # Note: In both channels because artifacthub.io/prerelease: "false"
+  # A new minor ships fast-only (docs/RELEASE-POLICY.md); a patch release
+  # promotes it to stable.
 
 # Optional metadata
 metadata:
   releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-1.1.0"
   containsSecurityUpdates: true
   minKubernetesVersion: "1.24.0"
-  breakingChanges: []
+  breakingChanges:
+    - "Network telemetry needs agent v3.2.0 and kubeadapt-k8s-pulse v3.2.0 (the chart defaults). An install that overrides agent.image.tag or kubeadapt-k8s-pulse.image.tag with an older release gets no flows."
+    - "With kubeadapt-k8s-pulse.enabled=true, 1.1.0 adds a pulse ClusterRole and ClusterRoleBinding that the 1.0.x upgrader cannot read, so its upgrade Job fails before changing anything. Run helm upgrade by hand once."
+    - "From 1.1.0 on, the upgrader holds no escalate: a later release that adds an agent or upgrader permission needs a manual helm upgrade."

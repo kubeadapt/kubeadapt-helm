@@ -39,8 +39,12 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
-    - kind: security
-      description: "The agent no longer holds nodes/proxy get, which is exec-capable: the kubelet authorises exec, attach and port-forward as nodes/proxy and a WebSocket upgrade is a GET, so a leaked agent token could run commands in every pod. Kubelet stats are read straight from each kubelet with nodes/stats get. agent.rbac.kubeletProxyFallback (default false) grants nodes/proxy for clusters whose kubelets self-sign their serving certificates."
+    - kind: changed
+      description: "The agent deploys kubeadapt-k8s-agent v3.2.0 and the network agent kubeadapt-k8s-pulse v3.2.0. Both are required for the flow channel below: pulse v3.1.0 refuses to send the token without TLS, and agent v3.0.1 has no flow listener."
+    - kind: added
+      description: "kubeadapt-k8s-pulse.enabled now connects pulse to the agent: the agent listens on global.pulseChannel.port (9091, published on its Service) and rejects pushes without a bearer token from a generated <name>-pulse-token Secret that upgrades reuse. The channel is plaintext gRPC, so the token and the flows travel unencrypted inside the cluster network. global.pulseChannel.existingSecret supplies your own token for renders without cluster access (helm template, Argo CD). agent.networkPolicy.pulseFrom adds a NetworkPolicy on that port."
+    - kind: changed
+      description: "Kubelet stats are read straight from each kubelet with nodes/stats get, and per node through the API server proxy where the kubelet cannot be used directly. agent.rbac.kubeletProxyFallback (default true) grants the nodes/proxy get that fallback needs. nodes/proxy get is exec-capable; set the value to false when every kubelet serving certificate is signed by the cluster CA and port 10250 is reachable."
     - kind: security
       description: "The upgrader can no longer widen its own rights: escalate is removed from its ClusterRole and Role, so it can write only RBAC whose permissions it already holds. A future release that adds an agent permission needs a manual helm upgrade; the upgrade Job fails and rolls back."
     - kind: security
@@ -49,14 +53,12 @@ annotations:
       description: "Unused agent ClusterRole grants: replicationcontrollers, networkpolicies, karpenter nodeclaims, and watch on metrics.k8s.io."
     - kind: fixed
       description: "The agent ClusterRole grants discovery.k8s.io endpointslices list/watch, which the agent's service informer needs since agent v3.1.0. Without it the agent stayed unready for 5 minutes on every start and API-server traffic was billed as external."
-    - kind: added
-      description: "kubeadapt-k8s-pulse.enabled now connects pulse to the agent: the agent listens on global.pulseChannel.port (9091, published on its Service) and rejects pushes without a bearer token from a generated <name>-pulse-token Secret that upgrades reuse. The channel is plaintext gRPC, so the token and the flows travel unencrypted inside the cluster network. global.pulseChannel.existingSecret supplies your own token for renders without cluster access (helm template, Argo CD). agent.networkPolicy.pulseFrom adds a NetworkPolicy on that port. Requires a pulse release cut from main after its TLS client was removed; v3.1.0 refuses a token without TLS."
     - kind: fixed
       description: "terminationGracePeriodSeconds is 120 (agent.terminationGracePeriodSeconds) whether or not the spool is on, covering the agent's 100s shutdown drain; it was 30s with the spool off."
     - kind: changed
-      description: "kubeadapt-k8s-pulse 1.1.0: flow export with a bearer token over plaintext gRPC, a read-only ClusterRole, and dnsPolicy ClusterFirstWithHostNet."
+      description: "The kubeadapt-k8s-pulse 1.1.0 subchart is packaged from this repository instead of pinned from the OCI registry, so each release ships the pulse chart of the same commit. It adds flow export, a read-only ClusterRole, dnsPolicy ClusterFirstWithHostNet, the memory-limit variable and the CNI configuration mount."
   artifacthub.io/containsSecurityUpdates: "true"
-  artifacthub.io/prerelease: "false"
+  artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0
   artifacthub.io/platforms: |
     - eks

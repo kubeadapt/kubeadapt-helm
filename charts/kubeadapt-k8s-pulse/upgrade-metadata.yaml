@@ -9,21 +9,18 @@ upgradeFrom:
   - "1.0.2"
   - "1.0.1"
   - "1.0.0"
-  - "0.2.0"
-  - "0.1.1"
-  - "0.1.0"
 
 # Channels this version is available in
 # - stable: Production-ready releases
 # - fast: Early access releases
 channels:
-  - stable
   - fast
-  # Note: In both channels because artifacthub.io/prerelease: "false"
+  # A new minor ships fast-only (docs/RELEASE-POLICY.md); a patch release
+  # promotes it to stable.
 
 # Optional metadata
 metadata:
-  releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-k8s-pulse-1.0.0"
+  releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-k8s-pulse-1.1.0"
   containsSecurityUpdates: true
   minKubernetesVersion: "1.24.0"
   minKernelVersion: "5.10"
