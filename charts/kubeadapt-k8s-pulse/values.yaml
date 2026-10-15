@@ -31,9 +31,6 @@ config:
   # Exposes: /metrics, /health/live, /health/ready
   metricsPort: 9090
 
-  # Collection interval for BPF map reads, leave it as is, unless you have specific needs
-  collectionInterval: "25s"
-
   # Log level for agent
   # Options: "debug", "info", "warn", "error"
   logLevel: "info"
@@ -74,6 +71,12 @@ config:
   # Dump BPF maps before deletion (synchronized with collection cycle)
   # WARNING: High I/O, only enable for troubleshooting
   dumpBPFMaps: false
+
+# Node directory with the CNI configuration (conflist files), mounted read-only.
+# Pulse reads it to measure the overlay's encapsulation overhead, which
+# bytes_wire includes. On a distribution that keeps the CNI configuration
+# elsewhere, set this to that directory.
+cniConfigDir: /etc/cni/net.d
 
 # Resource limits for eBPF agent
 # Note: eBPF agents are lightweight but require sufficient memory for BPF maps

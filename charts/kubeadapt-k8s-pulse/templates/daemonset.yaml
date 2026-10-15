@@ -51,19 +51,22 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-            # Pod metadata
+            # This node: the pod informer's field selector and the Node read
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-            - name: POD_NAME
+            # The container's memory limit. Pulse sizes its BPF maps and Go
+            # memory limit from it; with the cgroup filesystem mounted from the
+            # host it cannot find its own memory.max, so this is its primary
+            # source. Do not set GOMEMLIMIT: an explicit value disables pulse's
+            # own limit, which reserves room for the BPF maps.
+            - name: KUBEADAPT_MEMORY_LIMIT_BYTES
               valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
+                resourceFieldRef:
+                  containerName: kubeadapt-k8s-pulse
+                  resource: limits.memory
+                  divisor: "1"
 
             # ============================================================
             # eBPF Agent Configuration
@@ -74,8 +77,6 @@ spec:
               value: {{ .Values.config.logFormat | quote }}
             - name: EBPF_METRICS_PORT
               value: {{ .Values.config.metricsPort | quote }}
-            - name: EBPF_COLLECTION_INTERVAL
-              value: {{ .Values.config.collectionInterval | quote }}
             - name: EBPF_CONNECTION_TRACKING
               value: {{ .Values.config.connectionTracking | quote }}
 
@@ -146,6 +147,13 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            # The node's CNI configuration, read to measure the overlay's
+            # encapsulation overhead that bytes_wire includes. Pulse looks under
+            # /host first; without it the overhead is unknown and bytes_wire
+            # understates an overlay datapath.
+            - name: cni-conf
+              mountPath: /host/etc/cni/net.d
+              readOnly: true
             {{- if and $agentEndpoint $tokenSecret }}
             - name: pulse-token
               mountPath: /etc/kubeadapt/pulse-token
@@ -193,6 +201,12 @@ spec:
             type: DirectoryOrCreate
         - name: tmp
           emptyDir: {}
+        # No type check: pulse starts without this directory and logs a
+        # warning, so a node that keeps its CNI configuration elsewhere must not
+        # keep the pod from starting, and the chart has no reason to create it.
+        - name: cni-conf
+          hostPath:
+            path: {{ .Values.cniConfigDir }}
         {{- if and $agentEndpoint $tokenSecret }}
         - name: pulse-token
           secret:

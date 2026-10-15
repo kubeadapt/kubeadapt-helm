@@ -385,7 +385,6 @@ kubeadapt-k8s-pulse:
   # Override defaults if needed - see charts/kubeadapt-k8s-pulse/values.yaml for all options
   # config:
   #   logLevel: "info"
-  #   collectionInterval: "25s"
 
   # Scheduling - configure as needed for your cluster
   tolerations: []
