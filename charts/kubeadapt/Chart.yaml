@@ -5,7 +5,7 @@ type: application
 version: 1.1.0
 # The agent release this chart deploys (agent.image.tag). Keep in step with
 # that tag; it is also the image tag used when agent.image.tag is empty.
-appVersion: "v3.0.1"
+appVersion: "v3.2.0"
 
 # Dependencies
 dependencies:

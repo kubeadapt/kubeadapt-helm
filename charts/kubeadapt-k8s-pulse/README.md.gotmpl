@@ -91,7 +91,7 @@ Installed on its own, export is off until `config.export.agentEndpoint` is set. 
 
 The DaemonSet runs with `hostNetwork`, so `dnsPolicy` defaults to `ClusterFirstWithHostNet`: without it the pod cannot resolve cluster Service names.
 
-Export needs a pulse image that sends the token over plaintext gRPC, which is a release cut from pulse main after the TLS client was removed. The default `image.tag` (v3.0.1) does not export; v3.1.0 refuses to send a token without TLS.
+Export needs pulse v3.2.0 or later, the default `image.tag`. v3.0.1 does not export, and v3.1.0 refuses to send the token without TLS.
 
 ## Exported Metrics
 

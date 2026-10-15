@@ -6,10 +6,7 @@ global:
 
 agent:
   enabled: true
-  image:
-    repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
-    tag: "v3.0.1"
-    pullPolicy: IfNotPresent
+  # The image is the chart default, so CI installs what the chart ships.
   serviceAccount:
     create: true
     annotations: {}

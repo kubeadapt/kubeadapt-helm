@@ -6,11 +6,9 @@ enabled: true
 
 image:
   repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
-  # TODO(release): pin the first pulse release cut from main after adb34bc
-  # (plaintext export with a bearer token from EBPF_AGENT_AUTH_TOKEN_FILE).
-  # v3.0.1 does not export at all, so the export settings below are inert with
-  # it; v3.1.0 refuses a token without TLS and must not be pinned with them.
-  tag: "v3.0.1"
+  # The export settings below need v3.2.0 or later: v3.0.1 does not export, and
+  # v3.1.0 refuses to send the bearer token without TLS.
+  tag: "v3.2.0"
   pullPolicy: Always
 
 serviceAccount:
@@ -108,13 +106,8 @@ dnsPolicy: ClusterFirstWithHostNet
 env:
   # Retry-buffer capacity, in sub-batches; pulse's built-in default is 60.
   #
-  # Chart-side plumbing. No released pulse image reads this variable yet, so
-  # setting it here is inert until a release that reads EBPF_RETRY_BUFFER_SIZE
-  # and retries RESOURCE_EXHAUSTED is pinned in image.tag above; older images
-  # ignore an unknown environment variable.
-  #
-  # From that release on: the agent answers RESOURCE_EXHAUSTED whenever its
-  # intake is full, so agent back-pressure queues in this buffer instead of
+  # The agent answers RESOURCE_EXHAUSTED whenever its intake is full, and pulse
+  # v3.2.0 retries it, so agent back-pressure queues in this buffer instead of
   # being counted as a drop. At the exporter's 60s push cadence a node at the
   # modelled busy density (~750 flow rows per node per minute, well under the
   # 10,000-row sub-batch split) emits one sub-batch per window, so 120 buys

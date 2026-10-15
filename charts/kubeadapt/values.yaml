@@ -30,7 +30,7 @@ agent:
   image:
     # renovate: datasource=docker depName=public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
     repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
-    tag: "v3.0.1"
+    tag: "v3.2.0"
     pullPolicy: IfNotPresent
   # ============================================================
   # Service Account Configuration
@@ -162,11 +162,9 @@ agent:
   spool:
     # Write-ahead spool for network telemetry: it is meant to survive container
     # restarts and ingestion outages, and a pod replacement drains it during the
-    # termination grace period. No PersistentVolume is ever created.
-    #
-    # Chart-side plumbing. The volume and the KUBEADAPT_SPOOL_* variables below
-    # take effect once an agent release that writes to the spool ships; agent
-    # images that predate it ignore them and leave the volume empty.
+    # termination grace period. No PersistentVolume is ever created. Agent
+    # v3.2.0 and later write to it; earlier images ignore the KUBEADAPT_SPOOL_*
+    # variables and leave the volume empty.
     enabled: true
     # Ceiling the kubelet enforces on the emptyDir itself. Kept above maxBytes
     # so the agent's own bound is what evicts, not a pod eviction.
@@ -376,9 +374,8 @@ agent:
 #
 # Enabling it also opens the agent's flow listener (global.pulseChannel) and
 # connects the two over plaintext gRPC with a generated bearer token, which
-# travels unencrypted inside the cluster network. The pulse image must be a
-# release that sends the token without TLS (cut from pulse main after the TLS
-# client was removed); see kubeadapt-k8s-pulse.image.tag.
+# travels unencrypted inside the cluster network. It needs pulse v3.2.0 or
+# later (the default kubeadapt-k8s-pulse.image.tag) and agent v3.2.0 or later.
 #
 # For full configuration options, see: charts/kubeadapt-k8s-pulse/values.yaml
 kubeadapt-k8s-pulse:
