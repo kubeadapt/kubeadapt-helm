@@ -1,6 +1,6 @@
 # kubeadapt-k8s-pulse
 
-![Version: 1.0.2](https://img.shields.io/badge/Version-1.0.2-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.0.1](https://img.shields.io/badge/AppVersion-3.0.1-informational?style=flat-square)
+![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.2.0](https://img.shields.io/badge/AppVersion-3.2.0-informational?style=flat-square)
 
 High-performance eBPF-based network metrics agent for Kubernetes
 
@@ -33,7 +33,7 @@ helm repo update
 Or use OCI registry:
 
 ```console
-helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.0.2
+helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.1.0
 ```
 
 ## Installing the Chart
@@ -78,6 +78,21 @@ Additionally requires:
 - `hostNetwork: true` - Access host network namespace
 - `hostPID: true` - Track processes for connection attribution
 
+## Flow Export to the Kubeadapt Agent
+
+Installed by the `kubeadapt` chart (`kubeadapt-k8s-pulse.enabled=true`), pulse sends its flows to that chart's agent Service with no extra settings:
+
+- the endpoint is `<name>-agent.<namespace>.svc:9091`;
+- every push carries a bearer token, read from a file mounted from the Secret the `kubeadapt` chart generates, so it never appears in the pod spec.
+
+**The channel is plaintext gRPC.** The token authenticates pulse to the agent, but it travels unencrypted inside the cluster network, and so do the flow batches (pod IPs, DNS names, HTTP routes). Anything that can observe node traffic can read both.
+
+Installed on its own, export is off until `config.export.agentEndpoint` is set. `config.export.tokenSecret` names a Secret with the token under the key `token`; without it pulse sends no token.
+
+The DaemonSet runs with `hostNetwork`, so `dnsPolicy` defaults to `ClusterFirstWithHostNet`: without it the pod cannot resolve cluster Service names.
+
+Export needs pulse v3.2.0 or later, the default `image.tag`. v3.0.1 does not export, and v3.1.0 refuses to send the token without TLS.
+
 ## Exported Metrics
 
 ### Pod-Level Traffic Metrics
@@ -107,21 +122,25 @@ Additionally requires:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` |  |
-| config.collectionInterval | string | `"25s"` |  |
+| cniConfigDir | string | `"/etc/cni/net.d"` |  |
 | config.connectionTracking | bool | `true` |  |
 | config.dumpBPFMaps | bool | `false` |  |
 | config.enableProfiling | bool | `false` |  |
+| config.export.agentEndpoint | string | `""` |  |
+| config.export.tokenSecret | string | `""` |  |
 | config.logFormat | string | `"json"` |  |
 | config.logLevel | string | `"info"` |  |
 | config.metricsPort | int | `9090` |  |
 | config.profilingPort | int | `6060` |  |
+| dnsPolicy | string | `"ClusterFirstWithHostNet"` |  |
 | enabled | bool | `true` |  |
 | env[0].name | string | `"EBPF_RETRY_BUFFER_SIZE"` |  |
 | env[0].value | string | `"120"` |  |
 | image.pullPolicy | string | `"Always"` |  |
 | image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse"` |  |
-| image.tag | string | `"v3.0.1"` |  |
+| image.tag | string | `"v3.2.0"` |  |
 | nodeSelector | object | `{}` |  |
+| rbac.create | bool | `true` |  |
 | resources.limits.cpu | string | `"500m"` |  |
 | resources.limits.memory | string | `"384Mi"` |  |
 | resources.requests.cpu | string | `"100m"` |  |
@@ -131,6 +150,37 @@ Additionally requires:
 | serviceAccount.name | string | `""` |  |
 | tolerations | list | `[]` |  |
 | topologySpreadConstraints | list | `[]` |  |
+
+## DNS capture cap and node MTU
+
+pulse copies bytes from each DNS packet into an eBPF buffer for the IP→domain
+catalog. The capture cap is **MTU-derived at runtime, with no operator action,
+no Helm value, and no custom image** — pulse reads the MTU of the node's
+default-route device at startup (it asks the kernel which device would route to
+an external test address, the probe Cilium uses) and sizes the cap as `clamp(MTU − 28, 512, 8960)` (28 = 20 IPv4 + 8
+UDP). A standard 1500-MTU node uses 1472 bytes; a jumbo 9001-MTU node uses the
+full ceiling. This is the same MTU auto-detection Cilium uses, so one image is
+correct unmodified across EKS / AKS / GKE / on-prem and every
+kube-proxy or Cilium mode. The derived values are exposed as `kubeadapt_node_mtu`
+and `kubeadapt_dns_capture_cap_bytes` on `/metrics`.
+
+On **AWS EKS** this matters: EKS worker nodes and pod interfaces default to a
+**9001-byte (jumbo-frame) MTU**, and this is **CNI-independent** — the AWS VPC
+CNI (`AWS_VPC_ENI_MTU`/`POD_MTU` default `9001`), Cilium (auto-detects the ENI
+MTU), and Calico (auto-detects, defaults to `9001` on EKS) all give pods a
+~9001-byte MTU because it is a property of the underlying VPC, not of any one
+CNI. On such a fabric a DNS response larger than 1472 bytes (large A/AAAA sets,
+DNSSEC) can arrive **unfragmented in a single packet**; the runtime cap captures
+it in full instead of truncating at a fixed 1472.
+
+**Physics ceiling on 1500-MTU fabrics:** a DNS response larger than ~1472 bytes
+is IP-fragmented, and pulse's TC-ingress hook sees only fragment-0 pre-reassembly.
+So on 1500-MTU no cap captures a fragmented response fully — the runtime cap only
+adds coverage on jumbo (9001) fabrics where the large response arrives
+unfragmented. pulse counts the uncapturable class via `kubeadapt_dns_truncated_total`
+and `kubeadapt_dns_fragmented_total` so the gap stays visible on `/metrics`.
+If MTU detection fails, the cap falls back to 1472 — identical to a standard
+1500-MTU node.
 
 ## Troubleshooting
 

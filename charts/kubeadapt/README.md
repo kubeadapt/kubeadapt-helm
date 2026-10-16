@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 1.0.8](https://img.shields.io/badge/Version-1.0.8-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: v3.0.1](https://img.shields.io/badge/AppVersion-v3.0.1-informational?style=flat-square)
+![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: v3.2.0](https://img.shields.io/badge/AppVersion-v3.2.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -31,6 +31,24 @@ The agent pod meets the Kubernetes restricted Pod Security Standard by default. 
 `--set agent.podSecurityContext.runAsUser=null --set agent.podSecurityContext.runAsGroup=null --set agent.podSecurityContext.fsGroup=null`
 so the restricted-v2 SCC can assign the user and group.
 
+## Permissions
+
+The agent's ClusterRole is read-only: `list` and `watch` on the resources it collects, `list` on the metrics API, and `get` on `nodes/stats`, which the kubelet maps to its stats endpoints only. It holds no `nodes/proxy` unless you set `agent.rbac.kubeletProxyFallback=true` for kubelets that self-sign their serving certificates; that grant is exec-capable, see `values.yaml`.
+
+With `agent.autoUpgrade.enabled`, the upgrader sidecar (in the agent pod) gets a namespaced Role for its lock ConfigMap, the upgrade Job and Helm's release Secrets, and the upgrade Job runs under its own service account. The upgrader has no `escalate` or `bind`, so it can apply a release only if that release grants no permission it lacks; such a release needs a manual `helm upgrade`.
+
+## Network Telemetry
+
+`--set kubeadapt-k8s-pulse.enabled=true` deploys the network agent DaemonSet and connects it to the agent on port 9091 (`global.pulseChannel.port`). Every push carries a bearer token that the agent checks; the chart generates it into the Secret `<name>-pulse-token` on install and reuses it on upgrades. To rotate, delete the Secret, run `helm upgrade`, then restart the network agent DaemonSet.
+
+**The channel is plaintext gRPC.** The token authenticates the network agent to the agent, but it travels unencrypted inside the cluster network, and so do the flow batches (pod IPs, DNS names, HTTP routes). Anything that can observe node or pod traffic can read both.
+
+Rendering without cluster access (`helm template`, Argo CD) cannot see that Secret and would generate a new token each time. Create the Secret yourself with the key `token` and set `global.pulseChannel.existingSecret`.
+
+`agent.networkPolicy.pulseFrom` limits port 9091 to the sources you list. Read its comment in `values.yaml` first: the network agent runs with `hostNetwork`, and a list that does not match it on your network plugin stops network telemetry.
+
+This needs agent v3.2.0 and pulse v3.2.0 or later, the chart defaults: the channel is plaintext, pulse v3.1.0 refuses to send the token without TLS, and agent v3.0.1 has no flow listener.
+
 ## Uninstalling the Chart
 
 ```console
@@ -43,7 +61,7 @@ The namespace and any token Secret you created yourself stay behind; delete them
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.0.1 |
+| file://../kubeadapt-k8s-pulse | kubeadapt-k8s-pulse | 1.1.0 |
 
 ## Values
 
@@ -93,7 +111,8 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent"` |  |
-| agent.image.tag | string | `"v3.0.1"` |  |
+| agent.image.tag | string | `"v3.2.0"` |  |
+| agent.networkPolicy.pulseFrom | list | `[]` |  |
 | agent.nodeSelector | object | `{}` |  |
 | agent.podSecurityContext.fsGroup | int | `65532` |  |
 | agent.podSecurityContext.runAsGroup | int | `65532` |  |
@@ -101,6 +120,7 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | agent.podSecurityContext.runAsUser | int | `65532` |  |
 | agent.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
 | agent.rbac.create | bool | `true` |  |
+| agent.rbac.kubeletProxyFallback | bool | `true` |  |
 | agent.resources.limits.cpu | string | `"2000m"` |  |
 | agent.resources.limits.memory | string | `"16Gi"` |  |
 | agent.resources.requests.cpu | string | `"100m"` |  |
@@ -116,12 +136,15 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | agent.spool.maxBytes | string | `"1073741824"` |  |
 | agent.spool.mountPath | string | `"/var/lib/kubeadapt"` |  |
 | agent.spool.sizeLimit | string | `"2Gi"` |  |
+| agent.terminationGracePeriodSeconds | int | `120` |  |
 | agent.tmpVolume.sizeLimit | string | `"64Mi"` |  |
 | agent.tolerations | list | `[]` |  |
 | agent.topologySpreadConstraints | list | `[]` |  |
 | global.fullnameOverride | string | `""` |  |
 | global.name | string | `"kubeadapt"` |  |
 | global.nameOverride | string | `""` |  |
+| global.pulseChannel.existingSecret | string | `""` |  |
+| global.pulseChannel.port | int | `9091` |  |
 | kubeadapt-k8s-pulse.affinity | object | `{}` |  |
 | kubeadapt-k8s-pulse.enabled | bool | `false` |  |
 | kubeadapt-k8s-pulse.nodeSelector | object | `{}` |  |

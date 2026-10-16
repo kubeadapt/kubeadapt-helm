@@ -1,0 +1,30 @@
+{{- if and .Values.agent.enabled (include "kubeadapt.pulse.enabled" .) .Values.agent.networkPolicy.pulseFrom }}
+# Limits who can reach the agent's flow listener to agent.networkPolicy.pulseFrom.
+# Pulse runs with hostNetwork, so whether a podSelector matches it depends on
+# the network plugin; see the comment on that value.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "kubeadapt.name" . }}-agent
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kubeadapt.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: agent
+  policyTypes:
+    - Ingress
+  ingress:
+    # Health probes and /metrics, from anywhere, as without this policy.
+    - ports:
+        - port: {{ .Values.agent.config.healthPort }}
+          protocol: TCP
+    # Flow pushes from pulse.
+    - ports:
+        - port: {{ .Values.global.pulseChannel.port }}
+          protocol: TCP
+      from:
+        {{- toYaml .Values.agent.networkPolicy.pulseFrom | nindent 8 }}
+{{- end }}

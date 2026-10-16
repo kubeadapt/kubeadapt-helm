@@ -1,4 +1,5 @@
 {{- if .Values.agent.enabled }}
+{{- $pulse := include "kubeadapt.pulse.enabled" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,6 +8,10 @@ metadata:
     {{- include "kubeadapt.labels" . | nindent 4 }}
     app.kubernetes.io/component: agent
 spec:
+  # Exactly one. The agent is the cluster's single snapshot writer and keeps
+  # per-node kubelet counter baselines; a second replica would send a second
+  # full snapshot each interval and its own network-byte deltas. There is no
+  # leader election, so do not scale this Deployment or put an HPA on it.
   replicas: 1
   selector:
     matchLabels:
@@ -17,6 +22,12 @@ spec:
       labels:
         {{- include "kubeadapt.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: agent
+      {{- if and $pulse (not .Values.global.pulseChannel.existingSecret) }}
+      annotations:
+        # The agent reads the token once at startup, so a new generated token
+        # has to restart it.
+        checksum/pulse-token: {{ include "kubeadapt.pulseChannel.token" . | sha256sum }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "kubeadapt.name" . }}-agent
       {{- with .Values.agent.podSecurityContext }}
@@ -35,6 +46,11 @@ spec:
             - name: health
               containerPort: {{ .Values.agent.config.healthPort }}
               protocol: TCP
+            {{- if $pulse }}
+            - name: pulse
+              containerPort: {{ .Values.global.pulseChannel.port }}
+              protocol: TCP
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -141,6 +157,23 @@ spec:
               value: {{ .Values.agent.spool.maxBytes | quote }}
             {{- end }}
 
+            {{- if $pulse }}
+
+            # Flow intake from the pulse DaemonSet: a plaintext gRPC listener
+            # that rejects any push without the bearer token below. The token
+            # authenticates pulse; it travels UNENCRYPTED inside the cluster
+            # network, as do the flow batches.
+            - name: KUBEADAPT_PULSE_ENABLED
+              value: "true"
+            - name: KUBEADAPT_PULSE_LISTEN_PORT
+              value: {{ .Values.global.pulseChannel.port | quote }}
+            - name: KUBEADAPT_PULSE_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubeadapt.pulseChannel.secretName" . }}
+                  key: token
+            {{- end }}
+
             {{- if .Values.agent.env }}
             # Additional custom environment variables
             {{- toYaml .Values.agent.env | nindent 12 }}
@@ -228,11 +261,12 @@ spec:
           resources:
             {{- toYaml .Values.agent.autoUpgrade.resources | nindent 12 }}
       {{- end }}
-      {{- if .Values.agent.spool.enabled }}
-      # Room for the agent to drain its spool on SIGTERM before it exits, so a
-      # pod replacement does not strand undelivered telemetry.
-      terminationGracePeriodSeconds: 120
-      {{- end }}
+      # Room for the agent's shutdown sequence on SIGTERM: the network-telemetry
+      # drain (KUBEADAPT_SHUTDOWN_DRAIN_TIMEOUT, 100s by default) plus the final
+      # cache saves after it. It is needed whether or not the spool is on, since
+      # the drain runs either way; the Kubernetes default of 30s kills the agent
+      # a third of the way through it.
+      terminationGracePeriodSeconds: {{ .Values.agent.terminationGracePeriodSeconds }}
       volumes:
         # Scratch space: the root filesystem is read-only.
         - name: tmp

@@ -4,10 +4,7 @@
 # Enable the agent for CI testing
 enabled: true
 
-image:
-  repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
-  tag: "v3.0.1"
-  pullPolicy: Always  # Always pull to avoid stale cache in CI
+# The image is the chart default, so CI installs what the chart ships.
 
 serviceAccount:
   create: true
@@ -17,9 +14,6 @@ serviceAccount:
 config:
   # Metrics port
   metricsPort: 9090
-
-  # Use shorter collection interval for CI tests
-  collectionInterval: "15s"
 
   # Debug logging for CI
   logLevel: "debug"

@@ -1,4 +1,6 @@
 {{- if .Values.enabled }}
+{{- $agentEndpoint := include "kubeadapt-k8s-pulse.agentEndpoint" . }}
+{{- $tokenSecret := include "kubeadapt-k8s-pulse.tokenSecret" . }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -25,6 +27,10 @@ spec:
       serviceAccountName: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
       # Required for eBPF: access to host network namespace
       hostNetwork: true
+      # With hostNetwork, the default ClusterFirst policy falls back to the
+      # node's resolver, which cannot resolve cluster Service names such as
+      # the agent endpoint below.
+      dnsPolicy: {{ .Values.dnsPolicy }}
       # Required for eBPF: access to host PID namespace for process tracking
       hostPID: true
       containers:
@@ -45,19 +51,22 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-            # Pod metadata
+            # This node: the pod informer's field selector and the Node read
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-            - name: POD_NAME
+            # The container's memory limit. Pulse sizes its BPF maps and Go
+            # memory limit from it; with the cgroup filesystem mounted from the
+            # host it cannot find its own memory.max, so this is its primary
+            # source. Do not set GOMEMLIMIT: an explicit value disables pulse's
+            # own limit, which reserves room for the BPF maps.
+            - name: KUBEADAPT_MEMORY_LIMIT_BYTES
               valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
+                resourceFieldRef:
+                  containerName: kubeadapt-k8s-pulse
+                  resource: limits.memory
+                  divisor: "1"
 
             # ============================================================
             # eBPF Agent Configuration
@@ -68,10 +77,27 @@ spec:
               value: {{ .Values.config.logFormat | quote }}
             - name: EBPF_METRICS_PORT
               value: {{ .Values.config.metricsPort | quote }}
-            - name: EBPF_COLLECTION_INTERVAL
-              value: {{ .Values.config.collectionInterval | quote }}
             - name: EBPF_CONNECTION_TRACKING
               value: {{ .Values.config.connectionTracking | quote }}
+
+            {{- if $agentEndpoint }}
+
+            # Flow export to the Kubeadapt agent
+            - name: EBPF_EXPORT_ENABLED
+              value: "true"
+            - name: EBPF_AGENT_ENDPOINT
+              value: {{ $agentEndpoint | quote }}
+            {{- if $tokenSecret }}
+            # Bearer token the agent checks on every push. The channel is
+            # plaintext gRPC, so the token travels UNENCRYPTED inside the
+            # cluster network: it proves the sender to the agent, it does not
+            # hide the flows or itself from anything that can observe node
+            # traffic. A file, not an env value, so it never appears in the pod
+            # spec.
+            - name: EBPF_AGENT_AUTH_TOKEN_FILE
+              value: /etc/kubeadapt/pulse-token/token
+            {{- end }}
+            {{- end }}
 
             # Debug options
             {{- if .Values.config.enableProfiling }}
@@ -121,6 +147,18 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            # The node's CNI configuration, read to measure the overlay's
+            # encapsulation overhead that bytes_wire includes. Pulse looks under
+            # /host first; without it the overhead is unknown and bytes_wire
+            # understates an overlay datapath.
+            - name: cni-conf
+              mountPath: /host/etc/cni/net.d
+              readOnly: true
+            {{- if and $agentEndpoint $tokenSecret }}
+            - name: pulse-token
+              mountPath: /etc/kubeadapt/pulse-token
+              readOnly: true
+            {{- end }}
 
           livenessProbe:
             httpGet:
@@ -163,6 +201,21 @@ spec:
             type: DirectoryOrCreate
         - name: tmp
           emptyDir: {}
+        # No type check: pulse starts without this directory and logs a
+        # warning, so a node that keeps its CNI configuration elsewhere must not
+        # keep the pod from starting, and the chart has no reason to create it.
+        - name: cni-conf
+          hostPath:
+            path: {{ .Values.cniConfigDir }}
+        {{- if and $agentEndpoint $tokenSecret }}
+        - name: pulse-token
+          secret:
+            secretName: {{ $tokenSecret }}
+            defaultMode: 0400
+            items:
+              - key: token
+                path: token
+        {{- end }}
 
       {{- with .Values.nodeSelector }}
       nodeSelector:

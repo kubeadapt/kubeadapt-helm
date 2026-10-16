@@ -6,13 +6,22 @@ enabled: true
 
 image:
   repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
-  tag: "v3.0.1"
+  # The export settings below need v3.2.0 or later: v3.0.1 does not export, and
+  # v3.1.0 refuses to send the bearer token without TLS.
+  tag: "v3.2.0"
   pullPolicy: Always
 
 serviceAccount:
   create: true
   annotations: {}
   name: ""
+
+# ClusterRole + ClusterRoleBinding for the ServiceAccount above, all reads:
+# pods list/watch (pod identity, node-scoped informer), nodes get (this pod's
+# own Node) and cilium.io ciliumenvoyconfigs list (L7 detector). Without them
+# the pod informer never syncs and flows carry no pod identity.
+rbac:
+  create: true
 
 # ============================================================
 # eBPF Agent Configuration
@@ -21,9 +30,6 @@ config:
   # Metrics server port for Prometheus scraping
   # Exposes: /metrics, /health/live, /health/ready
   metricsPort: 9090
-
-  # Collection interval for BPF map reads, leave it as is, unless you have specific needs
-  collectionInterval: "25s"
 
   # Log level for agent
   # Options: "debug", "info", "warn", "error"
@@ -37,6 +43,25 @@ config:
   connectionTracking: true
 
   # ============================================================
+  # Flow export to the Kubeadapt agent
+  # ============================================================
+  # Installed by the kubeadapt chart, both settings below fill themselves in:
+  # flows go to that chart's agent Service with the bearer token from the
+  # Secret it generates. Leave them empty there.
+  #
+  # The channel is plaintext gRPC. The token authenticates pulse to the agent
+  # but travels UNENCRYPTED inside the cluster network, and so do the flow
+  # batches (pod IPs, DNS names, HTTP routes).
+  #
+  # Installed on its own, export stays off until agentEndpoint is set.
+  export:
+    # host:port of the agent's flow listener.
+    agentEndpoint: ""
+    # Secret with the agent's bearer token under the key "token". Empty: no
+    # token is sent.
+    tokenSecret: ""
+
+  # ============================================================
   # Debug Options (use with caution in production)
   # ============================================================
   # Enable pprof profiling endpoints
@@ -46,6 +71,12 @@ config:
   # Dump BPF maps before deletion (synchronized with collection cycle)
   # WARNING: High I/O, only enable for troubleshooting
   dumpBPFMaps: false
+
+# Node directory with the CNI configuration (conflist files), mounted read-only.
+# Pulse reads it to measure the overlay's encapsulation overhead, which
+# bytes_wire includes. On a distribution that keeps the CNI configuration
+# elsewhere, set this to that directory.
+cniConfigDir: /etc/cni/net.d
 
 # Resource limits for eBPF agent
 # Note: eBPF agents are lightweight but require sufficient memory for BPF maps
@@ -70,17 +101,16 @@ affinity: {}
 
 topologySpreadConstraints: []
 
+# Required with hostNetwork for the pod to resolve cluster Service names, such
+# as the agent endpoint above.
+dnsPolicy: ClusterFirstWithHostNet
+
 # Additional environment variables
 env:
   # Retry-buffer capacity, in sub-batches; pulse's built-in default is 60.
   #
-  # Chart-side plumbing. No released pulse image reads this variable yet, so
-  # setting it here is inert until a release that reads EBPF_RETRY_BUFFER_SIZE
-  # and retries RESOURCE_EXHAUSTED is pinned in image.tag above; older images
-  # ignore an unknown environment variable.
-  #
-  # From that release on: the agent answers RESOURCE_EXHAUSTED whenever its
-  # intake is full, so agent back-pressure queues in this buffer instead of
+  # The agent answers RESOURCE_EXHAUSTED whenever its intake is full, and pulse
+  # v3.2.0 retries it, so agent back-pressure queues in this buffer instead of
   # being counted as a drop. At the exporter's 60s push cadence a node at the
   # modelled busy density (~750 flow rows per node per minute, well under the
   # 10,000-row sub-batch split) emits one sub-batch per window, so 120 buys

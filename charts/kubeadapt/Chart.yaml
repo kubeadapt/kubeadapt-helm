@@ -2,16 +2,21 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 1.0.8
+version: 1.1.0
 # The agent release this chart deploys (agent.image.tag). Keep in step with
 # that tag; it is also the image tag used when agent.image.tag is empty.
-appVersion: "v3.0.1"
+appVersion: "v3.2.0"
 
 # Dependencies
 dependencies:
+  # The pulse chart in this repository, packaged into this chart at release
+  # time. Pinning it from the OCI registry instead meant a pulse change needed
+  # a second PR and release to reach this chart, and twice that second step
+  # was missed (1.0.2 shipped pulse 1.0.0, 1.0.6-1.0.8 shipped pulse 1.0.1).
+  # Keep the version equal to charts/kubeadapt-k8s-pulse/Chart.yaml.
   - name: kubeadapt-k8s-pulse
-    version: "1.0.1"
-    repository: "oci://ghcr.io/kubeadapt/kubeadapt-helm"
+    version: "1.1.0"
+    repository: "file://../kubeadapt-k8s-pulse"
     condition: kubeadapt-k8s-pulse.enabled
 
 maintainers:
@@ -35,17 +40,25 @@ annotations:
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
     - kind: changed
-      description: "The agent pod now meets the Kubernetes restricted Pod Security Standard by default: it runs as the image's non-root user (UID/GID 65532) with a RuntimeDefault seccomp profile, no privilege escalation, every capability dropped and a read-only root filesystem. The agent writes only to its emptyDir volumes. Settings live in agent.podSecurityContext and agent.securityContext; the auto-upgrade sidecar uses agent.autoUpgrade.securityContext. On OpenShift, set agent.podSecurityContext.runAsUser, runAsGroup and fsGroup to null so the restricted-v2 SCC can assign them."
-    - kind: fixed
-      description: "The auto-upgrade sidecar moves to kubeadapt-k8s-upgrader v3.0.2. Its upgrade Job meets the restricted Pod Security Standard and runs under the chart's upgrader service account; earlier releases referenced a service account the chart does not create, so upgrade Jobs could not start."
+      description: "The agent deploys kubeadapt-k8s-agent v3.2.0 and the network agent kubeadapt-k8s-pulse v3.2.0. Both are required for the flow channel below: pulse v3.1.0 refuses to send the token without TLS, and agent v3.0.1 has no flow listener."
     - kind: added
-      description: "A small /tmp emptyDir (agent.tmpVolume.sizeLimit, default 64Mi) because the root filesystem is read-only."
+      description: "kubeadapt-k8s-pulse.enabled now connects pulse to the agent: the agent listens on global.pulseChannel.port (9091, published on its Service) and rejects pushes without a bearer token from a generated <name>-pulse-token Secret that upgrades reuse. The channel is plaintext gRPC, so the token and the flows travel unencrypted inside the cluster network. global.pulseChannel.existingSecret supplies your own token for renders without cluster access (helm template, Argo CD). agent.networkPolicy.pulseFrom adds a NetworkPolicy on that port."
     - kind: changed
-      description: "The chart is no longer marked as a pre-release, and appVersion now reports the agent release the chart deploys (v3.0.1) instead of a placeholder."
+      description: "Kubelet stats are read straight from each kubelet with nodes/stats get, and per node through the API server proxy where the kubelet cannot be used directly. agent.rbac.kubeletProxyFallback (default true) grants the nodes/proxy get that fallback needs. nodes/proxy get is exec-capable; set the value to false when every kubelet serving certificate is signed by the cluster CA and port 10250 is reachable."
+    - kind: security
+      description: "The upgrader can no longer widen its own rights: escalate is removed from its ClusterRole and Role, so it can write only RBAC whose permissions it already holds. A future release that adds an agent permission needs a manual helm upgrade; the upgrade Job fails and rolls back."
+    - kind: security
+      description: "The namespaced Role with secrets get/list, configmap writes and job create is bound to the agent's service account only while auto-upgrade is on (the upgrader sidecar uses it), renamed <name>-upgrader-sidecar and trimmed to the calls the upgrader makes."
+    - kind: removed
+      description: "Unused agent ClusterRole grants: replicationcontrollers, networkpolicies, karpenter nodeclaims, and watch on metrics.k8s.io."
+    - kind: fixed
+      description: "The agent ClusterRole grants discovery.k8s.io endpointslices list/watch, which the agent's service informer needs since agent v3.1.0. Without it the agent stayed unready for 5 minutes on every start and API-server traffic was billed as external."
+    - kind: fixed
+      description: "terminationGracePeriodSeconds is 120 (agent.terminationGracePeriodSeconds) whether or not the spool is on, covering the agent's 100s shutdown drain; it was 30s with the spool off."
     - kind: changed
-      description: "One compatibility matrix across README.md, COMPATIBILITY.md and the chart annotations, including GKE Autopilot, EKS Fargate and OpenShift, which components run where, and what helm uninstall leaves behind. existingSecret is documented as the recommended way to provide the agent token."
-  artifacthub.io/containsSecurityUpdates: "false"
-  artifacthub.io/prerelease: "false"
+      description: "The kubeadapt-k8s-pulse 1.1.0 subchart is packaged from this repository instead of pinned from the OCI registry, so each release ships the pulse chart of the same commit. It adds flow export, a read-only ClusterRole, dnsPolicy ClusterFirstWithHostNet, the memory-limit variable and the CNI configuration mount."
+  artifacthub.io/containsSecurityUpdates: "true"
+  artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0
   artifacthub.io/platforms: |
     - eks

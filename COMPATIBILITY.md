@@ -50,9 +50,9 @@
 | Cloud Cost Integration            | ✓   | ✓   | ✓   | Custom     |
 | GPU Monitoring                    | ✓   | ✓   | ✓   | ✓          |
 | Network Cost Monitoring           | ✓   | ✓   | ✓   | -          |
+| Persistent Storage                | ✓   | ✓   | ✓   | ✓          |
 
 Network cost monitoring needs the network agent, so it is not available on EKS Fargate or GKE Autopilot.
-| Persistent Storage                | ✓   | ✓   | ✓   | ✓          |
 
 For issues or questions, please visit:
 
