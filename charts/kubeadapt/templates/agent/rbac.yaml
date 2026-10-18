@@ -177,5 +177,40 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "kubeadapt.name" . }}-agent
     namespace: {{ .Release.Namespace }}
+---
+# The agent replaces its own token and stores the new one in the Secret it
+# reads it from. get and update on that one Secret only, by name.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "kubeadapt.name" . }}-agent-token
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+rules:
+  - apiGroups: [""]
+    resources:
+      - secrets
+    resourceNames:
+      - {{ include "kubeadapt.agentTokenSecretName" . | quote }}
+    verbs: ["get", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "kubeadapt.name" . }}-agent-token
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "kubeadapt.name" . }}-agent-token
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kubeadapt.name" . }}-agent
+    namespace: {{ .Release.Namespace }}
 {{- end }}
 {{- end }}

@@ -72,8 +72,12 @@ spec:
             - name: KUBEADAPT_AGENT_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.agent.config.existingSecret | default (printf "%s-agent" (include "kubeadapt.name" .)) }}
+                  name: {{ include "kubeadapt.agentTokenSecretName" . }}
                   key: token
+            # The Secret above, by name, so the agent can store a rotated token
+            # in its "token" key.
+            - name: KUBEADAPT_TOKEN_SECRET_NAME
+              value: {{ include "kubeadapt.agentTokenSecretName" . | quote }}
 
             # Collection Settings
             - name: KUBEADAPT_SNAPSHOT_INTERVAL
@@ -140,6 +144,11 @@ spec:
             - name: KUBEADAPT_SPOOL_MAX_BYTES
               value: {{ .Values.agent.spool.maxBytes | quote }}
             {{- end }}
+            {{- if include "kubeadapt.secureops.enabled" . }}
+
+            # SecureOps opt-in (secureops.enabled): the scan Job the agent builds
+            {{- include "kubeadapt.secureops.env" . | nindent 12 }}
+            {{- end }}
 
             {{- if .Values.agent.env }}
             # Additional custom environment variables
@@ -185,7 +194,7 @@ spec:
             - name: KUBEADAPT_AGENT_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.agent.config.existingSecret | default (printf "%s-agent" (include "kubeadapt.name" .)) }}
+                  name: {{ include "kubeadapt.agentTokenSecretName" . }}
                   key: token
 
             # Pod identity (Downward API)
