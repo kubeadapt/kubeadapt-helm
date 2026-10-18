@@ -26,16 +26,19 @@
 
 - Discount pricing (RI/SP): Requires [cloud account connection](/docs/v1/how-to-guides/integrations/aws) via cross-account IAM role
 - EKS cluster auto-discovery included with the cloud account connection
+- SecureOps, private ECR images: an IRSA role (`secureops.scanner.cloudIdentity.aws.roleArn`) or an EKS Pod Identity association for the scanner service account
 
 #### Azure AKS
 
 - On-demand and spot pricing works without any setup
 - RI/SP discount integration: [Planned](https://feedback.kubeadapt.io/features/azure-reserved-vm-instances-savings-plans-6n8jg2)
+- SecureOps, private ACR images: AKS Workload Identity (`secureops.scanner.cloudIdentity.azure.clientId`)
 
 #### Google GKE
 
 - On-demand and spot pricing works without any setup
 - CUD discount integration: [Planned](https://feedback.kubeadapt.io/features/gcp-committed-use-discounts-cuds-igjr9r)
+- SecureOps, private Artifact Registry images: GKE Workload Identity (`secureops.scanner.cloudIdentity.gcp.serviceAccount`)
 
 #### On-Premise
 
@@ -49,6 +52,7 @@
 | Basic Metrics Collection          | ✓   | ✓   | ✓   | ✓          |
 | Cloud Cost Integration            | ✓   | ✓   | ✓   | Custom     |
 | GPU Monitoring                    | ✓   | ✓   | ✓   | ✓          |
+| SecureOps image scanning (opt-in) | ✓   | ✓   | ✓   | ✓          |
 | Network Cost Monitoring           | ✓   | ✓   | ✓   | -          |
 
 Network cost monitoring needs the network agent, so it is not available on EKS Fargate or GKE Autopilot.

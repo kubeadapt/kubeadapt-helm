@@ -128,6 +128,13 @@ jobs:
             --set kubeadapt-k8s-pulse.enabled=true \
             --dry-run
 
+          # Test with the SecureOps opt-in and auto-upgrade
+          helm install kubeadapt-test-secureops ./charts/kubeadapt \
+            --set agent.config.token=ci-test-key \
+            --set secureops.enabled=true \
+            --set agent.autoUpgrade.enabled=true \
+            --dry-run
+
           # Test template rendering
           helm template ./charts/kubeadapt \
             --set agent.config.token=ci-test-key \

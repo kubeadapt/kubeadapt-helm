@@ -1,0 +1,22 @@
+# CI: SecureOps opt-in, scanner with AKS Workload Identity, a named PriorityClass
+# and scan Job scheduling
+agent:
+  config:
+    token: "ci-test-key-123"
+    backendUrl: ""
+secureops:
+  enabled: true
+  scanner:
+    concurrency: 8
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: scanning
+        effect: NoSchedule
+    nodeSelector:
+      kubernetes.io/os: linux
+    cloudIdentity:
+      azure:
+        clientId: "00000000-1111-2222-3333-444444444444"
+  priorityClass:
+    name: "kubeadapt-ci-scan"

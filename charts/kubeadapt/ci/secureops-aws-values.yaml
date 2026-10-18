@@ -1,0 +1,11 @@
+# CI: SecureOps opt-in, scanner with an IAM role for service accounts (IRSA)
+agent:
+  config:
+    token: "ci-test-key-123"
+    backendUrl: ""
+secureops:
+  enabled: true
+  scanner:
+    cloudIdentity:
+      aws:
+        roleArn: "arn:aws:iam::123456789012:role/kubeadapt-secureops-scanner"

@@ -1,0 +1,15 @@
+{{- if and (include "kubeadapt.secureops.enabled" .) .Values.secureops.priorityClass.create }}
+# Below the default priority (0), so every ordinary workload schedules first
+# and may preempt a scan, and a scan never preempts anything.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "kubeadapt.secureops.priorityClassName" . }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: secureops-scanner
+value: -10
+globalDefault: false
+preemptionPolicy: Never
+description: "Kubeadapt image scan Jobs: below the default priority, never preempt other pods."
+{{- end }}

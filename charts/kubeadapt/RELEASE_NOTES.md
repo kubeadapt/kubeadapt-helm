@@ -1,3 +1,13 @@
+## 1.2.0
+
+- Every install gets a `<name>-agent-token` Role and RoleBinding: `get` and `update` on the agent token Secret only (`<name>-agent`, or `agent.config.existingSecret`), so the agent can store a replacement token. The agent also receives that Secret's name as `KUBEADAPT_TOKEN_SECRET_NAME`. If another tool manages a Secret you supply, let it create the Secret once and leave it alone afterwards, or it may restore the old token.
+- **SecureOps opt-in**, off by default: `secureops.enabled`. It is a permission you grant. With it false, the chart installs the same objects as 1.0.8. Turn it on with `helm upgrade kubeadapt kubeadapt/kubeadapt -n kubeadapt --reuse-values --set secureops.enabled=true`; a release installed from an earlier chart version needs `--reset-then-reuse-values` instead of `--reuse-values`.
+- It grants the agent `get` on Secrets in every namespace, used only for the image pull secrets your workloads reference (no `list` or `watch` outside the release namespace); `list` on Roles, ClusterRoles, RoleBindings, ClusterRoleBindings, Gateways and HTTPRoutes; and `create` and `delete` on Secrets in the release namespace, for the copy of a pull secret one scan Job uses, owned by that Job. The rules live in `<name>-agent-secureops` (ClusterRole, Role and their bindings).
+- It creates the scanner service account `<name>-secureops-scanner`, with no Kubernetes API token. `secureops.scanner.cloudIdentity` adds an IRSA role ARN, a GKE Workload Identity service account or an AKS Workload Identity client ID, for private registries that nodes reach with their own cloud identity. EKS Pod Identity is configured in EKS, not in the chart.
+- It creates `<name>-secureops-scan`, a PriorityClass at -10 with `preemptionPolicy: Never`. Set `secureops.priorityClass.create=false` and `secureops.priorityClass.name` to use an existing class.
+- `secureops.scanner` sets the scan Job: image pinned by digest, 200m CPU / 256Mi requested, 768Mi limit, a 4Gi scratch volume, 2 Jobs at once (1 to 8), a 15 minute deadline, tolerations and nodeSelector.
+- With `agent.autoUpgrade.enabled`, the upgrader holds the same cluster-wide rules, because Kubernetes only lets it update the agent's SecureOps binding if it holds them, and manages the PriorityClass by name.
+
 ## 1.0.8
 
 - The agent pod meets the Kubernetes **restricted** Pod Security Standard by default: non-root (UID/GID 65532, the image's own user), RuntimeDefault seccomp, no privilege escalation, all capabilities dropped, read-only root filesystem. The agent writes only to its emptyDir volumes (the spool/state directory and a new 64Mi `/tmp`). Configure with `agent.podSecurityContext`, `agent.securityContext` and `agent.autoUpgrade.securityContext`.
