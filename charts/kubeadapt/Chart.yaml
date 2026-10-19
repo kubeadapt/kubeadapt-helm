@@ -35,7 +35,7 @@ annotations:
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
     - kind: added
-      description: "Every install gets a <name>-agent-rotated-token Secret where the agent stores a replacement token, with get and update on that Secret only (the <name>-agent-token Role). Upgrades render back what is in it, and helm uninstall keeps it. The agent never writes the token Secret (<name>-agent or agent.config.existingSecret), so another tool can own that one. Both are mounted as files in the agent and auto-upgrade containers."
+      description: "Every install gets a <name>-agent-rotated-token Secret where the agent stores a replacement token, with get and update on that Secret only (the <name>-agent-token Role). Upgrades render back what is in it; helm uninstall deletes it. The agent never writes the token Secret (<name>-agent or agent.config.existingSecret), so another tool can own that one. Both are mounted as files in the agent and auto-upgrade containers."
     - kind: added
       description: "secureops.enabled, off by default, grants the SecureOps permissions: get on Secrets in every namespace, used only for the image pull secrets workloads reference; list on Roles, ClusterRoles, RoleBindings, ClusterRoleBindings, Gateways and HTTPRoutes; and create and delete on Secrets in the release namespace for the Job-owned copy of a pull secret. They live in their own ClusterRole and Role, <name>-agent-secureops. With it false, the chart installs the same objects as 1.0.8."
     - kind: added

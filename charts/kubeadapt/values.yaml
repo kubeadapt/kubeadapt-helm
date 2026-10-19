@@ -131,7 +131,7 @@ agent:
     # Secrets or a GitOps sync can own it. When the agent replaces its token,
     # it stores the new one in the chart's <name>-agent-rotated-token Secret
     # (get and update on that one Secret, through the <name>-agent-token Role).
-    # Upgrades keep what the agent wrote there, and so does helm uninstall.
+    # Upgrades keep what the agent wrote there; helm uninstall deletes it.
     existingSecret: ""
 
     # Backend API endpoint

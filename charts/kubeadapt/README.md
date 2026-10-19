@@ -27,7 +27,7 @@ kubectl create secret generic kubeadapt-agent-token --namespace kubeadapt --from
 helm install kubeadapt kubeadapt/kubeadapt --namespace kubeadapt --set agent.config.existingSecret=kubeadapt-agent-token
 ```
 
-The agent never writes the token Secret, so External Secrets Operator, Sealed Secrets or a GitOps sync can own it. When the agent replaces its token, it stores the new one in `kubeadapt-agent-rotated-token`, a Secret the chart creates empty. The agent has `get` and `update` on that one Secret, by name, through the `kubeadapt-agent-token` Role. Upgrades and auto-upgrades keep what the agent wrote there.
+The agent never writes the token Secret, so External Secrets Operator, Sealed Secrets or a GitOps sync can own it. When the agent replaces its token, it stores the new one in `kubeadapt-agent-rotated-token`, a Secret the chart creates empty. The agent has `get` and `update` on that one Secret, by name, through the `kubeadapt-agent-token` Role. Upgrades and auto-upgrades keep what the agent wrote there; `helm uninstall` deletes it.
 
 The agent pod meets the Kubernetes restricted Pod Security Standard by default. On OpenShift, add
 `--set agent.podSecurityContext.runAsUser=null --set agent.podSecurityContext.runAsGroup=null --set agent.podSecurityContext.fsGroup=null`
@@ -78,7 +78,7 @@ To revoke, set `secureops.enabled=false` the same way. The chart removes the rol
 helm uninstall kubeadapt --namespace kubeadapt
 ```
 
-The namespace, any token Secret you created yourself, and the `kubeadapt-agent-rotated-token` Secret stay behind; delete them with `kubectl` if you no longer need them. Delete `kubeadapt-agent-rotated-token` before installing under another release name, or for a different cluster. With SecureOps on, so do scan Jobs the agent had not removed yet and the pull secret copies they own: `kubectl delete jobs -n kubeadapt -l kubeadapt.io/run-id` deletes both. Then delete the cluster on the **Clusters** page in Kubeadapt so its token stops working.
+The namespace and any token Secret you created yourself stay behind; delete them with `kubectl` if you no longer need them. With SecureOps on, so do scan Jobs the agent had not removed yet and the pull secret copies they own: `kubectl delete jobs -n kubeadapt -l kubeadapt.io/run-id` deletes both. Then delete the cluster on the **Clusters** page in Kubeadapt so its token stops working.
 
 ## Requirements
 

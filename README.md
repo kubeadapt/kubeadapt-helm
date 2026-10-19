@@ -48,7 +48,7 @@ helm install kubeadapt kubeadapt/kubeadapt \
   --set agent.config.existingSecret=kubeadapt-agent-token
 ```
 
-The agent never writes the token Secret, so External Secrets Operator, Sealed Secrets or a GitOps sync can own it. When the agent replaces its token, it stores the new one in `kubeadapt-agent-rotated-token`, a Secret the chart creates empty. The agent has `get` and `update` on that one Secret, by name, through the `kubeadapt-agent-token` Role. Upgrades and auto-upgrades keep what the agent wrote there.
+The agent never writes the token Secret, so External Secrets Operator, Sealed Secrets or a GitOps sync can own it. When the agent replaces its token, it stores the new one in `kubeadapt-agent-rotated-token`, a Secret the chart creates empty. The agent has `get` and `update` on that one Secret, by name, through the `kubeadapt-agent-token` Role. Upgrades and auto-upgrades keep what the agent wrote there; `helm uninstall` deletes it.
 
 **Quick try:**
 
@@ -122,7 +122,6 @@ This removes the agent Deployment, its Service, ServiceAccounts, the chart-creat
 - the `kubeadapt` namespace (Helm does not delete namespaces): `kubectl delete namespace kubeadapt`
 - a token Secret you created yourself for `existingSecret`
 - auto-upgrade Jobs that are still running; finished Jobs delete themselves after their TTL
-- the `kubeadapt-agent-rotated-token` Secret, on purpose, so a reinstall under the same release name keeps the agent's current token. Delete it with `kubectl delete secret kubeadapt-agent-rotated-token -n kubeadapt` before installing under another release name, or for a different cluster
 - with SecureOps on, scan Jobs the agent had not removed yet, with the pull secret copies they own: `kubectl delete jobs -n kubeadapt -l kubeadapt.io/run-id` deletes both
 
 Nothing is installed outside the release namespace except the cluster-scoped RBAC objects listed above and, with SecureOps on, its PriorityClass.
