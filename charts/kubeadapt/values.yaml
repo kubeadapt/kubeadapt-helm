@@ -127,14 +127,11 @@ agent:
     #     --namespace kubeadapt --from-literal=token='<your-token>'
     # Example: existingSecret: "kubeadapt-agent-token"
     #
-    # The agent replaces its token with a new one from time to time and writes
-    # the new token into this Secret's "token" key, so the chart gives it get
-    # and update on this one Secret (the <name>-agent-token Role). The chart
-    # never writes this Secret itself. If a tool such as External Secrets
-    # Operator, Sealed Secrets or a GitOps sync manages it, that tool can
-    # write its stored token back over the new one. Let it create the Secret
-    # once and leave it alone afterwards (External Secrets Operator:
-    # refreshInterval: 0), or keep your store updated from the Secret.
+    # The agent never writes this Secret, so External Secrets Operator, Sealed
+    # Secrets or a GitOps sync can own it. When the agent replaces its token,
+    # it stores the new one in the chart's <name>-agent-rotated-token Secret
+    # (get and update on that one Secret, through the <name>-agent-token Role).
+    # Upgrades keep what the agent wrote there, and so does helm uninstall.
     existingSecret: ""
 
     # Backend API endpoint

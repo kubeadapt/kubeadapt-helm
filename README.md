@@ -48,7 +48,7 @@ helm install kubeadapt kubeadapt/kubeadapt \
   --set agent.config.existingSecret=kubeadapt-agent-token
 ```
 
-The agent replaces its token with a new one from time to time and writes it into the token Secret's `token` key, so every install has a `kubeadapt-agent-token` Role with `get` and `update` on that one Secret, by name. With `agent.config.existingSecret`, that is your Secret; the chart never writes it. If a tool such as External Secrets Operator, Sealed Secrets or a GitOps sync manages it, the tool can write its stored token back over the new one. Let it create the Secret once and leave it alone afterwards (External Secrets Operator: `refreshInterval: 0`), or keep your store updated from the Secret.
+The agent never writes the token Secret, so External Secrets Operator, Sealed Secrets or a GitOps sync can own it. When the agent replaces its token, it stores the new one in `kubeadapt-agent-rotated-token`, a Secret the chart creates empty. The agent has `get` and `update` on that one Secret, by name, through the `kubeadapt-agent-token` Role. Upgrades and auto-upgrades keep what the agent wrote there.
 
 **Quick try:**
 
@@ -122,6 +122,7 @@ This removes the agent Deployment, its Service, ServiceAccounts, the chart-creat
 - the `kubeadapt` namespace (Helm does not delete namespaces): `kubectl delete namespace kubeadapt`
 - a token Secret you created yourself for `existingSecret`
 - auto-upgrade Jobs that are still running; finished Jobs delete themselves after their TTL
+- the `kubeadapt-agent-rotated-token` Secret, on purpose, so a reinstall under the same release name keeps the agent's current token. Delete it with `kubectl delete secret kubeadapt-agent-rotated-token -n kubeadapt` before installing under another release name, or for a different cluster
 - with SecureOps on, scan Jobs the agent had not removed yet, with the pull secret copies they own: `kubectl delete jobs -n kubeadapt -l kubeadapt.io/run-id` deletes both
 
 Nothing is installed outside the release namespace except the cluster-scoped RBAC objects listed above and, with SecureOps on, its PriorityClass.

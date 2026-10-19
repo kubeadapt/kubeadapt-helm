@@ -76,6 +76,14 @@ when set, else the chart's own <name>-agent.
 {{- end }}
 
 {{/*
+The Secret the agent stores a rotated token in, key "token". The agent owns
+its contents; it never writes the token Secret above.
+*/}}
+{{- define "kubeadapt.agentRotatedTokenSecretName" -}}
+{{- include "kubeadapt.name" . }}-agent-rotated-token
+{{- end }}
+
+{{/*
 "true" when the customer granted the SecureOps opt-in (secureops.enabled) and
 the agent is enabled, "" otherwise.
 

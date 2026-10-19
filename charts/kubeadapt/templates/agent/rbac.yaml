@@ -178,8 +178,9 @@ subjects:
     name: {{ include "kubeadapt.name" . }}-agent
     namespace: {{ .Release.Namespace }}
 ---
-# The agent replaces its own token and stores the new one in the Secret it
-# reads it from. get and update on that one Secret only, by name.
+# The agent replaces its own token and stores the new one in
+# <name>-agent-rotated-token. get and update on that one Secret only, by name;
+# nothing on the token Secret the chart or the customer provides.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -193,7 +194,7 @@ rules:
     resources:
       - secrets
     resourceNames:
-      - {{ include "kubeadapt.agentTokenSecretName" . | quote }}
+      - {{ include "kubeadapt.agentRotatedTokenSecretName" . | quote }}
     verbs: ["get", "update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
