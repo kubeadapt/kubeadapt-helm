@@ -1,3 +1,7 @@
+## 1.0.9
+
+- Fixed: auto-upgrade failed on every release from 1.0.8. 1.0.8 gave the agent `get` on `nodes/proxy` and `nodes/stats`, but not the upgrader, and Kubernetes lets the upgrader update the agent's ClusterRoleBinding only if it holds every rule of the agent's ClusterRole. The upgrade Job stopped with "attempting to grant RBAC permissions not currently held" and rolled back. The upgrader now holds those two rules too. The upgrader of a 1.0.8 install takes this release on its own: it updates its own ClusterRole first, then the binding.
+
 ## 1.0.8
 
 - The agent pod meets the Kubernetes **restricted** Pod Security Standard by default: non-root (UID/GID 65532, the image's own user), RuntimeDefault seccomp, no privilege escalation, all capabilities dropped, read-only root filesystem. The agent writes only to its emptyDir volumes (the spool/state directory and a new 64Mi `/tmp`). Configure with `agent.podSecurityContext`, `agent.securityContext` and `agent.autoUpgrade.securityContext`.
