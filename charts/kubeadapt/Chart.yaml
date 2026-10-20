@@ -42,6 +42,10 @@ annotations:
       description: "With secureops.enabled, a scanner service account without a Kubernetes API token, with optional cloud identity for private registries (secureops.scanner.cloudIdentity: IRSA role ARN, GKE Workload Identity, AKS Workload Identity; EKS Pod Identity is set up outside the chart), and a PriorityClass below the default priority that never preempts (secureops.priorityClass, or an existing class)."
     - kind: added
       description: "secureops.scanner sets the scan Job: the scanner image pinned by digest, resources (200m CPU and 256Mi requested, 768Mi limit), a 4Gi scratch volume, 2 Jobs at once (at most 8), a 15 minute deadline, tolerations and nodeSelector."
+    - kind: added
+      description: "With secureops.enabled, a <name>-secureops-scan NetworkPolicy on scan Job pods: no ingress; egress only to DNS (53, 5353), port 443 on any host, the agent.config.backendUrl port when it is not 443, the EKS Pod Identity Agent, and the GKE metadata server with GKE Workload Identity. secureops.scanner.networkPolicy.extraEgress adds rules; secureops.scanner.networkPolicy.enabled=false turns it off."
+    - kind: added
+      description: "global.imagePullSecrets adds pull secrets for Kubeadapt's own images to the agent and scanner service accounts."
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0

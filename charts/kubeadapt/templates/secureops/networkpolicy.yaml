@@ -1,0 +1,81 @@
+{{- if include "kubeadapt.secureops.enabled" . }}
+{{- $np := .Values.secureops.scanner.networkPolicy | default dict }}
+{{- if $np.enabled }}
+{{- $id := .Values.secureops.scanner.cloudIdentity }}
+{{- $backend := urlParse (toString .Values.agent.config.backendUrl) }}
+{{- $backendPort := regexFind "[0-9]+$" (regexFind ":[0-9]+$" $backend.host) | default (ternary "80" "443" (eq $backend.scheme "http")) }}
+# Scan Job pods take no ingress, and reach out only to DNS, to port 443 and to
+# a cloud identity's credential endpoint. Port 443 has no destination limit:
+# the registries a scan reads from can be any host, inside the cluster or out.
+# Trivy runs with --skip-db-update, --skip-java-db-update, --skip-version-check
+# and --disable-telemetry, so it calls nothing else.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "kubeadapt.name" . }}-secureops-scan
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: secureops-scanner
+spec:
+  # Labels the agent puts on every scan Job pod.
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: secureops-scan
+      kubeadapt.io/kind: secureops.scan
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    # DNS, wherever the cluster resolves: CoreDNS pods, a NodeLocal DNSCache on
+    # the node, or OpenShift's DNS pods on 5353. A pod selector would match
+    # only the first.
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+        - port: 5353
+          protocol: UDP
+        - port: 5353
+          protocol: TCP
+    # Image registries and the Kubeadapt ingestion endpoint.
+    - ports:
+        - port: 443
+          protocol: TCP
+    {{- if ne $backendPort "443" }}
+    # The Kubeadapt ingestion endpoint, agent.config.backendUrl.
+    - ports:
+        - port: {{ int $backendPort }}
+          protocol: TCP
+    {{- end }}
+    # The EKS Pod Identity Agent on the node, which hands a pod only its own
+    # association's credentials. Unused outside EKS.
+    - to:
+        - ipBlock:
+            cidr: 169.254.170.23/32
+        - ipBlock:
+            cidr: fd00:ec2::23/128
+      ports:
+        - port: 80
+          protocol: TCP
+    {{- if $id.gcp.serviceAccount }}
+    # The GKE metadata server, for GKE Workload Identity.
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+      ports:
+        - port: 80
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.252/32
+      ports:
+        - port: 988
+          protocol: TCP
+    {{- end }}
+    {{- with $np.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
+{{- end }}

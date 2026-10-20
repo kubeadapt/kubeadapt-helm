@@ -11,6 +11,7 @@ metadata:
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+{{- include "kubeadapt.imagePullSecrets" . }}
 {{- end }}
 ---
 {{- if .Values.agent.rbac.create }}

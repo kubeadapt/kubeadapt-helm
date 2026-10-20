@@ -7,6 +7,8 @@
 - It creates the scanner service account `<name>-secureops-scanner`, with no Kubernetes API token. `secureops.scanner.cloudIdentity` adds an IRSA role ARN, a GKE Workload Identity service account or an AKS Workload Identity client ID, for private registries that nodes reach with their own cloud identity. EKS Pod Identity is configured in EKS, not in the chart.
 - It creates `<name>-secureops-scan`, a PriorityClass at -10 with `preemptionPolicy: Never`. Set `secureops.priorityClass.create=false` and `secureops.priorityClass.name` to use an existing class.
 - `secureops.scanner` sets the scan Job: image pinned by digest, 200m CPU / 256Mi requested, 768Mi limit, a 4Gi scratch volume, 2 Jobs at once (1 to 8), a 15 minute deadline, tolerations and nodeSelector.
+- It creates `<name>-secureops-scan`, a NetworkPolicy on scan Job pods: no ingress; egress only to DNS (53 and 5353), port 443 on any host, the port of `agent.config.backendUrl` when it is not 443, the EKS Pod Identity Agent, and the GKE metadata server with GKE Workload Identity. `secureops.scanner.networkPolicy.extraEgress` adds rules; `secureops.scanner.networkPolicy.enabled=false` turns it off for network plugins that do not enforce NetworkPolicies.
+- `global.imagePullSecrets` adds pull secrets for Kubeadapt's own images to the agent's service account and the scanner's.
 - With `agent.autoUpgrade.enabled`, the upgrader holds the same cluster-wide rules, because Kubernetes only lets it update the agent's SecureOps binding if it holds them, and manages the PriorityClass by name.
 
 ## 1.0.8

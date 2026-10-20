@@ -122,7 +122,7 @@ SecureOps is off by default. Setting `secureops.enabled=true` in the `kubeadapt`
 - **`list` on Gateways and HTTPRoutes (Gateway API), cluster-wide**, read during a scan. The agent already lists Ingresses and NetworkPolicies without SecureOps.
 - **`create` and `delete` on Secrets in the release namespace**, for the copy of a pull secret that one scan Job uses. The Job owns the copy, so Kubernetes deletes the copy with the Job.
 
-Scan Jobs run in the release namespace under the Job permissions the agent already has (`get`, `list`, `watch`, `create`, `delete`). They run as the `kubeadapt-secureops-scanner` service account, which has no Kubernetes API token and no role bindings, and with a PriorityClass below the default that never preempts other pods.
+Scan Jobs run in the release namespace under the Job permissions the agent already has (`get`, `list`, `watch`, `create`, `delete`). They run as the `kubeadapt-secureops-scanner` service account, which has no Kubernetes API token and no role bindings, and with a PriorityClass below the default that never preempts other pods. A NetworkPolicy on scan Job pods allows no inbound traffic, and outbound only DNS, port 443 and the cloud identity credential endpoints; `secureops.scanner.networkPolicy` adds rules or turns it off.
 
 With auto-upgrade enabled, the upgrader's service account holds the same cluster-wide rules, because Kubernetes lets it update the agent's role binding only if it holds them itself. It may also create PriorityClasses, and update or delete the SecureOps one.
 

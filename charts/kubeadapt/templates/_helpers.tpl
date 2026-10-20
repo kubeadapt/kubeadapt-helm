@@ -68,6 +68,18 @@ Behaviour:
 {{- end }}
 
 {{/*
+imagePullSecrets for a ServiceAccount, from global.imagePullSecrets. Pods
+created without pull secrets of their own get these from their service
+account.
+*/}}
+{{- define "kubeadapt.imagePullSecrets" -}}
+{{- with .Values.global.imagePullSecrets }}
+imagePullSecrets:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/*
 The Secret holding the agent token, key "token": agent.config.existingSecret
 when set, else the chart's own <name>-agent.
 */}}

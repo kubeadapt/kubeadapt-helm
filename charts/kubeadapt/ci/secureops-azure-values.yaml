@@ -1,5 +1,8 @@
 # CI: SecureOps opt-in, scanner with AKS Workload Identity, a named PriorityClass
-# and scan Job scheduling
+# and scan Job scheduling, a pull secret and an extra egress rule
+global:
+  imagePullSecrets:
+    - name: registry-credentials
 agent:
   config:
     token: "ci-test-key-123"
@@ -18,5 +21,13 @@ secureops:
     cloudIdentity:
       azure:
         clientId: "00000000-1111-2222-3333-444444444444"
+    networkPolicy:
+      extraEgress:
+        - to:
+            - ipBlock:
+                cidr: 10.20.0.0/16
+          ports:
+            - port: 5000
+              protocol: TCP
   priorityClass:
     name: "kubeadapt-ci-scan"

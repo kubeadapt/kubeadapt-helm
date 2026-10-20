@@ -56,6 +56,7 @@ Scan Jobs run in the release namespace with the Job permissions the agent alread
 
 - the `kubeadapt-secureops-scanner` service account that scan Jobs run as. It has no Kubernetes API token and no permissions.
 - the `kubeadapt-secureops-scan` PriorityClass (value -10, `preemptionPolicy: Never`), so your workloads schedule first and a scan never preempts them. Set `secureops.priorityClass.create=false` and `secureops.priorityClass.name` to use an existing class.
+- the `kubeadapt-secureops-scan` NetworkPolicy on scan Job pods. They take no inbound traffic, and reach out only to DNS (ports 53 and 5353), to port 443 on any host (image registries can be anywhere, and the Kubeadapt ingestion endpoint is on 443), to the port of `agent.config.backendUrl` when it is not 443, to the EKS Pod Identity Agent, and to the GKE metadata server when `secureops.scanner.cloudIdentity.gcp.serviceAccount` is set. Add rules for a registry on another port with `secureops.scanner.networkPolicy.extraEgress`, or set `secureops.scanner.networkPolicy.enabled=false` if your network plugin does not enforce NetworkPolicies.
 
 With `agent.autoUpgrade.enabled`, the upgrader also holds the cluster-wide rules above, because Kubernetes lets it update the agent's binding only if it holds them. It may also create PriorityClasses, and update or delete the SecureOps one.
 
@@ -68,9 +69,11 @@ With `agent.autoUpgrade.enabled`, the upgrader also holds the cluster-wide rules
 | Google GKE, Workload Identity | `secureops.scanner.cloudIdentity.gcp.serviceAccount` | `roles/artifactregistry.reader` |
 | Azure AKS, Workload Identity | `secureops.scanner.cloudIdentity.azure.clientId` (scan pods also get the `azure.workload.identity/use: "true"` label) | `AcrPull` |
 
+If your cluster pulls Kubeadapt's own images through a pull secret, list it in `global.imagePullSecrets`. The agent and scanner service accounts both get it.
+
 **Scan Jobs.** `secureops.scanner` sets their resources (200m CPU and 256Mi requested, 768Mi limit), scratch volume (`scratchSizeLimit`, 4Gi), how many run at once (`concurrency`, 2, at most 8), the deadline per Job (`jobDeadline`, 15m), `tolerations` and `nodeSelector`. The scanner image is pinned by digest.
 
-To revoke, set `secureops.enabled=false` the same way. The chart removes the roles, bindings, service account and PriorityClass.
+To revoke, set `secureops.enabled=false` the same way. The chart removes the roles, bindings, service account, PriorityClass and NetworkPolicy.
 
 ## Uninstalling the Chart
 
@@ -161,6 +164,7 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | agent.tolerations | list | `[]` |  |
 | agent.topologySpreadConstraints | list | `[]` |  |
 | global.fullnameOverride | string | `""` |  |
+| global.imagePullSecrets | list | `[]` |  |
 | global.name | string | `"kubeadapt"` |  |
 | global.nameOverride | string | `""` |  |
 | kubeadapt-k8s-pulse.affinity | object | `{}` |  |
@@ -178,6 +182,8 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | secureops.scanner.image.digest | string | `"sha256:0000000000000000000000000000000000000000000000000000000000000000"` |  |
 | secureops.scanner.image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-scanner"` |  |
 | secureops.scanner.jobDeadline | string | `"15m"` |  |
+| secureops.scanner.networkPolicy.enabled | bool | `true` |  |
+| secureops.scanner.networkPolicy.extraEgress | list | `[]` |  |
 | secureops.scanner.nodeSelector | object | `{}` |  |
 | secureops.scanner.resources.limits.memory | string | `"768Mi"` |  |
 | secureops.scanner.resources.requests.cpu | string | `"200m"` |  |

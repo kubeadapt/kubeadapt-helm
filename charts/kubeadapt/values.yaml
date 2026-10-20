@@ -3,6 +3,13 @@ global:
   name: "kubeadapt"
   nameOverride: ""
   fullnameOverride: ""
+  # Pull secrets in the release namespace for Kubeadapt's own images, for
+  # clusters that pull them through a mirror or private registry. Added to the
+  # agent's service account and, with SecureOps, the scanner's.
+  # Example:
+  #   imagePullSecrets:
+  #     - name: registry-credentials
+  imagePullSecrets: []
 
 agent:
   enabled: true
@@ -360,6 +367,25 @@ secureops:
     # Scheduling for scan Job pods.
     tolerations: []
     nodeSelector: {}
+
+    # A NetworkPolicy, <name>-secureops-scan, on scan Job pods: no ingress, and
+    # egress only to DNS, to port 443/TCP and to a cloud identity's credential
+    # endpoint. Port 443 is open to any destination, because the registries a
+    # scan reads from can be any host; the Kubeadapt ingestion endpoint is on
+    # it too. Set enabled false if your network plugin does not enforce
+    # NetworkPolicies, or to manage your own.
+    networkPolicy:
+      enabled: true
+      # More egress rules for scan Job pods, as NetworkPolicy egress rules, for
+      # a registry that is not on port 443. Example:
+      #   extraEgress:
+      #     - to:
+      #         - ipBlock:
+      #             cidr: 10.20.0.0/16
+      #       ports:
+      #         - port: 5000
+      #           protocol: TCP
+      extraEgress: []
 
     # Lets the scanner pull private images where nodes pull with their own
     # cloud identity and no pull secret exists. Set the one for your cloud.
