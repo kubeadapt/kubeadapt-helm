@@ -48,6 +48,8 @@ helm install kubeadapt kubeadapt/kubeadapt \
   --set agent.config.existingSecret=kubeadapt-agent-token
 ```
 
+The agent never writes the token Secret, so External Secrets Operator, Sealed Secrets or a GitOps sync can own it. When the agent replaces its token, it stores the new one in `kubeadapt-agent-rotated-token`, a Secret the chart creates empty. The agent has `get` and `update` on that one Secret, by name, through the `kubeadapt-agent-token` Role. Upgrades and auto-upgrades keep what the agent wrote there; `helm uninstall` deletes it.
+
 **Quick try:**
 
 ```bash
@@ -70,19 +72,62 @@ helm install kubeadapt kubeadapt/kubeadapt \
   --set agent.podSecurityContext.fsGroup=null
 ```
 
+## SecureOps (optional)
+
+SecureOps scans the images your cluster runs and reviews its security configuration. It needs permissions the agent does not have by default, so you grant them with one value, `secureops.enabled`, which is off by default:
+
+```bash
+helm upgrade kubeadapt kubeadapt/kubeadapt -n kubeadapt --reuse-values --set secureops.enabled=true
+```
+
+If the release was installed from an earlier chart version, use `--reset-then-reuse-values` (Helm 3.14+) instead of `--reuse-values`. `--reuse-values` keeps the earlier version's defaults, including its agent image. The chart detects this and stops with an error that says so, rather than grant permissions to an agent too old to use them.
+
+Turning it on gives the agent's service account exactly this, in a ClusterRole and a Role named `kubeadapt-agent-secureops`:
+
+| Permission | Where | Used for |
+|---|---|---|
+| `get` on Secrets | Whole cluster | Reading the image pull secrets your workloads reference, by name. No `list` or `watch`, so the agent cannot enumerate Secrets outside its own namespace. |
+| `list` on Roles, ClusterRoles, RoleBindings, ClusterRoleBindings | Whole cluster | Reviewing who can do what, during a scan. |
+| `list` on Gateways and HTTPRoutes (Gateway API) | Whole cluster | Finding workloads exposed outside the cluster, during a scan. The agent already lists Ingresses and NetworkPolicies. |
+| `create` and `delete` on Secrets | The release namespace (`kubeadapt`) | A copy of a pull secret for one scan Job. The Job owns the copy, so Kubernetes deletes it with the Job. |
+
+Scan Jobs run in the release namespace with the Job permissions the agent already has. The chart also creates:
+
+- the `kubeadapt-secureops-scanner` service account that scan Jobs run as. It has no Kubernetes API token and no permissions.
+- the `kubeadapt-secureops-scan` PriorityClass (value -10, `preemptionPolicy: Never`), so your workloads schedule first and a scan never preempts them. Set `secureops.priorityClass.create=false` and `secureops.priorityClass.name` to use an existing class.
+- the `kubeadapt-secureops-scan` NetworkPolicy on scan Job pods. They take no inbound traffic, and reach out only to DNS (ports 53 and 5353), to port 443 on any host (image registries can be anywhere, and the Kubeadapt ingestion endpoint is on 443), to the port of `agent.config.backendUrl` when it is not 443, to the EKS Pod Identity Agent, and to the GKE metadata server when `secureops.scanner.cloudIdentity.gcp.serviceAccount` is set. Add rules for a registry on another port with `secureops.scanner.networkPolicy.extraEgress`, or set `secureops.scanner.networkPolicy.enabled=false` if your network plugin does not enforce NetworkPolicies.
+
+With `agent.autoUpgrade.enabled`, the upgrader also holds the cluster-wide rules above, because Kubernetes lets it update the agent's binding only if it holds them. It may also create PriorityClasses, and update or delete the SecureOps one.
+
+**Private registries.** The scanner first uses the pull secret a workload references. Where nodes pull with their own cloud identity and no pull secret exists, give the scanner service account an identity of its own:
+
+| Cloud | Value | What the identity needs |
+|---|---|---|
+| Amazon EKS, IAM roles for service accounts | `secureops.scanner.cloudIdentity.aws.roleArn` | `ecr:GetAuthorizationToken`, `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer` |
+| Amazon EKS Pod Identity | none: create a Pod Identity association for `kubeadapt-secureops-scanner` in namespace `kubeadapt` | The same three ECR actions |
+| Google GKE, Workload Identity | `secureops.scanner.cloudIdentity.gcp.serviceAccount` | `roles/artifactregistry.reader` |
+| Azure AKS, Workload Identity | `secureops.scanner.cloudIdentity.azure.clientId` (scan pods also get the `azure.workload.identity/use: "true"` label) | `AcrPull` |
+
+If your cluster pulls Kubeadapt's own images through a pull secret, list it in `global.imagePullSecrets`. The agent and scanner service accounts both get it.
+
+**Scan Jobs.** `secureops.scanner` sets their resources (200m CPU and 256Mi requested, 768Mi limit), scratch volume (`scratchSizeLimit`, 4Gi), how many run at once (`concurrency`, 2, at most 8), the deadline per Job (`jobDeadline`, 15m), `tolerations` and `nodeSelector`. The scanner image is pinned by digest.
+
+To revoke, set `secureops.enabled=false` the same way. The chart removes the roles, bindings, service account, PriorityClass and NetworkPolicy.
+
 ## Uninstalling
 
 ```bash
 helm uninstall kubeadapt --namespace kubeadapt
 ```
 
-This removes the agent Deployment, its Service, ServiceAccounts, the chart-created token Secret, Roles, ClusterRoles and their bindings. It leaves behind:
+This removes the agent Deployment, its Service, ServiceAccounts, the chart-created token Secret, Roles, ClusterRoles, their bindings and the SecureOps PriorityClass. It leaves behind:
 
 - the `kubeadapt` namespace (Helm does not delete namespaces): `kubectl delete namespace kubeadapt`
 - a token Secret you created yourself for `existingSecret`
 - auto-upgrade Jobs that are still running; finished Jobs delete themselves after their TTL
+- with SecureOps on, scan Jobs the agent had not removed yet, with the pull secret copies they own: `kubectl delete jobs -n kubeadapt -l kubeadapt.io/run-id` deletes both
 
-Nothing is installed outside the release namespace except the cluster-scoped RBAC objects listed above.
+Nothing is installed outside the release namespace except the cluster-scoped RBAC objects listed above and, with SecureOps on, its PriorityClass.
 
 Then delete the cluster on the **Clusters** page in Kubeadapt, so its token stops working and it no longer shows as disconnected.
 

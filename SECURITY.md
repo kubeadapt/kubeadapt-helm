@@ -113,6 +113,21 @@ When using Kubeadapt Helm charts, we recommend following these security best pra
 4. Follow the principle of least privilege when configuring RBAC
 5. Keep your Helm and Kubernetes versions up to date
 
+## SecureOps Opt-in: What It Grants
+
+SecureOps is off by default. Setting `secureops.enabled=true` in the `kubeadapt` chart grants the agent's service account these permissions, and nothing else, in a ClusterRole and a Role named `kubeadapt-agent-secureops`:
+
+- **`get` on Secrets, cluster-wide.** Used only to read the image pull secrets that your workloads reference, one at a time by name. The agent has no `list` or `watch` on Secrets outside its own namespace, so it cannot enumerate them there.
+- **`list` on Roles, ClusterRoles, RoleBindings and ClusterRoleBindings, cluster-wide**, read during a scan.
+- **`list` on Gateways and HTTPRoutes (Gateway API), cluster-wide**, read during a scan. The agent already lists Ingresses and NetworkPolicies without SecureOps.
+- **`create` and `delete` on Secrets in the release namespace**, for the copy of a pull secret that one scan Job uses. The Job owns the copy, so Kubernetes deletes the copy with the Job.
+
+Scan Jobs run in the release namespace under the Job permissions the agent already has (`get`, `list`, `watch`, `create`, `delete`). They run as the `kubeadapt-secureops-scanner` service account, which has no Kubernetes API token and no role bindings, and with a PriorityClass below the default that never preempts other pods. A NetworkPolicy on scan Job pods allows no inbound traffic, and outbound only DNS, port 443 and the cloud identity credential endpoints; `secureops.scanner.networkPolicy` adds rules or turns it off.
+
+With auto-upgrade enabled, the upgrader's service account holds the same cluster-wide rules, because Kubernetes lets it update the agent's role binding only if it holds them itself. It may also create PriorityClasses, and update or delete the SecureOps one.
+
+Setting `secureops.enabled=false` removes all of it. See the [chart README](charts/kubeadapt/README.md#secureops-optional) for the cloud identity options used to reach private registries.
+
 ## Security Measures
 
 Our security measures include:

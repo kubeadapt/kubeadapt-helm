@@ -3,6 +3,13 @@ global:
   name: "kubeadapt"
   nameOverride: ""
   fullnameOverride: ""
+  # Pull secrets in the release namespace for Kubeadapt's own images, for
+  # clusters that pull them through a mirror or private registry. Added to the
+  # agent's service account and, with SecureOps, the scanner's.
+  # Example:
+  #   imagePullSecrets:
+  #     - name: registry-credentials
+  imagePullSecrets: []
 
 agent:
   enabled: true
@@ -126,6 +133,12 @@ agent:
     #   kubectl create secret generic kubeadapt-agent-token \
     #     --namespace kubeadapt --from-literal=token='<your-token>'
     # Example: existingSecret: "kubeadapt-agent-token"
+    #
+    # The agent never writes this Secret, so External Secrets Operator, Sealed
+    # Secrets or a GitOps sync can own it. When the agent replaces its token,
+    # it stores the new one in the chart's <name>-agent-rotated-token Secret
+    # (get and update on that one Secret, through the <name>-agent-token Role).
+    # Upgrades keep what the agent wrote there; helm uninstall deletes it.
     existingSecret: ""
 
     # Backend API endpoint
@@ -294,6 +307,118 @@ agent:
   affinity: {}
 
   topologySpreadConstraints: []
+
+# ============================================================
+# SecureOps (opt-in)
+# ============================================================
+# A permission you grant, off by default. While it is false the chart renders
+# exactly what it renders without SecureOps. To grant it:
+#
+#   helm upgrade kubeadapt kubeadapt/kubeadapt -n kubeadapt --reuse-values \
+#     --set secureops.enabled=true
+#
+# If the release was installed from an earlier chart version, use
+# --reset-then-reuse-values instead of --reuse-values: --reuse-values keeps the
+# earlier version's defaults, including its agent image.
+#
+# Granting it gives the agent's service account:
+#   - get on Secrets in every namespace, used only to read the image pull
+#     secrets your workloads reference. Get only, no list or watch: the agent
+#     reads a pull secret by its name and cannot enumerate Secrets outside
+#     this namespace.
+#   - list in every namespace on Roles, ClusterRoles, RoleBindings,
+#     ClusterRoleBindings, Gateways and HTTPRoutes, read during a scan. The agent
+#     already lists NetworkPolicies and Ingresses.
+#   - create and delete on Secrets in this namespace, for the copy of a pull
+#     secret one scan Job uses. The Job owns the copy, so it is deleted with it.
+# Scan Jobs run in this namespace under the agent's existing Job permissions.
+#
+# It also creates the scanner service account and a low PriorityClass. With
+# agent.autoUpgrade.enabled, the upgrader holds the same cluster-wide rules,
+# because Kubernetes lets it update the agent's binding only if it holds them
+# itself. It may also create PriorityClasses, and update or delete this one.
+secureops:
+  enabled: false
+
+  scanner:
+    image:
+      # The agent runs this image by digest and accepts no other.
+      repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-scanner
+      # TODO(release): set to the digest of the published scanner image.
+      digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        memory: 768Mi
+
+    # Size limit of the scan Job's scratch emptyDir. An image that does not fit
+    # is reported as too large to scan.
+    scratchSizeLimit: 4Gi
+
+    # Scan Jobs the agent runs at once, 1 to 8.
+    concurrency: 2
+
+    # A scan Job still running after this long is stopped (Go duration).
+    jobDeadline: "15m"
+
+    # Scheduling for scan Job pods.
+    tolerations: []
+    nodeSelector: {}
+
+    # A NetworkPolicy, <name>-secureops-scan, on scan Job pods: no ingress, and
+    # egress only to DNS, to port 443/TCP and to a cloud identity's credential
+    # endpoint. Port 443 is open to any destination, because the registries a
+    # scan reads from can be any host; the Kubeadapt ingestion endpoint is on
+    # it too. Set enabled false if your network plugin does not enforce
+    # NetworkPolicies, or to manage your own.
+    networkPolicy:
+      enabled: true
+      # More egress rules for scan Job pods, as NetworkPolicy egress rules, for
+      # a registry that is not on port 443. Example:
+      #   extraEgress:
+      #     - to:
+      #         - ipBlock:
+      #             cidr: 10.20.0.0/16
+      #       ports:
+      #         - port: 5000
+      #           protocol: TCP
+      extraEgress: []
+
+    # Lets the scanner pull private images where nodes pull with their own
+    # cloud identity and no pull secret exists. Set the one for your cloud.
+    # The scanner service account is <name>-secureops-scanner (kubeadapt-
+    # secureops-scanner by default) in this namespace.
+    cloudIdentity:
+      aws:
+        # IAM roles for service accounts (IRSA): the role ARN, set as the
+        # eks.amazonaws.com/role-arn annotation. The role needs
+        # ecr:GetAuthorizationToken, ecr:BatchGetImage and
+        # ecr:GetDownloadUrlForLayer.
+        # EKS Pod Identity needs nothing here: create a Pod Identity
+        # association for the scanner service account in EKS instead.
+        roleArn: ""
+      gcp:
+        # GKE Workload Identity: the Google service account email, set as the
+        # iam.gke.io/gcp-service-account annotation. It needs read access to
+        # your Artifact Registry repositories (roles/artifactregistry.reader).
+        serviceAccount: ""
+      azure:
+        # AKS Workload Identity: the managed identity's client ID, set as the
+        # azure.workload.identity/client-id annotation. Scan pods then carry
+        # the azure.workload.identity/use: "true" label. The identity needs
+        # AcrPull on your registries.
+        clientId: ""
+
+  priorityClass:
+    # Create a PriorityClass for scan Jobs: value -10, below the default 0, and
+    # preemptionPolicy Never. Set false to use an existing class named in
+    # name, or none when name is empty.
+    create: true
+    # With create, overrides the default name <name>-secureops-scan.
+    name: ""
 
 # ============================================================
 # eBPF Agent Configuration (Network Cost Tracking)

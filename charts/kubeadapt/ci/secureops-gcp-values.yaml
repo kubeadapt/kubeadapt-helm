@@ -1,0 +1,13 @@
+# CI: SecureOps opt-in, scanner with GKE Workload Identity, no PriorityClass
+agent:
+  config:
+    token: "ci-test-key-123"
+    backendUrl: ""
+secureops:
+  enabled: true
+  scanner:
+    cloudIdentity:
+      gcp:
+        serviceAccount: "kubeadapt-scanner@ci-project.iam.gserviceaccount.com"
+  priorityClass:
+    create: false

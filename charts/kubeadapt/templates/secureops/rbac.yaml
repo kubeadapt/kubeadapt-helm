@@ -1,0 +1,86 @@
+{{- if and (include "kubeadapt.secureops.enabled" .) .Values.agent.rbac.create }}
+# What the SecureOps opt-in (secureops.enabled) adds to the agent's service
+# account. Turning the opt-in off removes these four objects.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubeadapt.secureops.rbacName" . }}{{ include "kubeadapt.clusterResourceSuffix" . }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+rules:
+  # The image pull secrets that workloads reference, read one by one by name.
+  # No list or watch, so the agent cannot enumerate Secrets outside its own
+  # namespace.
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["get"]
+
+  # Listed during a scan, not watched. NetworkPolicies and Ingresses are
+  # already listed under the agent's base ClusterRole.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - roles
+      - clusterroles
+      - rolebindings
+      - clusterrolebindings
+    verbs: ["list"]
+
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources:
+      - gateways
+      - httproutes
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "kubeadapt.secureops.rbacName" . }}{{ include "kubeadapt.clusterResourceSuffix" . }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "kubeadapt.secureops.rbacName" . }}{{ include "kubeadapt.clusterResourceSuffix" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kubeadapt.name" . }}-agent
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "kubeadapt.secureops.rbacName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+rules:
+  # The copy of a workload's pull secret that one scan Job uses. The copy is
+  # owned by the Job, so Kubernetes deletes it with the Job. The scan Jobs
+  # themselves, including the dry-run create, use the jobs verbs the agent's
+  # base Role already has (get, list, watch, create, delete).
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "kubeadapt.secureops.rbacName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "kubeadapt.secureops.rbacName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kubeadapt.name" . }}-agent
+    namespace: {{ .Release.Namespace }}
+{{- end }}

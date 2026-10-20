@@ -107,6 +107,9 @@ rules:
     resourceNames:
       - "{{ include "kubeadapt.name" . }}-agent{{ include "kubeadapt.clusterResourceSuffix" . }}"
       - "{{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}"
+      {{- if include "kubeadapt.secureops.enabled" . }}
+      - "{{ include "kubeadapt.secureops.rbacName" . }}{{ include "kubeadapt.clusterResourceSuffix" . }}"
+      {{- end }}
     verbs: ["get", "list", "update", "patch", "delete", "escalate"]
   # Separate rule for create (resourceNames constraint not supported)
   - apiGroups: ["rbac.authorization.k8s.io"]
@@ -174,6 +177,39 @@ rules:
       - nodepools
       - nodeclaims
     verbs: ["list", "watch"]
+  {{- if include "kubeadapt.secureops.enabled" . }}
+  # SecureOps opt-in (secureops.enabled). The upgrader holds the rules of the
+  # agent's SecureOps ClusterRole so it may update that ClusterRoleBinding.
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["get"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - roles
+      - clusterroles
+      - rolebindings
+      - clusterrolebindings
+    verbs: ["list"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources:
+      - gateways
+      - httproutes
+    verbs: ["list"]
+  {{- if .Values.secureops.priorityClass.create }}
+  # The scan Jobs' PriorityClass. Create cannot be limited by name.
+  - apiGroups: ["scheduling.k8s.io"]
+    resources:
+      - priorityclasses
+    resourceNames:
+      - "{{ include "kubeadapt.secureops.priorityClassName" . }}"
+    verbs: ["get", "update", "patch", "delete"]
+  - apiGroups: ["scheduling.k8s.io"]
+    resources:
+      - priorityclasses
+    verbs: ["create"]
+  {{- end }}
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

@@ -72,8 +72,18 @@ spec:
             - name: KUBEADAPT_AGENT_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.agent.config.existingSecret | default (printf "%s-agent" (include "kubeadapt.name" .)) }}
+                  name: {{ include "kubeadapt.agentTokenSecretName" . }}
                   key: token
+            # The same token as a file, and the token the agent rotated to, if
+            # any. Mounted Secrets are updated in place, so a re-read sees a
+            # new token; the environment above is fixed at container start.
+            - name: KUBEADAPT_AGENT_TOKEN_FILE
+              value: /var/run/secrets/kubeadapt/token/token
+            - name: KUBEADAPT_ROTATED_TOKEN_FILE
+              value: /var/run/secrets/kubeadapt/rotated-token/token
+            # The Secret the agent writes a rotated token into, key "token".
+            - name: KUBEADAPT_ROTATED_TOKEN_SECRET_NAME
+              value: {{ include "kubeadapt.agentRotatedTokenSecretName" . | quote }}
 
             # Collection Settings
             - name: KUBEADAPT_SNAPSHOT_INTERVAL
@@ -140,6 +150,11 @@ spec:
             - name: KUBEADAPT_SPOOL_MAX_BYTES
               value: {{ .Values.agent.spool.maxBytes | quote }}
             {{- end }}
+            {{- if include "kubeadapt.secureops.enabled" . }}
+
+            # SecureOps opt-in (secureops.enabled): the scan Job the agent builds
+            {{- include "kubeadapt.secureops.env" . | nindent 12 }}
+            {{- end }}
 
             {{- if .Values.agent.env }}
             # Additional custom environment variables
@@ -150,6 +165,12 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: agent-token
+              mountPath: /var/run/secrets/kubeadapt/token
+              readOnly: true
+            - name: rotated-token
+              mountPath: /var/run/secrets/kubeadapt/rotated-token
+              readOnly: true
             {{- if .Values.agent.spool.enabled }}
             - name: spool
               mountPath: {{ required "agent.spool.mountPath must be set" .Values.agent.spool.mountPath | quote }}
@@ -185,8 +206,13 @@ spec:
             - name: KUBEADAPT_AGENT_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.agent.config.existingSecret | default (printf "%s-agent" (include "kubeadapt.name" .)) }}
+                  name: {{ include "kubeadapt.agentTokenSecretName" . }}
                   key: token
+            # The token as files, re-readable after a rotation (see the agent).
+            - name: KUBEADAPT_AGENT_TOKEN_FILE
+              value: /var/run/secrets/kubeadapt/token/token
+            - name: KUBEADAPT_ROTATED_TOKEN_FILE
+              value: /var/run/secrets/kubeadapt/rotated-token/token
 
             # Pod identity (Downward API)
             - name: POD_NAME
@@ -227,6 +253,13 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.agent.autoUpgrade.resources | nindent 12 }}
+          volumeMounts:
+            - name: agent-token
+              mountPath: /var/run/secrets/kubeadapt/token
+              readOnly: true
+            - name: rotated-token
+              mountPath: /var/run/secrets/kubeadapt/rotated-token
+              readOnly: true
       {{- end }}
       {{- if .Values.agent.spool.enabled }}
       # Room for the agent to drain its spool on SIGTERM before it exits, so a
@@ -238,6 +271,19 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: {{ .Values.agent.tmpVolume.sizeLimit | quote }}
+        # The agent token as files. Unlike the environment, a mounted Secret is
+        # updated in place when the Secret changes.
+        - name: agent-token
+          secret:
+            secretName: {{ include "kubeadapt.agentTokenSecretName" . }}
+            items:
+              - key: token
+                path: token
+        # Empty until the agent first rotates its token.
+        - name: rotated-token
+          secret:
+            secretName: {{ include "kubeadapt.agentRotatedTokenSecretName" . }}
+            optional: true
         {{- if .Values.agent.spool.enabled }}
         # emptyDir, never a PersistentVolume: the spool has to survive a
         # container restart and an ingestion outage, not a pod replacement.
