@@ -14,16 +14,24 @@ serviceAccount:
   annotations: {}
   name: ""
 
+# Read-only Kubernetes API access for the ServiceAccount above, through a
+# ClusterRole and ClusterRoleBinding:
+#   - pods list and watch: pod identity for each node's traffic
+#   - nodes get: the node's own UID and zone
+#   - ciliumenvoyconfigs (cilium.io) list: detecting an in-cluster Envoy proxy on Cilium
+# Without them the DaemonSet keeps running, and traffic is reported without
+# pod and node identity.
+rbac:
+  create: true
+
 # ============================================================
 # eBPF Agent Configuration
 # ============================================================
 config:
-  # Metrics server port for Prometheus scraping
-  # Exposes: /metrics, /health/live, /health/ready
+  # Port of the metrics and health server: /metrics, /health/live and
+  # /health/ready. The pod uses the node's network, so the server listens on
+  # this port on every node address, without authentication.
   metricsPort: 9090
-
-  # Collection interval for BPF map reads, leave it as is, unless you have specific needs
-  collectionInterval: "25s"
 
   # Log level for agent
   # Options: "debug", "info", "warn", "error"
@@ -33,25 +41,77 @@ config:
   # Options: "json" (production), "console" (development)
   logFormat: "json"
 
-  # Enable connection tracking (read-then-delete pattern with overflow ringbuffer)
+  # Read the overflow ring buffer, which carries the flows the kernel flow
+  # table had no room for. Turning it off drops those flows.
   connectionTracking: true
+
+  # ============================================================
+  # Export to the Kubeadapt agent
+  # ============================================================
+  # Sends each node's traffic records, one batch a minute, to the agent's
+  # in-cluster listener, presenting a bearer token the agent checks. Without
+  # export the DaemonSet only serves its Prometheus metrics. The kubeadapt
+  # chart turns this on and supplies the endpoint and the token.
+  export:
+    enabled: false
+    # The agent listener as host:port. Empty: the <name>-agent-pulse Service
+    # of the kubeadapt chart in this release's namespace, on port
+    # global.pulse.listenPort (default 9091).
+    agentEndpoint: ""
+    # Secret holding the token under the key "token". Empty:
+    # global.pulse.existingSecret, or else the <name>-pulse-token Secret the
+    # kubeadapt chart creates. The token is mounted as a file and read again
+    # on every send, so a changed Secret takes effect without a restart.
+    tokenSecret: ""
 
   # ============================================================
   # Debug Options (use with caution in production)
   # ============================================================
-  # Enable pprof profiling endpoints
+  # Go pprof endpoints, served on 127.0.0.1 only: reach them with
+  # kubectl port-forward to the pod.
   enableProfiling: false
   profilingPort: 6060
 
-  # Dump BPF maps before deletion (synchronized with collection cycle)
-  # WARNING: High I/O, only enable for troubleshooting
-  dumpBPFMaps: false
+# ============================================================
+# Privileges
+# ============================================================
+# The container runs as root in its own PID namespace with every Linux
+# capability dropped except the ones below, no privilege escalation and a
+# read-only root filesystem. It shares the node's network namespace and mounts
+# the node paths it reads (see templates/daemonset.yaml).
+#
+# Platforms where the reduced set is not enough (an SELinux or AppArmor policy
+# that denies the BPF operations, for example) can return to a fully
+# privileged container with privileged: true.
+privileged: false
 
-# Resource limits for eBPF agent
-# Note: eBPF agents are lightweight but require sufficient memory for BPF maps
+# Capabilities added to the container when privileged is false.
+capabilities:
+  # Create BPF maps and load the BPF programs.
+  - BPF
+  # Required by the kernel verifier to accept the programs.
+  - PERFMON
+  # Attach to pod network interfaces, follow interface changes, read conntrack.
+  - NET_ADMIN
+  # Raise the locked-memory limit for BPF maps. Needed only on kernels older
+  # than 5.11; on 5.11 and newer it can be removed.
+  - SYS_RESOURCE
+  # Read other containers' executables for the runtime inventory. Can be
+  # removed when the inventory is turned off (EBPF_FINGERPRINT_ENABLED=false
+  # in env); without it the inventory lists no containers.
+  - SYS_PTRACE
+
+# Seccomp profile of the container. Unset uses the kubelet's default. Set
+# {type: RuntimeDefault} where the container runtime's default profile allows
+# the bpf and perf_event_open system calls to a container holding CAP_BPF and
+# CAP_PERFMON; otherwise the programs fail to load.
+seccompProfile: {}
+
+# Resource requests and limits. Pulse sizes its kernel maps and its Go memory
+# limit from the memory limit, so a larger limit lets a busy node hold more
+# flows; always set one.
 resources:
   requests:
-    # 129-155Mi measured across 3 pods (up to 121% of the old 128Mi request).
     cpu: 100m
     memory: 256Mi
   limits:
@@ -61,8 +121,11 @@ resources:
 # ============================================================
 # Scheduling Configuration
 # ============================================================
-# Default tolerations to run on all nodes including masters
-tolerations: []
+# A node without pulse has no traffic measured at all. The default tolerates
+# every taint so that control-plane, GPU, spot and other dedicated nodes are
+# covered too. Replace the list to narrow it.
+tolerations:
+  - operator: Exists
 
 nodeSelector: {}
 
@@ -70,23 +133,28 @@ affinity: {}
 
 topologySpreadConstraints: []
 
+# system-node-critical keeps pulse from being evicted ahead of workloads and
+# lets it be scheduled on a full node. While it is a system-* class, the chart
+# also creates a ResourceQuota that admits this class in the release namespace,
+# which some clusters (GKE, for example) require outside kube-system.
+priorityClassName: system-node-critical
+
+# Time pulse gets after SIGTERM to detach from the node and deliver its last
+# batch. Its shutdown sequence is bounded at about 26 seconds; keep this above it.
+terminationGracePeriodSeconds: 45
+
+# The pod shares the node's network, where the node's resolver cannot look up
+# cluster Service names such as the agent endpoint. ClusterFirstWithHostNet
+# sends those lookups to the cluster DNS.
+dnsPolicy: ClusterFirstWithHostNet
+
 # Additional environment variables
 env:
-  # Retry-buffer capacity, in sub-batches; pulse's built-in default is 60.
-  #
-  # Chart-side plumbing. No released pulse image reads this variable yet, so
-  # setting it here is inert until a release that reads EBPF_RETRY_BUFFER_SIZE
-  # and retries RESOURCE_EXHAUSTED is pinned in image.tag above; older images
-  # ignore an unknown environment variable.
-  #
-  # From that release on: the agent answers RESOURCE_EXHAUSTED whenever its
-  # intake is full, so agent back-pressure queues in this buffer instead of
-  # being counted as a drop. At the exporter's 60s push cadence a node at the
-  # modelled busy density (~750 flow rows per node per minute, well under the
-  # 10,000-row sub-batch split) emits one sub-batch per window, so 120 buys
-  # roughly two hours of sustained agent refusals per node before drop-oldest
-  # evicts anything; a node busy enough to split a window into several
-  # sub-batches burns that budget proportionally faster. The buffer's 32 MiB
-  # byte backstop still applies and is not reached at these batch sizes.
+  # Batches pulse keeps for a later retry while the agent cannot take them
+  # (unreachable, or full and asking pulse to retry); pulse's own default is
+  # 60. A node sends one batch a minute, or more when a minute holds over
+  # 10,000 flows, so 120 holds about two hours of batches from a node that
+  # sends one a minute before the oldest is dropped. The buffer also has a
+  # byte limit derived from the memory limit, never below 32 MiB.
   - name: EBPF_RETRY_BUFFER_SIZE
     value: "120"

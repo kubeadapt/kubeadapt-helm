@@ -3,6 +3,22 @@ global:
   name: "kubeadapt"
   nameOverride: ""
   fullnameOverride: ""
+  # Shared by the agent and the network monitor (kubeadapt-k8s-pulse). Used
+  # only while kubeadapt-k8s-pulse.enabled is true.
+  pulse:
+    # Port of the agent's in-cluster listener that the network monitor sends
+    # its traffic records to. Served by the <name>-agent-pulse ClusterIP Service.
+    listenPort: 9091
+    # The agent accepts records only from a sender that presents this token.
+    # Empty: the chart creates the Secret <name>-pulse-token with a random
+    # token on first install and keeps the same token on every helm upgrade.
+    # Set this to use your own Secret instead, with the token under the key
+    # "token". Set it as well when a tool renders the chart without cluster
+    # access (helm template, for example), since the chart then cannot read
+    # the existing token and would create a new one on every render.
+    # Both pods mount the token as a file and read it again while running, so
+    # changing the Secret rotates the token without a restart.
+    existingSecret: ""
 
 agent:
   enabled: true
@@ -91,13 +107,11 @@ agent:
   # Network Telemetry Spool
   # ============================================================
   spool:
-    # Write-ahead spool for network telemetry: it is meant to survive container
-    # restarts and ingestion outages, and a pod replacement drains it during the
-    # termination grace period. No PersistentVolume is ever created.
-    #
-    # Chart-side plumbing. The volume and the KUBEADAPT_SPOOL_* variables below
-    # take effect once an agent release that writes to the spool ships; agent
-    # images that predate it ignore them and leave the volume empty.
+    # Write-ahead spool for network telemetry, on an emptyDir. It keeps the
+    # batches the backend has not acknowledged through a container restart and
+    # an ingestion outage; when the pod is replaced, the agent tries to deliver
+    # them within the termination grace period. The agent's restart-surviving
+    # caches share the volume. No PersistentVolume is ever created.
     enabled: true
     # Ceiling the kubelet enforces on the emptyDir itself. Kept above maxBytes
     # so the agent's own bound is what evicts, not a pod eviction.
@@ -296,34 +310,32 @@ agent:
   topologySpreadConstraints: []
 
 # ============================================================
-# eBPF Agent Configuration (Network Cost Tracking)
+# Network Monitor (Network Cost Tracking)
 # ============================================================
-# Deploys a DaemonSet that uses eBPF to track pod-to-pod network traffic
+# Deploys a DaemonSet that measures each pod's network traffic with eBPF and
+# sends it to the agent, which reports it to Kubeadapt as network cost.
+#
+# When enabled, the chart also turns on the agent's listener for it, exposes
+# that listener on the <name>-agent-pulse ClusterIP Service, and gives both
+# sides the same token (see global.pulse).
 #
 # Prerequisites:
-# - Linux kernel >= 5.10 on every node it runs on
-# - Privileged container access (hostNetwork, hostPID) - not available on
-#   GKE Autopilot or EKS Fargate; OpenShift needs the privileged SCC
+# - Linux kernel 5.10 or newer on every node it runs on
+# - The node's network namespace, host paths and the Linux
+#   capabilities BPF, PERFMON, NET_ADMIN, SYS_RESOURCE and SYS_PTRACE, which
+#   GKE Autopilot and EKS Fargate do not allow. The namespace must allow the
+#   privileged Pod Security level; on OpenShift, use the privileged SCC.
 #
-# This chart version does not connect the DaemonSet to the agent, so on its own
-# it reports nothing to Kubeadapt. Leave it disabled unless Kubeadapt support
-# has set up network monitoring for your cluster.
-#
-# For full configuration options, see: charts/kubeadapt-k8s-pulse/values.yaml
+# For all options, see charts/kubeadapt-k8s-pulse/values.yaml.
 kubeadapt-k8s-pulse:
-  # Set to true to deploy the eBPF agent DaemonSet for network cost tracking
+  # Set to true to deploy the network monitor DaemonSet.
   enabled: false
 
-  # Override defaults if needed - see charts/kubeadapt-k8s-pulse/values.yaml for all options
-  # config:
-  #   logLevel: "info"
-  #   collectionInterval: "25s"
+  config:
+    export:
+      # Send traffic records to this release's agent.
+      enabled: true
 
-  # Scheduling - configure as needed for your cluster
-  tolerations: []
-
-  nodeSelector: {}
-
-  affinity: {}
-
-  topologySpreadConstraints: []
+  # Scheduling (tolerations, priorityClassName, nodeSelector, affinity) is set
+  # in charts/kubeadapt-k8s-pulse/values.yaml. By default the DaemonSet runs on
+  # every node, tainted ones included.

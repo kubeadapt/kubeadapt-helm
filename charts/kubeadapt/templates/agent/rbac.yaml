@@ -63,6 +63,12 @@ rules:
       - poddisruptionbudgets
     verbs: ["list", "watch"]
 
+  # Names the addresses behind Services that are not pods, such as the API server.
+  - apiGroups: ["discovery.k8s.io"]
+    resources:
+      - endpointslices
+    verbs: ["list", "watch"]
+
   - apiGroups: ["networking.k8s.io"]
     resources:
       - ingresses
