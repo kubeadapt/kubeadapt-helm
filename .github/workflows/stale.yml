@@ -23,7 +23,11 @@ jobs:
         days-before-close: 7
         # Issues with these labels will never be considered stale
         exempt-issue-labels: "security,pinned,bug"
-        exempt-pr-labels: "security,pinned,dependencies"
+        exempt-pr-labels: "security,pinned,dependencies,in-progress"
+        # PRs are marked stale but never closed by the bot: open chart work
+        # (pulse wiring, RBAC, upgrade gates) was closed while still wanted.
+        days-before-pr-close: -1
+        exempt-draft-pr: true
         # Comment to post when marking an issue as stale
         stale-issue-message: >
           This issue has been automatically marked as stale because it has not had
