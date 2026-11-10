@@ -50,6 +50,35 @@ app.kubernetes.io/component: kubeadapt-k8s-pulse
 {{- end }}
 
 {{/*
+Base name of the kubeadapt chart's objects in this namespace, used for the
+default agent endpoint and token Secret.
+*/}}
+{{- define "kubeadapt-k8s-pulse.parentName" -}}
+{{- $global := .Values.global | default dict -}}
+{{- default "kubeadapt" $global.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+
+{{/*
+Agent listener the traffic records are sent to.
+*/}}
+{{- define "kubeadapt-k8s-pulse.agentEndpoint" -}}
+{{- if .Values.config.export.agentEndpoint -}}
+{{- .Values.config.export.agentEndpoint -}}
+{{- else -}}
+{{- $pulse := (.Values.global | default dict).pulse | default dict -}}
+{{- printf "%s-agent-pulse.%s.svc:%v" (include "kubeadapt-k8s-pulse.parentName" .) .Release.Namespace (default 9091 $pulse.listenPort) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Secret holding the token presented to the agent.
+*/}}
+{{- define "kubeadapt-k8s-pulse.tokenSecretName" -}}
+{{- $pulse := (.Values.global | default dict).pulse | default dict -}}
+{{- coalesce .Values.config.export.tokenSecret $pulse.existingSecret (printf "%s-pulse-token" (include "kubeadapt-k8s-pulse.parentName" .)) -}}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "kubeadapt-k8s-pulse.serviceAccountName" -}}

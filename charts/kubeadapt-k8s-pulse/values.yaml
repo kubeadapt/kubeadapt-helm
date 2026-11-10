@@ -37,6 +37,25 @@ config:
   connectionTracking: true
 
   # ============================================================
+  # Export to the Kubeadapt agent
+  # ============================================================
+  # Sends each node's traffic records, one batch a minute, to the agent's
+  # in-cluster listener, presenting a bearer token the agent checks. Without
+  # export the DaemonSet only serves its Prometheus metrics. The kubeadapt
+  # chart turns this on and supplies the endpoint and the token.
+  export:
+    enabled: false
+    # The agent listener as host:port. Empty: the <name>-agent-pulse Service
+    # of the kubeadapt chart in this release's namespace, on port
+    # global.pulse.listenPort (default 9091).
+    agentEndpoint: ""
+    # Secret holding the token under the key "token". Empty:
+    # global.pulse.existingSecret, or else the <name>-pulse-token Secret the
+    # kubeadapt chart creates. The token is mounted as a file and read again
+    # on every send, so a changed Secret takes effect without a restart.
+    tokenSecret: ""
+
+  # ============================================================
   # Debug Options (use with caution in production)
   # ============================================================
   # Enable pprof profiling endpoints
@@ -69,6 +88,11 @@ nodeSelector: {}
 affinity: {}
 
 topologySpreadConstraints: []
+
+# The pod shares the node's network, where the node's resolver cannot look up
+# cluster Service names such as the agent endpoint. ClusterFirstWithHostNet
+# sends those lookups to the cluster DNS.
+dnsPolicy: ClusterFirstWithHostNet
 
 # Additional environment variables
 env:

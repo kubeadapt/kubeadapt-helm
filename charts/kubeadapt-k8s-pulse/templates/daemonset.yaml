@@ -25,6 +25,7 @@ spec:
       serviceAccountName: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
       # Required for eBPF: access to host network namespace
       hostNetwork: true
+      dnsPolicy: {{ .Values.dnsPolicy }}
       # Required for eBPF: access to host PID namespace for process tracking
       hostPID: true
       containers:
@@ -72,6 +73,16 @@ spec:
               value: {{ .Values.config.collectionInterval | quote }}
             - name: EBPF_CONNECTION_TRACKING
               value: {{ .Values.config.connectionTracking | quote }}
+            {{- if .Values.config.export.enabled }}
+
+            # Export to the Kubeadapt agent
+            - name: EBPF_EXPORT_ENABLED
+              value: "true"
+            - name: EBPF_AGENT_ENDPOINT
+              value: {{ include "kubeadapt-k8s-pulse.agentEndpoint" . | quote }}
+            - name: EBPF_AGENT_AUTH_TOKEN_FILE
+              value: /var/run/secrets/kubeadapt/pulse/token
+            {{- end }}
 
             # Debug options
             {{- if .Values.config.enableProfiling }}
@@ -121,6 +132,11 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.config.export.enabled }}
+            - name: agent-token
+              mountPath: /var/run/secrets/kubeadapt/pulse
+              readOnly: true
+            {{- end }}
 
           livenessProbe:
             httpGet:
@@ -163,6 +179,16 @@ spec:
             type: DirectoryOrCreate
         - name: tmp
           emptyDir: {}
+        {{- if .Values.config.export.enabled }}
+        # Token presented to the agent, mounted as a file so that a changed
+        # Secret is picked up on the next send.
+        - name: agent-token
+          secret:
+            secretName: {{ include "kubeadapt-k8s-pulse.tokenSecretName" . }}
+            items:
+              - key: token
+                path: token
+        {{- end }}
 
       {{- with .Values.nodeSelector }}
       nodeSelector:

@@ -35,6 +35,11 @@ spec:
             - name: health
               containerPort: {{ .Values.agent.config.healthPort }}
               protocol: TCP
+            {{- if include "kubeadapt.pulseConnected" . }}
+            - name: pulse
+              containerPort: {{ .Values.global.pulse.listenPort }}
+              protocol: TCP
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -140,6 +145,17 @@ spec:
             - name: KUBEADAPT_SPOOL_MAX_BYTES
               value: {{ .Values.agent.spool.maxBytes | quote }}
             {{- end }}
+            {{- if include "kubeadapt.pulseConnected" . }}
+
+            # Listener for the network monitor. It accepts only senders that
+            # present a token from this file, which it reads again while running.
+            - name: KUBEADAPT_PULSE_ENABLED
+              value: "true"
+            - name: KUBEADAPT_PULSE_LISTEN_PORT
+              value: {{ .Values.global.pulse.listenPort | quote }}
+            - name: KUBEADAPT_PULSE_AUTH_TOKEN_FILE
+              value: /var/run/secrets/kubeadapt/pulse/token
+            {{- end }}
 
             {{- if .Values.agent.env }}
             # Additional custom environment variables
@@ -153,6 +169,11 @@ spec:
             {{- if .Values.agent.spool.enabled }}
             - name: spool
               mountPath: {{ required "agent.spool.mountPath must be set" .Values.agent.spool.mountPath | quote }}
+            {{- end }}
+            {{- if include "kubeadapt.pulseConnected" . }}
+            - name: pulse-token
+              mountPath: /var/run/secrets/kubeadapt/pulse
+              readOnly: true
             {{- end }}
       {{- if .Values.agent.autoUpgrade.enabled }}
         - name: upgrader
@@ -244,6 +265,16 @@ spec:
         - name: spool
           emptyDir:
             sizeLimit: {{ .Values.agent.spool.sizeLimit | quote }}
+        {{- end }}
+        {{- if include "kubeadapt.pulseConnected" . }}
+        # Token shared with the network monitor, mounted as a file so that a
+        # changed Secret reaches the running agent.
+        - name: pulse-token
+          secret:
+            secretName: {{ include "kubeadapt.pulseTokenSecretName" . }}
+            items:
+              - key: token
+                path: token
         {{- end }}
       {{- with .Values.agent.nodeSelector }}
       nodeSelector:
