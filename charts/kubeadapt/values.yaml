@@ -107,13 +107,11 @@ agent:
   # Network Telemetry Spool
   # ============================================================
   spool:
-    # Write-ahead spool for network telemetry: it is meant to survive container
-    # restarts and ingestion outages, and a pod replacement drains it during the
-    # termination grace period. No PersistentVolume is ever created.
-    #
-    # Chart-side plumbing. The volume and the KUBEADAPT_SPOOL_* variables below
-    # take effect once an agent release that writes to the spool ships; agent
-    # images that predate it ignore them and leave the volume empty.
+    # Write-ahead spool for network telemetry, on an emptyDir. It keeps the
+    # batches the backend has not acknowledged through a container restart and
+    # an ingestion outage; when the pod is replaced, the agent tries to deliver
+    # them within the termination grace period. The agent's restart-surviving
+    # caches share the volume. No PersistentVolume is ever created.
     enabled: true
     # Ceiling the kubelet enforces on the emptyDir itself. Kept above maxBytes
     # so the agent's own bound is what evicts, not a pod eviction.
