@@ -88,6 +88,14 @@ rules:
     resources:
       - poddisruptionbudgets
     verbs: ["get", "list", "create", "update", "patch", "delete"]
+  {{- if (index .Values "kubeadapt-k8s-pulse").enabled }}
+
+  # The ResourceQuota that admits the network monitor's priority class
+  - apiGroups: [""]
+    resources:
+      - resourcequotas
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

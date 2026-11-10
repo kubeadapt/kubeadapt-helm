@@ -338,11 +338,6 @@ kubeadapt-k8s-pulse:
       # Send traffic records to this release's agent.
       enabled: true
 
-  # Scheduling - configure as needed for your cluster
-  tolerations: []
-
-  nodeSelector: {}
-
-  affinity: {}
-
-  topologySpreadConstraints: []
+  # Scheduling (tolerations, priorityClassName, nodeSelector, affinity) is set
+  # in charts/kubeadapt-k8s-pulse/values.yaml. By default the DaemonSet runs on
+  # every node, tainted ones included.

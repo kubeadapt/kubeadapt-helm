@@ -1,0 +1,20 @@
+{{- if and .Values.enabled (has .Values.priorityClassName (list "system-node-critical" "system-cluster-critical")) }}
+# Admits pods of the priority class above in this namespace on clusters that
+# allow system-* classes outside kube-system only under a matching quota. It
+# applies to no other pod.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ include "kubeadapt-k8s-pulse.fullname" . }}-critical-pods
+  labels:
+    {{- include "kubeadapt-k8s-pulse.labels" . | nindent 4 }}
+spec:
+  hard:
+    pods: "1M"
+  scopeSelector:
+    matchExpressions:
+      - scopeName: PriorityClass
+        operator: In
+        values:
+          - {{ .Values.priorityClassName }}
+{{- end }}

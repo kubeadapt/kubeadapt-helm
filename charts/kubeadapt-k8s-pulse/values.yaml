@@ -125,14 +125,27 @@ resources:
 # ============================================================
 # Scheduling Configuration
 # ============================================================
-# Default tolerations to run on all nodes including masters
-tolerations: []
+# A node without pulse has no traffic measured at all. The default tolerates
+# every taint so that control-plane, GPU, spot and other dedicated nodes are
+# covered too. Replace the list to narrow it.
+tolerations:
+  - operator: Exists
 
 nodeSelector: {}
 
 affinity: {}
 
 topologySpreadConstraints: []
+
+# system-node-critical keeps pulse from being evicted ahead of workloads and
+# lets it be scheduled on a full node. While it is a system-* class, the chart
+# also creates a ResourceQuota that admits this class in the release namespace,
+# which some clusters (GKE, for example) require outside kube-system.
+priorityClassName: system-node-critical
+
+# Time pulse gets after SIGTERM to detach from the node and deliver its last
+# batch. Its shutdown sequence is bounded at about 26 seconds; keep this above it.
+terminationGracePeriodSeconds: 45
 
 # The pod shares the node's network, where the node's resolver cannot look up
 # cluster Service names such as the agent endpoint. ClusterFirstWithHostNet
