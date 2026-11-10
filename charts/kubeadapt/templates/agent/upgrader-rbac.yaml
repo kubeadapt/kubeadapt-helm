@@ -107,6 +107,9 @@ rules:
     resourceNames:
       - "{{ include "kubeadapt.name" . }}-agent{{ include "kubeadapt.clusterResourceSuffix" . }}"
       - "{{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}"
+      {{- if (index .Values "kubeadapt-k8s-pulse").enabled }}
+      - "{{ include "kubeadapt.pulseClusterRoleName" . }}"
+      {{- end }}
     verbs: ["get", "list", "update", "patch", "delete", "escalate"]
   # Separate rule for create (resourceNames constraint not supported)
   - apiGroups: ["rbac.authorization.k8s.io"]
@@ -178,6 +181,17 @@ rules:
       - nodepools
       - nodeclaims
     verbs: ["list", "watch"]
+  {{- if (index .Values "kubeadapt-k8s-pulse").enabled }}
+  # All permissions the kubeadapt-k8s-pulse ClusterRole grants
+  - apiGroups: [""]
+    resources:
+      - nodes
+    verbs: ["get"]
+  - apiGroups: ["cilium.io"]
+    resources:
+      - ciliumenvoyconfigs
+    verbs: ["list"]
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

@@ -79,6 +79,14 @@ Secret holding the token presented to the agent.
 {{- end }}
 
 {{/*
+Name of the ClusterRole and its binding. Cluster-scoped objects have no
+namespace, so the release namespace is part of the name.
+*/}}
+{{- define "kubeadapt-k8s-pulse.clusterRoleName" -}}
+{{- printf "%s-%s" (include "kubeadapt-k8s-pulse.fullname" .) .Release.Namespace | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "kubeadapt-k8s-pulse.serviceAccountName" -}}

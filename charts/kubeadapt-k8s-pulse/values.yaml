@@ -14,6 +14,16 @@ serviceAccount:
   annotations: {}
   name: ""
 
+# Read-only Kubernetes API access for the ServiceAccount above, through a
+# ClusterRole and ClusterRoleBinding:
+#   - pods list and watch: pod identity for each node's traffic
+#   - nodes get: the node's own UID and zone
+#   - ciliumenvoyconfigs (cilium.io) list: detecting an in-cluster Envoy proxy on Cilium
+# Without them the DaemonSet keeps running, and traffic is reported without
+# pod and node identity.
+rbac:
+  create: true
+
 # ============================================================
 # eBPF Agent Configuration
 # ============================================================

@@ -85,3 +85,22 @@ kubeadapt-k8s-pulse chart derives the same default name.
 {{- define "kubeadapt.pulseTokenSecretName" -}}
 {{- .Values.global.pulse.existingSecret | default (printf "%s-pulse-token" (include "kubeadapt.name" .)) -}}
 {{- end }}
+
+{{/*
+Name of the kubeadapt-k8s-pulse ClusterRole, derived as that chart derives it.
+*/}}
+{{- define "kubeadapt.pulseClusterRoleName" -}}
+{{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict -}}
+{{- $full := "" -}}
+{{- if $pulse.fullnameOverride -}}
+{{- $full = $pulse.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := default "kubeadapt-k8s-pulse" $pulse.nameOverride -}}
+{{- if contains $name .Release.Name -}}
+{{- $full = .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $full = printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+{{- printf "%s-%s" $full .Release.Namespace | trunc 63 | trimSuffix "-" -}}
+{{- end }}
