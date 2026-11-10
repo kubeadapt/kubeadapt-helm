@@ -28,12 +28,10 @@ rbac:
 # eBPF Agent Configuration
 # ============================================================
 config:
-  # Metrics server port for Prometheus scraping
-  # Exposes: /metrics, /health/live, /health/ready
+  # Port of the metrics and health server: /metrics, /health/live and
+  # /health/ready. The pod uses the node's network, so the server listens on
+  # this port on every node address, without authentication.
   metricsPort: 9090
-
-  # Collection interval for BPF map reads, leave it as is, unless you have specific needs
-  collectionInterval: "25s"
 
   # Log level for agent
   # Options: "debug", "info", "warn", "error"
@@ -43,7 +41,8 @@ config:
   # Options: "json" (production), "console" (development)
   logFormat: "json"
 
-  # Enable connection tracking (read-then-delete pattern with overflow ringbuffer)
+  # Read the overflow ring buffer, which carries the flows the kernel flow
+  # table had no room for. Turning it off drops those flows.
   connectionTracking: true
 
   # ============================================================
@@ -68,13 +67,10 @@ config:
   # ============================================================
   # Debug Options (use with caution in production)
   # ============================================================
-  # Enable pprof profiling endpoints
+  # Go pprof endpoints, served on 127.0.0.1 only: reach them with
+  # kubectl port-forward to the pod.
   enableProfiling: false
   profilingPort: 6060
-
-  # Dump BPF maps before deletion (synchronized with collection cycle)
-  # WARNING: High I/O, only enable for troubleshooting
-  dumpBPFMaps: false
 
 # ============================================================
 # Privileges
@@ -111,11 +107,11 @@ capabilities:
 # CAP_PERFMON; otherwise the programs fail to load.
 seccompProfile: {}
 
-# Resource limits for eBPF agent
-# Note: eBPF agents are lightweight but require sufficient memory for BPF maps
+# Resource requests and limits. Pulse sizes its kernel maps and its Go memory
+# limit from the memory limit, so a larger limit lets a busy node hold more
+# flows; always set one.
 resources:
   requests:
-    # 129-155Mi measured across 3 pods (up to 121% of the old 128Mi request).
     cpu: 100m
     memory: 256Mi
   limits:
@@ -154,21 +150,11 @@ dnsPolicy: ClusterFirstWithHostNet
 
 # Additional environment variables
 env:
-  # Retry-buffer capacity, in sub-batches; pulse's built-in default is 60.
-  #
-  # Chart-side plumbing. No released pulse image reads this variable yet, so
-  # setting it here is inert until a release that reads EBPF_RETRY_BUFFER_SIZE
-  # and retries RESOURCE_EXHAUSTED is pinned in image.tag above; older images
-  # ignore an unknown environment variable.
-  #
-  # From that release on: the agent answers RESOURCE_EXHAUSTED whenever its
-  # intake is full, so agent back-pressure queues in this buffer instead of
-  # being counted as a drop. At the exporter's 60s push cadence a node at the
-  # modelled busy density (~750 flow rows per node per minute, well under the
-  # 10,000-row sub-batch split) emits one sub-batch per window, so 120 buys
-  # roughly two hours of sustained agent refusals per node before drop-oldest
-  # evicts anything; a node busy enough to split a window into several
-  # sub-batches burns that budget proportionally faster. The buffer's 32 MiB
-  # byte backstop still applies and is not reached at these batch sizes.
+  # Batches pulse keeps for a later retry while the agent cannot take them
+  # (unreachable, or full and asking pulse to retry); pulse's own default is
+  # 60. A node sends one batch a minute, or more when a minute holds over
+  # 10,000 flows, so 120 holds about two hours of batches from a node that
+  # sends one a minute before the oldest is dropped. The buffer also has a
+  # byte limit derived from the memory limit, never below 32 MiB.
   - name: EBPF_RETRY_BUFFER_SIZE
     value: "120"
