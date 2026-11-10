@@ -76,6 +76,41 @@ config:
   # WARNING: High I/O, only enable for troubleshooting
   dumpBPFMaps: false
 
+# ============================================================
+# Privileges
+# ============================================================
+# The container runs as root in its own PID namespace with every Linux
+# capability dropped except the ones below, no privilege escalation and a
+# read-only root filesystem. It shares the node's network namespace and mounts
+# the node paths it reads (see templates/daemonset.yaml).
+#
+# Platforms where the reduced set is not enough (an SELinux or AppArmor policy
+# that denies the BPF operations, for example) can return to a fully
+# privileged container with privileged: true.
+privileged: false
+
+# Capabilities added to the container when privileged is false.
+capabilities:
+  # Create BPF maps and load the BPF programs.
+  - BPF
+  # Required by the kernel verifier to accept the programs.
+  - PERFMON
+  # Attach to pod network interfaces, follow interface changes, read conntrack.
+  - NET_ADMIN
+  # Raise the locked-memory limit for BPF maps. Needed only on kernels older
+  # than 5.11; on 5.11 and newer it can be removed.
+  - SYS_RESOURCE
+  # Read other containers' executables for the runtime inventory. Can be
+  # removed when the inventory is turned off (EBPF_FINGERPRINT_ENABLED=false
+  # in env); without it the inventory lists no containers.
+  - SYS_PTRACE
+
+# Seccomp profile of the container. Unset uses the kubelet's default. Set
+# {type: RuntimeDefault} where the container runtime's default profile allows
+# the bpf and perf_event_open system calls to a container holding CAP_BPF and
+# CAP_PERFMON; otherwise the programs fail to load.
+seccompProfile: {}
+
 # Resource limits for eBPF agent
 # Note: eBPF agents are lightweight but require sufficient memory for BPF maps
 resources:

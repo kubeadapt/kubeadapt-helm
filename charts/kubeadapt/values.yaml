@@ -323,8 +323,10 @@ agent:
 #
 # Prerequisites:
 # - Linux kernel 5.10 or newer on every node it runs on
-# - Privileged container access (hostNetwork, hostPID) - not available on
-#   GKE Autopilot or EKS Fargate; OpenShift needs the privileged SCC
+# - The node's network namespace, host paths and the Linux
+#   capabilities BPF, PERFMON, NET_ADMIN, SYS_RESOURCE and SYS_PTRACE, which
+#   GKE Autopilot and EKS Fargate do not allow. The namespace must allow the
+#   privileged Pod Security level; on OpenShift, use the privileged SCC.
 #
 # For all options, see charts/kubeadapt-k8s-pulse/values.yaml.
 kubeadapt-k8s-pulse:

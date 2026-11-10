@@ -23,11 +23,10 @@ spec:
         prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
-      # Required for eBPF: access to host network namespace
+      # The node's network namespace: pulse attaches to the host side of
+      # each pod's network interface and follows interface changes there.
       hostNetwork: true
       dnsPolicy: {{ .Values.dnsPolicy }}
-      # Required for eBPF: access to host PID namespace for process tracking
-      hostPID: true
       containers:
         - name: kubeadapt-k8s-pulse
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -59,6 +58,15 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            # This container's memory limit in bytes. Pulse sizes its kernel
+            # maps and Go memory limit from it; in its own PID namespace it
+            # cannot find its cgroup on the node to read the limit there.
+            - name: KUBEADAPT_MEMORY_LIMIT_BYTES
+              valueFrom:
+                resourceFieldRef:
+                  containerName: kubeadapt-k8s-pulse
+                  resource: limits.memory
+                  divisor: "1"
 
             # ============================================================
             # eBPF Agent Configuration
@@ -102,33 +110,48 @@ spec:
             {{- end }}
 
           securityContext:
-            # eBPF agents require privileged mode for:
-            # - BPF syscalls and map operations
-            # - Bidirectional mount propagation for BPF maps
-            # - Kernel tracepoint attachment
+            {{- if .Values.privileged }}
             privileged: true
+            {{- else }}
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              {{- with .Values.capabilities }}
+              add:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+            {{- end }}
             readOnlyRootFilesystem: true
+            # Root, because the BPF filesystem and the cgroup tree pulse uses
+            # are owned by root.
             runAsNonRoot: false
             runAsUser: 0
+            {{- with .Values.seccompProfile }}
+            seccompProfile:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
 
           volumeMounts:
-            - name: sys
-              mountPath: /sys
-              readOnly: true
+            # The node's processes, read for the container runtime inventory.
             - name: proc
               mountPath: /host/proc
               readOnly: true
+            # Writable: pulse pins its flow table here so a restart resumes
+            # it, and holds the lock that keeps one instance per node. On
+            # Cilium it also reads Cilium's connection tracking maps here.
+            # HostToContainer shows a BPF filesystem the node mounts later.
             - name: bpf-maps
               mountPath: /sys/fs/bpf
-              mountPropagation: Bidirectional
+              mountPropagation: HostToContainer
+            # The node's cgroup tree: finding pod cgroups, attaching the
+            # cgroup programs, reading this container's memory usage.
             - name: cgroup
               mountPath: /sys/fs/cgroup
-              readOnly: true
-            - name: debugfs
-              mountPath: /sys/kernel/debug
               readOnly: true
             - name: tmp
               mountPath: /tmp
@@ -157,10 +180,6 @@ spec:
             failureThreshold: 3
 
       volumes:
-        - name: sys
-          hostPath:
-            path: /sys
-            type: Directory
         - name: proc
           hostPath:
             path: /proc
@@ -173,10 +192,6 @@ spec:
           hostPath:
             path: /sys/fs/cgroup
             type: Directory
-        - name: debugfs
-          hostPath:
-            path: /sys/kernel/debug
-            type: DirectoryOrCreate
         - name: tmp
           emptyDir: {}
         {{- if .Values.config.export.enabled }}
