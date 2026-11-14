@@ -9,7 +9,7 @@
 | Platform                 | Kubernetes Versions | Agent (`kubeadapt`) | Network monitor (`kubeadapt-k8s-pulse`) | Notes                                                                 |
 | ------------------------ | ------------------- | ------------------- | -------------------------------------- | --------------------------------------------------------------------- |
 | Amazon EKS (EC2 nodes)   | 1.24 - 1.35         | ✓                   | ✓                                      | Full support with IRSA                                                |
-| Amazon EKS on Fargate    | 1.24 - 1.35         | ✓                   | -                                      | Fargate runs no DaemonSets                                            |
+| Amazon EKS on Fargate    | 1.24 - 1.35         | ✓                   | -                                      | Fargate runs no DaemonSets; in a mixed cluster the EC2 nodes are covered |
 | Azure AKS                | 1.24 - 1.35         | ✓                   | ✓                                      | Full support with Managed Identity                                    |
 | Google GKE Standard      | 1.24 - 1.35         | ✓                   | ✓                                      | Full support with Workload Identity                                   |
 | Google GKE Autopilot     | 1.24 - 1.35         | ✓                   | -                                      | Autopilot does not allow host network or added capabilities          |
@@ -18,7 +18,7 @@
 
 **Agent:** one Deployment, restricted Pod Security Standard by default (non-root, read-only root filesystem, no capabilities). Needs [metrics-server](https://github.com/kubernetes-sigs/metrics-server) for CPU and memory usage.
 
-**Network monitor:** a DaemonSet on every node, tainted ones included, at `system-node-critical` priority. Disabled by default. It needs:
+**Network monitor:** a DaemonSet on every Linux node, tainted ones included, except AWS Fargate and virtual-kubelet nodes. It has no priority class by default and does not preempt workloads. Disabled by default. It needs:
 
 - Linux kernel 5.10 or newer
 - the node's network namespace (`hostNetwork`), not its PID namespace
@@ -27,7 +27,7 @@
 - read-only RBAC: list and watch pods, get nodes, list `ciliumenvoyconfigs.cilium.io`
 - a namespace that allows the privileged Pod Security level
 
-Where an SELinux or AppArmor policy denies the BPF operations to a container with these capabilities, `kubeadapt-k8s-pulse.privileged=true` runs it privileged.
+Where an SELinux or AppArmor policy denies the BPF operations to a container with these capabilities, set `kubeadapt-k8s-pulse.seLinuxOptions`, or run it privileged with `kubeadapt-k8s-pulse.privileged=true`. Exceptions for Pod Security Admission, Kyverno and Gatekeeper are in [examples/network-monitor](examples/network-monitor).
 
 ### Platform-Specific Requirements
 

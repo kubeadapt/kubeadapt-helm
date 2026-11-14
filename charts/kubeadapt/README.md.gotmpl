@@ -35,7 +35,17 @@ so the restricted-v2 SCC can assign the user and group.
 
 The network monitor (`kubeadapt-k8s-pulse`) is off by default. `--set kubeadapt-k8s-pulse.enabled=true` deploys its DaemonSet, turns on the agent's listener for it behind the `<name>-agent-pulse` ClusterIP Service, and gives both sides the same token: a Secret the chart creates once and keeps across upgrades, or your own Secret named in `global.pulse.existingSecret` (key `token`). Use your own Secret when a tool renders the chart without cluster access, such as Argo CD.
 
-The DaemonSet needs Linux 5.10 or newer, the node's network namespace, read-only node paths, writable `/sys/fs/bpf` and the capabilities `BPF`, `PERFMON`, `NET_ADMIN`, `SYS_RESOURCE` and `SYS_PTRACE`, so its namespace must allow the privileged Pod Security level. See the [kubeadapt-k8s-pulse chart](../kubeadapt-k8s-pulse) for each requirement.
+The DaemonSet needs Linux 5.10 or newer, the node's network namespace, read-only node paths, writable `/sys/fs/bpf` and the capabilities `BPF`, `PERFMON`, `NET_ADMIN`, `SYS_RESOURCE` and `SYS_PTRACE`, so its namespace must allow the privileged Pod Security level. See the [kubeadapt-k8s-pulse chart](../kubeadapt-k8s-pulse) for each requirement, for scheduling, rollout and private registries, and for troubleshooting; [examples/network-monitor](../../examples/network-monitor) has policy exceptions.
+
+It runs on every Linux node except AWS Fargate and virtual-kubelet nodes, tolerates every taint and never preempts a workload. In a namespace that denies ingress by default, set `agent.networkPolicy.enabled=true` and `agent.networkPolicy.nodeCIDRs` so the DaemonSet, which connects from node addresses, can reach the agent.
+
+## Upgrading
+
+```console
+helm upgrade kubeadapt kubeadapt/{{ .Name }} --namespace kubeadapt --reset-then-reuse-values
+```
+
+`--reset-then-reuse-values` (Helm 3.14 or newer) keeps your settings and takes everything else from the new chart. `--reuse-values` also keeps the previous version's defaults, image tags included: with the network monitor off the chart renders and notes it, with `kubeadapt-k8s-pulse.enabled=true` it stops and asks for `--reset-then-reuse-values`.
 
 ## Uninstalling the Chart
 

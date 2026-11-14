@@ -1,0 +1,93 @@
+# Kyverno PolicyException for the network monitor (kubeadapt-k8s-pulse).
+#
+# For clusters that enforce the Kyverno Pod Security policies as
+# ClusterPolicies (the "kyverno-policies" chart or the pod-security folder of
+# kyverno/policies). It exempts the network monitor's DaemonSet and its pods,
+# and nothing else in the namespace, from the rules its pod cannot meet. Every
+# other rule keeps applying to it: it does not run privileged, does not use
+# the host PID or IPC namespace, drops every capability it does not list and
+# does not allow privilege escalation.
+#
+# Before applying:
+#   - Policy exceptions must be on in Kyverno (features.policyExceptions in
+#     its chart) and allowed in the namespace this object is created in.
+#   - Replace "kubeadapt" with the release namespace, and the name pattern
+#     with the DaemonSet's name if the release is not called "kubeadapt":
+#       kubectl -n <namespace> get daemonset -l app.kubernetes.io/component=kubeadapt-k8s-pulse
+#   - Keep only the entries for policies the cluster has. The first four are
+#     the baseline profile, the rest the restricted profile. To see which
+#     rules deny the pod today:
+#       kubectl -n <namespace> get events --field-selector involvedObject.kind=DaemonSet
+#
+# With kubeadapt-k8s-pulse.seLinuxOptions set, also add disallow-selinux
+# (rules selinux-type and autogen-selinux-type). With
+# kubeadapt-k8s-pulse.privileged=true, also add disallow-privileged-containers
+# (rules privileged-containers and autogen-privileged-containers).
+#
+# Clusters that enforce Pod Security with Kyverno ValidatingPolicy objects
+# need a PolicyException of the policies.kyverno.io group instead; it takes
+# the same facts, listed in the "What the pod asks of the node" table of the
+# kubeadapt-k8s-pulse chart README.
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: kubeadapt-network-monitor
+  namespace: kubeadapt
+spec:
+  match:
+    any:
+      - resources:
+          kinds:
+            - DaemonSet
+            - Pod
+          namespaces:
+            - kubeadapt
+          names:
+            - kubeadapt-kubeadapt-k8s-pulse*
+  exceptions:
+    # hostNetwork: true. hostPID and hostIPC stay off.
+    - policyName: disallow-host-namespaces
+      ruleNames:
+        - host-namespaces
+        - autogen-host-namespaces
+    # hostPath volumes: /proc, /sys/fs/bpf, /sys/fs/cgroup, /etc/cni/net.d,
+    # /var/run/ztunnel.
+    - policyName: disallow-host-path
+      ruleNames:
+        - host-path
+        - autogen-host-path
+    # The metrics and health port (9090 by default) is a port of the node,
+    # because the pod uses the node's network.
+    - policyName: disallow-host-ports
+      ruleNames:
+        - host-ports-none
+        - autogen-host-ports-none
+    # Added capabilities: BPF, PERFMON, NET_ADMIN, SYS_RESOURCE, SYS_PTRACE.
+    - policyName: disallow-capabilities
+      ruleNames:
+        - adding-capabilities
+        - autogen-adding-capabilities
+    - policyName: disallow-capabilities-strict
+      ruleNames:
+        - adding-capabilities-strict
+        - autogen-adding-capabilities-strict
+    # Runs as root: the BPF filesystem and the cgroup tree are owned by root.
+    - policyName: require-run-as-nonroot
+      ruleNames:
+        - run-as-non-root
+        - autogen-run-as-non-root
+    - policyName: require-run-as-non-root-user
+      ruleNames:
+        - run-as-non-root-user
+        - autogen-run-as-non-root-user
+    # hostPath is not among the restricted volume types.
+    - policyName: restrict-volume-types
+      ruleNames:
+        - restricted-volumes
+        - autogen-restricted-volumes
+    # No seccomp profile is set by default. Not needed once
+    # kubeadapt-k8s-pulse.seccompProfile.type is RuntimeDefault.
+    - policyName: restrict-seccomp-strict
+      ruleNames:
+        - check-seccomp-strict
+        - autogen-check-seccomp-strict

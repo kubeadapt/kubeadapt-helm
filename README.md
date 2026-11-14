@@ -91,7 +91,42 @@ What the DaemonSet needs on each node:
 - read-only access to the node's `/proc`, cgroup tree, CNI configuration (`/etc/cni/net.d`) and Istio ztunnel directory (`/var/run/ztunnel`), and write access to the BPF filesystem (`/sys/fs/bpf`)
 - read-only Kubernetes API access: list and watch pods, get nodes, list CiliumEnvoyConfigs
 
-It runs at the `system-node-critical` priority and tolerates every taint, so it covers every node. The host network, host paths and added capabilities place it outside the baseline Pod Security Standard, so its namespace must allow the privileged level. Where a platform's security policy blocks the reduced capability set, `--set kubeadapt-k8s-pulse.privileged=true` runs it as a privileged container.
+The [kubeadapt-k8s-pulse chart README](charts/kubeadapt-k8s-pulse/README.md#what-the-pod-asks-of-the-node) lists each of these with the pod field and the reason. The host network, host paths and added capabilities place the pod outside the baseline Pod Security Standard, so its namespace must allow the privileged level, and a policy engine needs an exception for it: [examples/network-monitor](examples/network-monitor) has the namespace label, a Kyverno PolicyException and Gatekeeper constraints, each limited to what the pod uses. Where a node's security policy blocks the reduced capability set, set `kubeadapt-k8s-pulse.seLinuxOptions`, or run it privileged with `kubeadapt-k8s-pulse.privileged=true`.
+
+Where it runs and how it rolls out:
+
+- One pod on every Linux node, tainted pools included. Nodes that cannot run a DaemonSet pod (AWS Fargate, virtual-kubelet) get none. Narrow it with `kubeadapt-k8s-pulse.tolerations` and `kubeadapt-k8s-pulse.nodeRequirements`.
+- It has no priority class by default and never evicts a workload to get onto a node. On a node with no room for its requests (100m CPU, 256Mi) the pod waits, and that node is not measured until it starts. `kubeadapt-k8s-pulse.priorityClass.create=true` keeps ordinary workloads from pushing it out, still without evicting anything; `kubeadapt-k8s-pulse.priorityClassName=system-node-critical` guarantees a place on every node at the price of evicting lower-priority pods on full ones.
+- A later change reaches 25% of the nodes at a time (`kubeadapt-k8s-pulse.updateStrategy`), so a rollout takes minutes on any cluster size.
+- Images can come from your own registry: `agent.image.repository`, `agent.autoUpgrade.image.repository`, `agent.autoUpgrade.jobImage`, `kubeadapt-k8s-pulse.image.repository`, with `global.imagePullSecrets` for credentials.
+- In a namespace that denies ingress by default, `agent.networkPolicy.enabled=true` with `agent.networkPolicy.nodeCIDRs` admits the DaemonSet to the agent's listener. Its connections come from node addresses, so a pod selector cannot match them. On Cilium, node addresses are not matched by an `ipBlock`; allow the `host` and `remote-node` entities to port 9091 of the agent with a CiliumNetworkPolicy instead.
+
+After the install, Helm prints the commands that show whether every node has a ready pod and, when one has not, where the reason is: admission denials in the DaemonSet's events, scheduling and image pulls in the pod's events, node security policy in the pod's log. The chart README's [Troubleshooting](charts/kubeadapt-k8s-pulse/README.md#troubleshooting) section has the full table.
+
+## Upgrading
+
+```bash
+helm repo update
+helm upgrade kubeadapt kubeadapt/kubeadapt \
+  --namespace kubeadapt \
+  --reset-then-reuse-values
+```
+
+`--reset-then-reuse-values` (Helm 3.14 or newer) keeps the settings you made and takes everything else from the new chart. With an older Helm, pass your settings again with `-f` or `--set`.
+
+Do not use `--reuse-values` to move to a new chart version. It also keeps the previous version's defaults, image tags included, so the release would keep running the old images under new templates. With the network monitor off the chart still renders that way and says so in its notes; with `kubeadapt-k8s-pulse.enabled=true` it stops and asks for `--reset-then-reuse-values`, because the network monitor only works with the images and settings of the same release.
+
+With the network monitor on, give `--wait` a timeout that covers the DaemonSet's rollout (`--timeout 15m`), and on Helm 4 use `--wait=legacy`: the default there waits for a ready pod on every node, which one full node can hold up.
+
+### Upgrade Jobs left by releases before 1.0.8
+
+The auto-upgrade sidecar of chart releases before 1.0.8 created `kubeadapt-upgrade-*` Jobs under a service account that does not exist, so they never started and are still in the namespace. They do not affect the upgrade, and this chart creates no account of that name. Remove them:
+
+```bash
+kubectl -n kubeadapt get jobs \
+  -o jsonpath='{range .items[?(@.spec.template.spec.serviceAccountName=="kubeadapt-k8s-upgrader")]}{.metadata.name}{"\n"}{end}' \
+  | xargs -r kubectl -n kubeadapt delete job
+```
 
 ## Uninstalling
 
@@ -99,7 +134,7 @@ It runs at the `system-node-critical` priority and tolerates every taint, so it 
 helm uninstall kubeadapt --namespace kubeadapt
 ```
 
-This removes the agent Deployment, its Services, ServiceAccounts, the chart-created token Secrets, Roles, ClusterRoles and their bindings, and the network monitor DaemonSet and its ResourceQuota. It leaves behind:
+This removes the agent Deployment, its Services, ServiceAccounts, the chart-created token Secrets, Roles, ClusterRoles and their bindings, and the network monitor DaemonSet with its NetworkPolicy, PriorityClass and ResourceQuota where those were enabled. It leaves behind:
 
 - the `kubeadapt` namespace (Helm does not delete namespaces): `kubectl delete namespace kubeadapt`
 - a token Secret you created yourself for `existingSecret`

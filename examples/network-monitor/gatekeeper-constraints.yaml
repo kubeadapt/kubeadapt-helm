@@ -1,0 +1,124 @@
+# Gatekeeper exemption for the network monitor (kubeadapt-k8s-pulse).
+#
+# Gatekeeper has no exception object: every constraint that matches a pod
+# must pass. The network monitor is admitted in two steps.
+#
+# 1. Take the release namespace out of each cluster-wide constraint that
+#    denies the pod. The denials are in the DaemonSet's events:
+#
+#      kubectl -n kubeadapt get events --field-selector involvedObject.kind=DaemonSet
+#
+#    Each message starts with the constraint's name in brackets. For each one:
+#
+#      kubectl get constraints
+#      kubectl patch <kind> <name> --type=json \
+#        -p '[{"op":"add","path":"/spec/match/excludedNamespaces/-","value":"kubeadapt"}]'
+#
+#    (use "path":"/spec/match/excludedNamespaces","value":["kubeadapt"] when
+#    the constraint has no excludedNamespaces list yet)
+#
+# 2. Apply the constraints below. They cover that namespace only and allow
+#    exactly what the network monitor's pod uses, so the namespace is not
+#    left open: any other host path, capability, host port or volume type is
+#    still denied there. The agent pod and the upgrade Job of the same
+#    release pass them too.
+#
+# The kinds come from the pod-security-policy templates of the Gatekeeper
+# library (github.com/open-policy-agent/gatekeeper-library); a kind whose
+# template is not installed can be left out. Replace "kubeadapt" with the
+# release namespace. If kubeadapt-k8s-pulse.config.metricsPort was changed,
+# use that port for min and max.
+#
+# A constraint written in-house needs only step 1, and so does the library's
+# seccomp constraint while the pod sets no seccomp profile.
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPSPHostNetworkingPorts
+metadata:
+  name: kubeadapt-network-monitor-host-network
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces: ["kubeadapt"]
+  parameters:
+    # The node's network namespace, and in it only the metrics and health port.
+    hostNetwork: true
+    min: 9090
+    max: 9090
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPSPHostFilesystem
+metadata:
+  name: kubeadapt-network-monitor-host-paths
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces: ["kubeadapt"]
+  parameters:
+    allowedHostPaths:
+      - pathPrefix: /proc
+        readOnly: true
+      # Writable: the pinned flow table and the one-instance-per-node lock.
+      - pathPrefix: /sys/fs/bpf
+        readOnly: false
+      - pathPrefix: /sys/fs/cgroup
+        readOnly: true
+      - pathPrefix: /etc/cni/net.d
+        readOnly: true
+      - pathPrefix: /var/run/ztunnel
+        readOnly: true
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPSPCapabilities
+metadata:
+  name: kubeadapt-network-monitor-capabilities
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces: ["kubeadapt"]
+  parameters:
+    allowedCapabilities:
+      - BPF
+      - PERFMON
+      - NET_ADMIN
+      - SYS_RESOURCE
+      - SYS_PTRACE
+    requiredDropCapabilities:
+      - ALL
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPSPVolumeTypes
+metadata:
+  name: kubeadapt-network-monitor-volumes
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces: ["kubeadapt"]
+  parameters:
+    volumes:
+      - hostPath
+      - emptyDir
+      - secret
+      - projected
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPSPAllowedUsers
+metadata:
+  name: kubeadapt-network-monitor-users
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces: ["kubeadapt"]
+  parameters:
+    # The network monitor runs as root; the agent keeps its own non-root user.
+    runAsUser:
+      rule: RunAsAny
