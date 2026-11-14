@@ -1,4 +1,12 @@
 {{- if .Values.enabled }}
+{{- /*
+Settings are read through maps that may be empty, so that values written for
+an earlier release (see validate.yaml) end in its message, not in a nil
+pointer.
+*/}}
+{{- $config := .Values.config | default dict }}
+{{- $export := $config.export | default dict }}
+{{- $image := .Values.image | default dict }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -10,34 +18,37 @@ spec:
     matchLabels:
       {{- include "kubeadapt-k8s-pulse.selectorLabels" . | nindent 6 }}
   updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
+    {{- toYaml (.Values.updateStrategy | default (dict "type" "RollingUpdate" "rollingUpdate" (dict "maxUnavailable" "25%"))) | nindent 4 }}
   template:
     metadata:
       labels:
         {{- include "kubeadapt-k8s-pulse.selectorLabels" . | nindent 8 }}
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: {{ .Values.config.metricsPort | quote }}
+        prometheus.io/port: {{ $config.metricsPort | quote }}
         prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
       # The node's network namespace: pulse attaches to the host side of
       # each pod's network interface and follows interface changes there.
       hostNetwork: true
-      dnsPolicy: {{ .Values.dnsPolicy }}
-      {{- with .Values.priorityClassName }}
+      dnsPolicy: {{ .Values.dnsPolicy | default "ClusterFirstWithHostNet" }}
+      {{- with include "kubeadapt-k8s-pulse.priorityClassName" . }}
       priorityClassName: {{ . }}
       {{- end }}
-      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 45 }}
+      {{- with include "kubeadapt-k8s-pulse.imagePullSecrets" . }}
+      imagePullSecrets:
+        {{- . | nindent 8 }}
+      {{- end }}
       containers:
         - name: kubeadapt-k8s-pulse
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ $image.repository }}:{{ $image.tag }}"
+          imagePullPolicy: {{ $image.pullPolicy | default "IfNotPresent" }}
           ports:
+            # With hostNetwork this is a port of the node itself.
             - name: metrics
-              containerPort: {{ .Values.config.metricsPort }}
+              containerPort: {{ $config.metricsPort }}
               protocol: TCP
           env:
             # DaemonSet pod identity (for Prometheus metric labels)
@@ -76,14 +87,14 @@ spec:
             # eBPF Agent Configuration
             # ============================================================
             - name: EBPF_LOG_LEVEL
-              value: {{ .Values.config.logLevel | quote }}
+              value: {{ $config.logLevel | quote }}
             - name: EBPF_LOG_FORMAT
-              value: {{ .Values.config.logFormat | quote }}
+              value: {{ $config.logFormat | quote }}
             - name: EBPF_METRICS_PORT
-              value: {{ .Values.config.metricsPort | quote }}
+              value: {{ $config.metricsPort | quote }}
             - name: EBPF_CONNECTION_TRACKING
-              value: {{ .Values.config.connectionTracking | quote }}
-            {{- if .Values.config.export.enabled }}
+              value: {{ $config.connectionTracking | quote }}
+            {{- if $export.enabled }}
 
             # Export to the Kubeadapt agent
             - name: EBPF_EXPORT_ENABLED
@@ -95,11 +106,11 @@ spec:
             {{- end }}
 
             # Debug options
-            {{- if .Values.config.enableProfiling }}
+            {{- if $config.enableProfiling }}
             - name: EBPF_ENABLE_PROFILING
               value: "true"
             - name: EBPF_PROFILING_PORT
-              value: {{ .Values.config.profilingPort | quote }}
+              value: {{ $config.profilingPort | quote }}
             {{- end }}
 
             {{- if .Values.env }}
@@ -128,6 +139,10 @@ spec:
             runAsUser: 0
             {{- with .Values.seccompProfile }}
             seccompProfile:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            {{- with .Values.seLinuxOptions }}
+            seLinuxOptions:
               {{- toYaml . | nindent 14 }}
             {{- end }}
 
@@ -163,7 +178,7 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
-            {{- if .Values.config.export.enabled }}
+            {{- if $export.enabled }}
             - name: agent-token
               mountPath: /var/run/secrets/kubeadapt/pulse
               readOnly: true
@@ -172,7 +187,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /health/live
-              port: {{ .Values.config.metricsPort }}
+              port: {{ $config.metricsPort }}
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 5
@@ -181,7 +196,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /health/ready
-              port: {{ .Values.config.metricsPort }}
+              port: {{ $config.metricsPort }}
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
@@ -210,7 +225,7 @@ spec:
             type: DirectoryOrCreate
         - name: tmp
           emptyDir: {}
-        {{- if .Values.config.export.enabled }}
+        {{- if $export.enabled }}
         # Token presented to the agent, mounted as a file so that a changed
         # Secret is picked up on the next send.
         - name: agent-token
@@ -229,9 +244,9 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with include "kubeadapt-k8s-pulse.affinity" . }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- . | nindent 8 }}
       {{- end }}
       {{- with .Values.topologySpreadConstraints }}
       topologySpreadConstraints:

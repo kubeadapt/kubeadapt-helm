@@ -1,0 +1,25 @@
+{{- if .Values.enabled }}
+{{- $ns := .Release.Namespace -}}
+{{- $ds := include "kubeadapt-k8s-pulse.fullname" . -}}
+The network monitor runs one pod per Linux node, tainted nodes included. AWS
+Fargate and virtual-kubelet nodes get none.
+
+  kubectl -n {{ $ns }} get daemonset {{ $ds }}
+
+READY should reach DESIRED. When it does not:
+
+  # pods that were denied by an admission controller, with the reason
+  kubectl -n {{ $ns }} get events --sort-by=.lastTimestamp \
+    --field-selector involvedObject.kind=DaemonSet,involvedObject.name={{ $ds }}
+  # pods that exist and are not ready
+  kubectl -n {{ $ns }} get pods -l app.kubernetes.io/component=kubeadapt-k8s-pulse,app.kubernetes.io/instance={{ .Release.Name }} -o wide --no-headers | awk '$2 != "1/1"'
+  kubectl -n {{ $ns }} describe pod <pod>
+  kubectl -n {{ $ns }} logs <pod> --tail=50
+
+The chart README lists each cause and its setting under Troubleshooting.
+{{- if not (.Values.config.export | default dict).enabled }}
+
+Export to the Kubeadapt agent is off: this release serves Prometheus metrics
+only. Install through the kubeadapt chart to report network cost.
+{{- end }}
+{{- end }}

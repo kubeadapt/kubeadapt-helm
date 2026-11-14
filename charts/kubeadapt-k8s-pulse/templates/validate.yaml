@@ -1,0 +1,10 @@
+{{- /*
+`helm upgrade --reuse-values` renders this chart with the values of the
+release being upgraded: the old chart's defaults, image tag included, and
+nothing from this values.yaml. The image and the pod's privileges must come
+from the same release, so such values are refused with the way out. rbac is
+the marker: every values.yaml since the reduced privileges has it.
+*/}}
+{{- if and .Values.enabled (not (hasKey .Values "rbac")) }}
+{{- fail "kubeadapt-k8s-pulse: these values were written for an earlier chart release (helm upgrade --reuse-values keeps the previous release's defaults, image tags included). The network monitor needs the image and settings of this release. Upgrade with --reset-then-reuse-values (Helm 3.14 or newer), which keeps your own overrides and takes everything else from this chart, or pass your overrides again with -f." }}
+{{- end }}

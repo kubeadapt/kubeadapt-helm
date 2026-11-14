@@ -5,9 +5,16 @@
 enabled: true
 
 image:
+  # Point this at your own registry when you mirror the image.
   repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
   tag: "v3.0.1"
-  pullPolicy: Always
+  # Release tags are never moved, so a node pulls each release once. Always
+  # would ask the registry on every pod start, on every node.
+  pullPolicy: IfNotPresent
+
+# Pull secrets for a registry that needs credentials, as a list of
+# {name: <secret>}. Added to global.imagePullSecrets of the kubeadapt chart.
+imagePullSecrets: []
 
 serviceAccount:
   create: true
@@ -29,8 +36,11 @@ rbac:
 # ============================================================
 config:
   # Port of the metrics and health server: /metrics, /health/live and
-  # /health/ready. The pod uses the node's network, so the server listens on
-  # this port on every node address, without authentication.
+  # /health/ready. The pod uses the node's network, so this is a port of the
+  # node itself: the server listens on it on every node address, without
+  # authentication. If another process on the node holds the port, pulse keeps
+  # measuring but the pod never becomes ready; choose a free port here. The
+  # probes, the Service and the scrape annotation follow it.
   metricsPort: 9090
 
   # Log level for agent
@@ -107,6 +117,15 @@ capabilities:
 # CAP_PERFMON; otherwise the programs fail to load.
 seccompProfile: {}
 
+# SELinux label of the container. Unset uses the label the container runtime
+# assigns. On a node that enforces SELinux, set it when the audit log shows
+# the default label denied a BPF, cgroup or /proc operation, for example
+# {type: spc_t} on Fedora and RHEL based nodes or
+# {user: system_u, role: system_r, type: control_t, level: s0} on Bottlerocket
+# (the label a privileged container gets there). Has no effect on nodes
+# without SELinux.
+seLinuxOptions: {}
+
 # Resource requests and limits. Pulse sizes its kernel maps and its Go memory
 # limit from the memory limit, so a larger limit lets a busy node hold more
 # flows; always set one.
@@ -122,22 +141,89 @@ resources:
 # Scheduling Configuration
 # ============================================================
 # A node without pulse has no traffic measured at all. The default tolerates
-# every taint so that control-plane, GPU, spot and other dedicated nodes are
-# covered too. Replace the list to narrow it.
+# every taint so that control-plane, GPU, spot and other dedicated node pools
+# are covered too. To narrow it, replace the list with the taints you accept.
 tolerations:
   - operator: Exists
 
 nodeSelector: {}
 
+# Extra scheduling rules. nodeRequirements below is added to every node
+# selector term set here, so a rule of your own never brings back a node that
+# pulse cannot run on.
 affinity: {}
+
+# Nodes pulse can run on, as node affinity expressions that the chart adds to
+# the DaemonSet whatever affinity says. The DaemonSet controller creates no
+# pod at all for a node that fails one of them. The defaults keep it to Linux
+# nodes backed by a real machine: on AWS Fargate and on virtual-kubelet nodes
+# a DaemonSet pod can never start, and with the blanket toleration above it
+# would stay Pending for good, which also makes `helm upgrade --wait` time
+# out. Add an expression to leave out another pool; an empty list removes the
+# rule.
+nodeRequirements:
+  - key: kubernetes.io/os
+    operator: In
+    values:
+      - linux
+  - key: eks.amazonaws.com/compute-type
+    operator: NotIn
+    values:
+      - fargate
+  - key: type
+    operator: NotIn
+    values:
+      - virtual-kubelet
 
 topologySpreadConstraints: []
 
-# system-node-critical keeps pulse from being evicted ahead of workloads and
-# lets it be scheduled on a full node. While it is a system-* class, the chart
-# also creates a ResourceQuota that admits this class in the release namespace,
-# which some clusters (GKE, for example) require outside kube-system.
-priorityClassName: system-node-critical
+# Priority class of the pods. Empty by default: pulse then has the cluster's
+# default priority, so the scheduler never evicts a workload to make room for
+# it. The cost is that on a node with less than its requests free the pod
+# waits Pending, and that node's traffic is not measured, until room appears.
+# Nodes added later are not affected where the autoscaler counts DaemonSet
+# requests when it sizes a node (Karpenter and Cluster Autoscaler do).
+#
+# Choices, from least to most intrusive:
+#   - "" (default): never preempts; a workload with a higher priority class
+#     can preempt pulse.
+#   - priorityClass.create below: never preempts and is not preempted by
+#     ordinary workloads.
+#   - system-node-critical, or a class of your own that preempts: pulse always
+#     gets its place, and on a full node the scheduler evicts lower-priority
+#     pods to make it. While this is a system-* class, the chart also creates
+#     a ResourceQuota that admits the class in the release namespace, which
+#     some clusters (GKE, for example) require outside kube-system.
+priorityClassName: ""
+
+# A PriorityClass owned by this release with preemptionPolicy: Never. Pods of
+# this class are placed ahead of lower-priority pods waiting for the same
+# room and are not chosen as victims when an ordinary workload needs room,
+# but they never cause another pod to be evicted. Takes the place of
+# priorityClassName when create is true.
+priorityClass:
+  create: false
+  # Name of the class. Empty: <release>-kubeadapt-k8s-pulse-<namespace>.
+  name: ""
+  # Above the default of 0 and below the system classes (2000000000 and up).
+  value: 1000000
+
+# How a change to the DaemonSet reaches the nodes. maxUnavailable is the share
+# of nodes whose pod may be down at the same time. With a percentage a
+# rollout takes the same number of waves on 10 nodes and on 1000, each wave
+# as long as one pod needs to stop, pull and become ready, so 25% finishes in
+# four waves; a count such as 1 takes one wave per node, which is hours on a
+# large cluster and outlasts the timeout of `helm upgrade --wait` and of the
+# automatic upgrade. A pod that does not become ready counts against the
+# share, so a release that fails to start stops spreading at that point. A
+# restarting pod leaves a gap in that node's measurements and does not touch
+# pod traffic. maxSurge cannot be used: the pod uses the node's network and
+# only one instance per node attaches, so a second pod on the same node never
+# becomes ready.
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 25%
 
 # Time pulse gets after SIGTERM to detach from the node and deliver its last
 # batch. Its shutdown sequence is bounded at about 26 seconds; keep this above it.
