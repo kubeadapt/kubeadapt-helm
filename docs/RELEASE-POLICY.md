@@ -88,6 +88,7 @@ Follow these steps when cutting a release:
 1. **Update `Chart.yaml`**
    - Bump `version` to the new semver
    - Set `artifacthub.io/prerelease: "true"` for fast-only, `"false"` for stable
+   - **When `charts/kubeadapt-k8s-pulse` changed, release it first, in its own merge.** The `kubeadapt` chart is packaged with the network monitor chart downloaded from the registry at the version under `dependencies`, not with the one in the tree. So: give `charts/kubeadapt-k8s-pulse` a new version and merge that alone; after its release, set the `dependencies` version in `charts/kubeadapt/Chart.yaml` to it together with the `kubeadapt` version bump. Both bumps in one merge cannot be packaged, and a stale `dependencies` version releases a `kubeadapt` chart with an old network monitor. `scripts/check-subchart-pin.sh` checks this in every pull request and again in `publish.yml` before packaging; run it locally before opening the release PR.
 
 2. **Update `upgrade-metadata.yaml`**
    - Set `chartVersion` to match `Chart.yaml` version exactly
@@ -102,7 +103,16 @@ Follow these steps when cutting a release:
    - Required fields (`chartVersion`, `upgradeFrom`, `channels`) are present
 
 4. **Merge to main**
-   `publish.yml` runs: packages the chart, pushes to GHCR, creates a GitHub Release, and sets the prerelease flag via `gh release edit`.
+   `publish.yml` runs: checks the network monitor dependency (`scripts/check-subchart-pin.sh`), packages the chart, pushes to GHCR, creates a GitHub Release, and sets the prerelease flag via `gh release edit`.
 
 5. **Verify on GitHub**
    Confirm the release appears with the correct badge: "Pre-release" for fast-only, "Latest" for stable.
+
+6. **Verify the published package**
+   Render the chart from the registry, not from the source tree, with the network monitor on, and check that the DaemonSet is the one this release describes:
+   ```bash
+   helm template kubeadapt oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt --version <version> \
+     --set agent.config.token=x --set kubeadapt-k8s-pulse.enabled=true \
+     | grep -E 'privileged:|EBPF_EXPORT_ENABLED|image:'
+   ```
+   Expect `privileged: false`, `EBPF_EXPORT_ENABLED` and the image tags of this release.

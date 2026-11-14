@@ -47,6 +47,11 @@ jobs:
       - name: Render tests
         run: ./scripts/test-render.sh
 
+      # A kubeadapt chart release is packaged with the network monitor chart
+      # downloaded from the registry, not with the one in this tree.
+      - name: Check the network monitor chart the kubeadapt chart would be released with
+        run: ./scripts/check-subchart-pin.sh
+
   chart-test:
     runs-on: ubuntu-latest
     steps:

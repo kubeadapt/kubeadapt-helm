@@ -40,6 +40,11 @@ jobs:
         with:
           version: v3.13.3
 
+      # Stops the release when the kubeadapt chart would be packaged with a
+      # network monitor chart other than the one in this commit.
+      - name: Check the network monitor chart the kubeadapt chart is released with
+        run: ./scripts/check-subchart-pin.sh
+
       # Import GPG private key for chart signing
       - name: Prepare PGP key
         run: |

@@ -30,7 +30,7 @@ stage() {
 render() {
   local name="$1" chart="$2"
   shift 2
-  if helm template kubeadapt "$chart" --namespace kubeadapt-system "$@" >"$OUT" 2>"$WORK/err"; then
+  if helm template kubeadapt "$chart" --namespace kubeadapt-system "${TOKEN[@]}" "$@" >"$OUT" 2>"$WORK/err"; then
     echo "ok    $name"
   else
     echo "FAIL  $name"
@@ -45,7 +45,7 @@ render() {
 refused() {
   local name="$1" chart="$2"
   shift 2
-  if helm template kubeadapt "$chart" --namespace kubeadapt-system "$@" >/dev/null 2>"$WORK/err"; then
+  if helm template kubeadapt "$chart" --namespace kubeadapt-system "${TOKEN[@]}" "$@" >/dev/null 2>"$WORK/err"; then
     echo "FAIL  $name: rendered"
     FAILED=1
   elif grep -q -- '--reset-then-reuse-values' "$WORK/err"; then
@@ -64,11 +64,30 @@ hasnt() { ! grep -Eq -- "$2" "$OUT" || { echo "FAIL    not expected: $1"; FAILED
 stage "$WORK/new"
 NEW="$WORK/new/kubeadapt"
 ON=(--set kubeadapt-k8s-pulse.enabled=true)
+# Every release has an agent token; --reuse-values carries it along.
+TOKEN=(--set agent.config.token=test-token)
 
 echo "== this chart's own values"
 render "defaults" "$NEW"
 hasnt "a DaemonSet while the network monitor is off" '^kind: DaemonSet'
 hasnt "a NetworkPolicy by default" '^kind: NetworkPolicy'
+
+# An upgrade that resets the values and names no token must not write an
+# empty token Secret.
+if helm template kubeadapt "$NEW" >/dev/null 2>"$WORK/err"; then
+  echo "FAIL  no agent token must not render"
+  FAILED=1
+elif grep -q 'agent.config.existingSecret' "$WORK/err"; then
+  echo "ok    no agent token is refused"
+else
+  echo "FAIL  no agent token"
+  sed 's/^/        /' "$WORK/err"
+  FAILED=1
+fi
+TOKEN=(--set agent.config.existingSecret=my-token)
+render "token from an existing Secret" "$NEW"
+hasnt "a token Secret of the chart's own" '^kind: Secret'
+TOKEN=(--set agent.config.token=test-token)
 
 render "network monitor on" "$NEW" "${ON[@]}"
 has "AWS Fargate nodes excluded" 'key: eks.amazonaws.com/compute-type'
@@ -91,7 +110,8 @@ has "AWS Fargate nodes still excluded" 'key: eks.amazonaws.com/compute-type'
 render "chart-owned priority class" "$NEW" "${ON[@]}" \
   --set kubeadapt-k8s-pulse.priorityClass.create=true --set agent.autoUpgrade.enabled=true
 has "a PriorityClass" '^kind: PriorityClass'
-has "that never preempts" '^preemptionPolicy: Never'
+# A class that never preempts does not keep the pod's place on a full node.
+hasnt "preemptionPolicy: Never" 'preemptionPolicy: Never'
 has "used by the pods" 'priorityClassName: kubeadapt-kubeadapt-k8s-pulse-kubeadapt-system'
 has "manageable by the upgrader" 'priorityclasses'
 
@@ -108,11 +128,23 @@ has "the SELinux type" 'type: spc_t'
 has "the moved node port" 'containerPort: 19090'
 hasnt "the default node port" '[: "]9090"?$'
 
+render "pod annotations and labels" "$NEW" "${ON[@]}" \
+  --set agent.podAnnotations.policy=agent --set agent.podLabels.team=platform \
+  --set kubeadapt-k8s-pulse.podAnnotations.policy=monitor --set kubeadapt-k8s-pulse.podLabels.team=platform \
+  --set-string 'kubeadapt-k8s-pulse.podAnnotations.prometheus\.io/scrape=false' \
+  --set 'kubeadapt-k8s-pulse.podLabels.app\.kubernetes\.io/component=other'
+has "the agent's annotation" 'policy: agent'
+has "the network monitor's annotation" 'policy: monitor'
+[ "$(grep -c -- 'team: platform' "$OUT")" = 2 ] || { echo "FAIL    expected: the label on both pods"; FAILED=1; }
+has "the replaced scrape annotation" 'prometheus.io/scrape: "false"'
+hasnt "the default scrape annotation" 'prometheus.io/scrape: "true"'
+hasnt "a replaced selector label" 'component: other'
+
 render "network policy" "$NEW" "${ON[@]}" --set agent.networkPolicy.enabled=true \
   --set 'agent.networkPolicy.nodeCIDRs[0]=10.0.0.0/16'
 has "a NetworkPolicy" '^kind: NetworkPolicy'
 has "the node range" 'cidr: "10.0.0.0/16"'
-if helm template kubeadapt "$NEW" "${ON[@]}" --set agent.networkPolicy.enabled=true >/dev/null 2>"$WORK/err"; then
+if helm template kubeadapt "$NEW" "${TOKEN[@]}" "${ON[@]}" --set agent.networkPolicy.enabled=true >/dev/null 2>"$WORK/err"; then
   echo "FAIL  network policy without node ranges must not render"
   FAILED=1
 elif grep -q 'nodeCIDRs' "$WORK/err"; then
