@@ -95,9 +95,19 @@ Against the Pod Security Standards, the host network, the host paths, the node p
 ## Scheduling and Rollout
 
 - **Which nodes.** One pod per Linux node. The default `tolerations` tolerate every taint, so dedicated and tainted pools are measured too; replace the list to narrow it. `nodeRequirements` keeps the DaemonSet off nodes where its pod can never start (AWS Fargate, virtual-kubelet, other operating systems): no pod is created for them, so none stays Pending. It is applied on top of `nodeSelector` and `affinity`.
-- **Priority.** No priority class by default, so the scheduler never evicts a workload for the network monitor. On a node with less than the pod's requests free, the pod waits and that node is not measured until room appears. `priorityClass.create=true` gives it a class of its own with `preemptionPolicy: Never`: still no eviction of other pods, ordinary workloads cannot push it out, and after a restart it gets its place back before pods that were waiting. Use it on a busy cluster that runs near full. `priorityClassName=system-node-critical` guarantees a place on every node by evicting lower-priority pods on full nodes.
-- **Rollout.** A change reaches `updateStrategy.rollingUpdate.maxUnavailable` of the nodes at a time, `25%` by default: four waves of about a minute, on any number of nodes. A pod that fails to become ready counts against that share, so a bad release stops there. A restart leaves a short gap in that node's measurements and does not touch pod traffic. `maxSurge` cannot be used, because the pod uses the node's network and only one instance per node attaches.
-- **`helm upgrade --wait`.** Helm 3 waits until every node has the new pod and all but `maxUnavailable` of them are ready. Helm 4 waits until every pod is ready, so one pod waiting on a full node holds it until the timeout; pass `--wait=legacy` for the Helm 3 rule, or leave `--wait` out when turning the network monitor on for the first time.
+- **Priority.** The pod requests 100m CPU and 256Mi. A node whose capacity is already requested has no room for it, when the network monitor is first turned on and again whenever its pod there restarts or is replaced: the DaemonSet deletes the old pod before it creates the new one, nothing holds the room in between, and a workload pod that was waiting takes it within the same second. Kubernetes has no way to keep the room without evicting for it, so there are three choices, described in full in `values.yaml`:
+
+  | | `priorityClassName: ""` (default) | `priorityClass.create: true` | `priorityClassName: system-node-critical` |
+  |---|---|---|---|
+  | Evicts workload pods | never | on a node without room: as few as needed, lowest priority and most recently started first, only below `priorityClass.value` (1000000) | on a node without room: any pod below the node-critical ones |
+  | First enable on a full node | pod `Pending`, node not measured until room appears | one workload pod evicted in tests; the network monitor starts when that pod has ended (2 s in tests, at most its termination grace period) | same |
+  | Restart or rollout on a full node with workload pods waiting | a waiting pod takes the room, network monitor `Pending` | the pod that just took the room is evicted before its container starts, network monitor back in 2 s | same |
+  | Can be evicted by | any workload with a priority class | workloads with a class above `priorityClass.value` | no workload |
+  | Rollout and `helm upgrade --wait` | stop when the waiting pods fill the `maxUnavailable` share | complete | complete |
+  | Under node memory pressure | ends like any workload container | ends like any workload container | workload containers are ended first |
+
+- **Rollout.** A change reaches `updateStrategy.rollingUpdate.maxUnavailable` of the nodes at a time, `25%` by default: four waves of well under a minute each, on any number of nodes. A pod that fails to become ready counts against that share, so a bad release stops there; so does a pod that waits `Pending` on a node without room. A restart leaves a short gap in that node's measurements and does not touch pod traffic. `maxSurge` cannot be used, because the pod uses the node's network and only one instance per node attaches. A rollout that is held by waiting pods continues when they start; to push it through, raise the share for that one upgrade (`--set updateStrategy.rollingUpdate.maxUnavailable=50%`, under `kubeadapt-k8s-pulse.` in the `kubeadapt` chart).
+- **`helm upgrade --wait`.** Helm waits until the rollout has reached every node, so pods that wait `Pending` can hold it until the timeout; the release is then marked `failed` although everything else runs, and `--atomic` rolls it back. On a large cluster, leave `--wait` and `--atomic` out of the upgrade that turns the network monitor on or changes it, and watch the DaemonSet (see Troubleshooting). Helm 4 in addition needs every pod ready by default; `--wait=legacy` gives the Helm 3 rule.
 
 ## Private Registries
 
@@ -152,7 +162,7 @@ disallow-host-namespaces:
   autogen-host-namespaces: ...
 ```
 
-Apply an exception for the listed rules ([examples/network-monitor/kyverno-policy-exception.yaml](../../examples/network-monitor/kyverno-policy-exception.yaml)) and run the command again.
+Apply an exception for the listed rules ([examples/network-monitor/kyverno-policy-exception.yaml](../../examples/network-monitor/kyverno-policy-exception.yaml)) and run the command again. The exception has to match the DaemonSet and its pods: the list above comes from the check of the DaemonSet, which does not see the host port, and an exception for the DaemonSet alone lets the install succeed and leaves it without pods. `helm template ... | kubectl apply --dry-run=server -f -` shows the objections without creating anything.
 
 ### `CURRENT` Is Lower Than `DESIRED`: Pods Are Not Created
 
@@ -167,7 +177,7 @@ kubectl -n <namespace> get events --sort-by=.lastTimestamp \
 |----------------|-------|------------|
 | `violates PodSecurity "baseline:latest"` or `"restricted:latest"` | The namespace enforces a Pod Security level | Label the namespace `pod-security.kubernetes.io/enforce=privileged` |
 | `admission webhook "validate.kyverno.svc-fail" denied the request` followed by policy and rule names | A Kyverno policy that checks pods only | Apply a PolicyException for the listed rules |
-| `admission webhook "validation.gatekeeper.sh" denied the request: [<constraint>]` | A Gatekeeper constraint | Exclude the namespace from the listed constraints |
+| `admission webhook "validation.gatekeeper.sh" denied the request: [<constraint>]`, or `ValidatingAdmissionPolicy 'gatekeeper-<template>' with binding 'gatekeeper-<template>-<constraint>' denied request` (the default from Gatekeeper 3.22) | A Gatekeeper constraint | Exclude the namespace from the named constraint; one denial is reported at a time, so repeat |
 | another webhook's name | A vendor admission controller | Add an exclusion for the namespace or the image in that product |
 | `exceeded quota` or `no PriorityClass with name` | `priorityClassName` names a class the namespace may not use, or one that does not exist | Leave it empty, or use `priorityClass.create=true` |
 
@@ -183,7 +193,8 @@ kubectl -n <namespace> logs <pod> --tail=50
 
 | The pod is | And shows | Cause | What to do |
 |------------|-----------|-------|------------|
-| `Pending` | event `Insufficient cpu` or `Insufficient memory` | The node has less than the pod's requests free, and the pod does not preempt | It starts when room appears. For a guaranteed place, see Priority above |
+| `Pending` | event `Insufficient cpu` or `Insufficient memory` | The node has no room for the pod's requests and the pod has no priority class to evict for it. Also happens to a pod that was running, after a restart or a rollout on a full node | It starts when room appears; until then the node is not measured. For a guaranteed place, see Priority under Scheduling and Rollout |
+| `Pending` | event `didn't have free ports` | Another pod on the node has declared the same host port | `config.metricsPort` |
 | `Pending` | event `node(s) had untolerated taint` | `tolerations` was narrowed | Add the taint, or leave the pool out with `nodeRequirements` |
 | `ImagePullBackOff`, `ErrImagePull` | the registry's answer in the events (`toomanyrequests`, `unauthorized`, `no match for platform`) | Rate limit, missing credentials, or an image without the node's architecture in a private copy | `image.repository`, `imagePullSecrets`; copy all platforms of the image |
 | `CreateContainerError`, `RunContainerError` | a host path or security option in the message | The node or its runtime refuses a mount or an option | Compare with the table under "What the Pod Asks of the Node" |
@@ -191,6 +202,23 @@ kubectl -n <namespace> logs <pod> --tail=50
 | `Running`, not ready | log: the metrics port cannot be bound | Another process on the node holds the port | `config.metricsPort` |
 | `Running`, ready at first, then not | log: sends to the agent fail | Nothing is acknowledged for three export windows (three minutes): the agent is down, its listener is off, the token differs, or a NetworkPolicy blocks node addresses | Check the agent pod and the `<name>-agent-pulse` Service's endpoint; see `agent.networkPolicy` in the `kubeadapt` chart |
 | `CrashLoopBackOff` | log of the previous run: `kubectl logs <pod> --previous` | Kernel older than 5.10 | See Prerequisites |
+
+### Pods `Pending` on Nodes Without Room
+
+```bash
+kubectl -n <namespace> get pods -l app.kubernetes.io/component=kubeadapt-k8s-pulse --field-selector status.phase=Pending \
+  -o custom-columns=POD:.metadata.name,NODE:.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].values[0],SINCE:.metadata.creationTimestamp
+kubectl -n <namespace> get daemonset <ds> \
+  -o custom-columns=DESIRED:.status.desiredNumberScheduled,UPDATED:.status.updatedNumberScheduled,READY:.status.numberReady
+```
+
+Each line of the first command is a node that is not measured. `UPDATED` below `DESIRED` and not moving means a rollout is held by them. Before turning the network monitor on, this lists the nodes with the most CPU already requested:
+
+```bash
+kubectl get nodes -o name | while read n; do
+  kubectl describe "$n" | awk -v n="$n" '/Allocated resources/{f=1} f && $1=="cpu"{print n, $2, $3; exit}'
+done | sort -k3 -r | head -30
+```
 
 ### `DESIRED` Is Lower Than Expected: Nodes Without a Pod
 

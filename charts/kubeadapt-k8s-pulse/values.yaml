@@ -21,6 +21,15 @@ serviceAccount:
   annotations: {}
   name: ""
 
+# Extra annotations and labels for the pods, for example the ones a policy
+# engine matches an exemption on or a scrape configuration selects by. The
+# pods carry prometheus.io/scrape, prometheus.io/port and prometheus.io/path
+# annotations by default; an annotation of the same name here replaces it.
+# The chart's own labels (app.kubernetes.io/name, instance and component)
+# cannot be replaced: the DaemonSet selects its pods by them.
+podAnnotations: {}
+podLabels: {}
+
 # Read-only Kubernetes API access for the ServiceAccount above, through a
 # ClusterRole and ClusterRoleBinding:
 #   - pods list and watch: pod identity for each node's traffic
@@ -177,37 +186,77 @@ nodeRequirements:
 
 topologySpreadConstraints: []
 
-# Priority class of the pods. Empty by default: pulse then has the cluster's
-# default priority, so the scheduler never evicts a workload to make room for
-# it. The cost is that on a node with less than its requests free the pod
-# waits Pending, and that node's traffic is not measured, until room appears.
-# Nodes added later are not affected where the autoscaler counts DaemonSet
-# requests when it sizes a node (Karpenter and Cluster Autoscaler do).
+# ============================================================
+# Priority: what happens on a node without room
+# ============================================================
+# The pod requests 100m CPU and 256Mi (resources above). A node whose capacity
+# is already requested by other pods has no room for it. That can happen when
+# the network monitor is first turned on, and again every time its pod on such
+# a node restarts or is replaced by a rollout: the DaemonSet deletes the old
+# pod before it creates the new one (two cannot run on one node, see
+# updateStrategy), nothing holds the room in between, and a workload pod that
+# was waiting for room takes it within the same second.
 #
-# Choices, from least to most intrusive:
-#   - "" (default): never preempts. A workload with a higher priority class
-#     can preempt pulse, and on a full node the room a restarting pulse pod
-#     frees can go to a workload pod that was already waiting.
-#   - priorityClass.create below: never preempts, is not preempted by
-#     ordinary workloads and is placed ahead of them, so it keeps its place
-#     through restarts. A good fit for a busy cluster that runs near full.
-#   - system-node-critical, or a class of your own that preempts: pulse always
-#     gets its place, and on a full node the scheduler evicts lower-priority
-#     pods to make it. While this is a system-* class, the chart also creates
-#     a ResourceQuota that admits the class in the release namespace, which
-#     some clusters (GKE, for example) require outside kube-system.
+# There are three choices. Kubernetes offers no way to keep the room without
+# being able to evict for it: a class with preemptionPolicy: Never was tried
+# and lost the room like a pod with no class.
+#
+# 1. No priority class. The default: priorityClassName "" and
+#    priorityClass.create false.
+#    The network monitor never causes a pod to be evicted.
+#    On a node without room its pod waits Pending, and that node's traffic is
+#    not measured until room appears; it then starts at once. On a full node
+#    with workload pods waiting, expect this after every restart and rollout.
+#    A workload pod with any priority class of its own can evict it.
+#    A waiting pod also counts against updateStrategy.maxUnavailable: once
+#    that many wait, a rollout stops until they start, and `helm upgrade
+#    --wait` runs into its timeout.
+#
+# 2. A priority class of the chart's own: priorityClass.create true.
+#    Every node that can run the pod gets it and keeps it.
+#    On a node without room the scheduler evicts workload pods to place it: as
+#    few as it can, chosen among the pods of the lowest priority, the most
+#    recently started first, whatever their size. In tests that was one pod
+#    per full node when the network monitor was first turned on. The network
+#    monitor starts when the evicted pod has ended: two seconds later in the
+#    tests, up to that pod's termination grace period otherwise. After a
+#    restart or a rollout the pod evicted was the one that had just taken the
+#    freed room, before its container had started; nothing that was running
+#    was touched.
+#    Only pods with a priority below priorityClass.value can be evicted, which
+#    covers every pod without a priority class. Workloads you give a higher
+#    class are safe from it and can evict it in turn. A PodDisruptionBudget is
+#    respected only when the scheduler has another pod to choose.
+#
+# 3. priorityClassName: system-node-critical.
+#    Places the pod like choice 2, with a class that is above every class a
+#    user can create. So no workload can evict it, and on a node where nothing
+#    lower is left it can evict any pod below the node-critical ones, cluster
+#    add-ons such as DNS and autoscalers included. The kubelet also treats it
+#    as critical to the node: under memory pressure the kernel ends workload
+#    containers before this one. The chart adds a ResourceQuota that admits
+#    the class in the release namespace, which some clusters (GKE, for
+#    example) require outside kube-system.
+#
+# Where an autoscaler counts DaemonSet requests when it sizes a node
+# (Karpenter and Cluster Autoscaler do), nodes it adds later have room for the
+# pod from the start under every choice.
+
+# Name of an existing PriorityClass for the pods. Empty: none, or the chart's
+# own when priorityClass.create is true.
 priorityClassName: ""
 
-# A PriorityClass owned by this release with preemptionPolicy: Never. Pods of
-# this class are placed ahead of lower-priority pods waiting for the same
-# room and are not chosen as victims when an ordinary workload needs room,
-# but they never cause another pod to be evicted. Takes the place of
+# A PriorityClass owned by this release (choice 2). Takes the place of
 # priorityClassName when create is true.
 priorityClass:
   create: false
   # Name of the class. Empty: <release>-kubeadapt-k8s-pulse-<namespace>.
   name: ""
-  # Above the default of 0 and below the system classes (2000000000 and up).
+  # Pods below this priority can be evicted to place the network monitor;
+  # pods at or above it cannot. 1000000 is above the default of 0 and far
+  # below the system classes (2000000000 and up). Kubernetes does not allow
+  # the value of an existing class to be changed: to change it, set a new
+  # name with it.
   value: 1000000
 
 # How a change to the DaemonSet reaches the nodes. maxUnavailable is the share
@@ -217,7 +266,8 @@ priorityClass:
 # four waves; a count such as 1 takes one wave per node, which is hours on a
 # large cluster and outlasts the timeout of `helm upgrade --wait` and of the
 # automatic upgrade. A pod that does not become ready counts against the
-# share, so a release that fails to start stops spreading at that point. A
+# share, so a release that fails to start stops spreading at that point; so
+# does a pod that waits Pending on a node without room (see Priority above). A
 # restarting pod leaves a gap in that node's measurements and does not touch
 # pod traffic. maxSurge cannot be used: the pod uses the node's network and
 # only one instance per node attaches, so a second pod on the same node never

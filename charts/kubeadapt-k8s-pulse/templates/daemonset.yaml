@@ -22,11 +22,12 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "kubeadapt-k8s-pulse.selectorLabels" . | nindent 8 }}
+        {{- /* The selector labels win over a podLabels entry of the same name. */}}
+        {{- toYaml (merge (include "kubeadapt-k8s-pulse.selectorLabels" . | fromYaml) (.Values.podLabels | default dict)) | nindent 8 }}
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: {{ $config.metricsPort | quote }}
-        prometheus.io/path: "/metrics"
+        {{- /* The scrape annotations are defaults: podAnnotations can replace each of them. */}}
+        {{- $scrape := dict "prometheus.io/scrape" "true" "prometheus.io/port" ($config.metricsPort | toString) "prometheus.io/path" "/metrics" }}
+        {{- toYaml (merge (deepCopy (.Values.podAnnotations | default dict)) $scrape) | nindent 8 }}
     spec:
       serviceAccountName: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
       # The node's network namespace: pulse attaches to the host side of

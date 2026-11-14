@@ -1,7 +1,7 @@
 {{- $class := .Values.priorityClass | default dict }}
 {{- if and .Values.enabled $class.create }}
-# Never preempts: a pod of this class waits for room instead of evicting
-# another pod, and is not evicted to make room for lower-priority pods.
+# On a node without room, the scheduler makes room for a pod of this class by
+# evicting pods of a lower priority, as few as the pod's requests need.
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
@@ -9,7 +9,6 @@ metadata:
   labels:
     {{- include "kubeadapt-k8s-pulse.labels" . | nindent 4 }}
 value: {{ $class.value | default 1000000 | int64 }}
-preemptionPolicy: Never
 globalDefault: false
-description: Kubeadapt network monitor. Does not preempt other pods.
+description: Kubeadapt network monitor, one pod per node. May preempt pods of a lower priority on a node without room.
 {{- end }}
