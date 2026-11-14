@@ -88,7 +88,8 @@ Follow these steps when cutting a release:
 1. **Update `Chart.yaml`**
    - Bump `version` to the new semver
    - Set `artifacthub.io/prerelease: "true"` for fast-only, `"false"` for stable
-   - **When `charts/kubeadapt-k8s-pulse` changed, release it first, in its own merge.** The `kubeadapt` chart is packaged with the network monitor chart downloaded from the registry at the version under `dependencies`, not with the one in the tree. So: give `charts/kubeadapt-k8s-pulse` a new version and merge that alone; after its release, set the `dependencies` version in `charts/kubeadapt/Chart.yaml` to it together with the `kubeadapt` version bump. Both bumps in one merge cannot be packaged, and a stale `dependencies` version releases a `kubeadapt` chart with an old network monitor. `scripts/check-subchart-pin.sh` checks this in every pull request and again in `publish.yml` before packaging; run it locally before opening the release PR.
+   - **When `charts/kubeadapt-k8s-pulse` changed, release it first, in its own merge.** The `kubeadapt` chart is packaged with the network monitor chart downloaded from the registry at the version under `dependencies`, not with the one in the tree. So: give `charts/kubeadapt-k8s-pulse` a new version and merge that alone; after its release, set the `dependencies` version in `charts/kubeadapt/Chart.yaml` to it together with the `kubeadapt` version bump. Both bumps in one merge cannot be packaged, and a stale `dependencies` version releases a `kubeadapt` chart with an old network monitor. `scripts/check-release.sh` checks this in every pull request and again in `publish.yml` before packaging; run it locally before opening the release PR.
+   - **`charts/kubeadapt-k8s-pulse`: the image.** Set `image.tag` in `values.yaml` and in `ci/default-values.yaml` to the network monitor release, and the `kubeadapt.io/minimum-image-version` annotation in `Chart.yaml` to the oldest release that chart may run. The templates refuse an older tag, because images from before the minimum replace the tc filter of the node's CNI or network policy agent. `scripts/check-release.sh` fails when the chart's own default does not pass.
 
 2. **Update `upgrade-metadata.yaml`**
    - Set `chartVersion` to match `Chart.yaml` version exactly
@@ -103,7 +104,7 @@ Follow these steps when cutting a release:
    - Required fields (`chartVersion`, `upgradeFrom`, `channels`) are present
 
 4. **Merge to main**
-   `publish.yml` runs: checks the network monitor dependency (`scripts/check-subchart-pin.sh`), packages the chart, pushes to GHCR, creates a GitHub Release, and sets the prerelease flag via `gh release edit`.
+   `publish.yml` runs: runs the release checks (`scripts/check-release.sh`), packages the chart, pushes to GHCR, creates a GitHub Release, and sets the prerelease flag via `gh release edit`.
 
 5. **Verify on GitHub**
    Confirm the release appears with the correct badge: "Pre-release" for fast-only, "Latest" for stable.

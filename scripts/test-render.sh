@@ -63,7 +63,11 @@ hasnt() { ! grep -Eq -- "$2" "$OUT" || { echo "FAIL    not expected: $1"; FAILED
 
 stage "$WORK/new"
 NEW="$WORK/new/kubeadapt"
-ON=(--set kubeadapt-k8s-pulse.enabled=true)
+# The oldest image the network monitor chart accepts. The cases below name it,
+# so that they do not depend on the default tag of the day.
+MIN="$(helm show chart "$ROOT/charts/kubeadapt-k8s-pulse" | awk '$1 == "kubeadapt.io/minimum-image-version:" { print $2 }' | tr -d "\"'")"
+[ -n "$MIN" ] || { echo "FAIL  no kubeadapt.io/minimum-image-version annotation"; exit 1; }
+ON=(--set kubeadapt-k8s-pulse.enabled=true --set "kubeadapt-k8s-pulse.image.tag=v$MIN")
 # Every release has an agent token; --reuse-values carries it along.
 TOKEN=(--set agent.config.token=test-token)
 
@@ -100,6 +104,33 @@ hasnt "maxUnavailable: 1" 'maxUnavailable: 1$'
 has "IfNotPresent for the network monitor" 'imagePullPolicy: IfNotPresent'
 hasnt "an Always pull policy" 'imagePullPolicy: Always'
 hasnt "a NetworkPolicy by default" '^kind: NetworkPolicy'
+
+hasnt "a mount that creates a directory on nodes without the mesh" 'ztunnel'
+
+# Images from before the minimum replace the tc filter of the node's CNI or
+# network policy agent.
+image() { # <tag> <refused|accepted>
+  local out
+  if helm template kubeadapt "$NEW" --namespace kubeadapt-system "${TOKEN[@]}" \
+    --set kubeadapt-k8s-pulse.enabled=true --set-string "kubeadapt-k8s-pulse.image.tag=$1" >/dev/null 2>"$WORK/err"; then
+    out=accepted
+  elif grep -q 'network policy' "$WORK/err"; then
+    out=refused
+  else
+    out=error
+  fi
+  if [ "$out" = "$2" ]; then echo "ok    image tag $1 is $2"; else echo "FAIL  image tag $1: $out, expected $2"; sed 's/^/        /' "$WORK/err" | cut -c1-300; FAILED=1; fi
+}
+image v3.0.1 refused
+image v3.1.0 refused
+image "v$MIN" accepted
+image "$MIN" accepted
+image v99.0.0 accepted
+image main-0a1b2c3 accepted
+image "v3.0.1@sha256:0000000000000000000000000000000000000000000000000000000000000000" accepted
+
+render "Istio ambient" "$NEW" "${ON[@]}" --set kubeadapt-k8s-pulse.istioAmbient.enabled=true
+has "the ztunnel directory" 'path: /var/run/ztunnel'
 
 render "own affinity keeps the node requirements" "$NEW" "${ON[@]}" \
   --set 'kubeadapt-k8s-pulse.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key=pool' \
