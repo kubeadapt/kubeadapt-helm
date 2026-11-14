@@ -10,5 +10,5 @@ values.yaml that can connect the two has it.
 */}}
 {{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict }}
 {{- if and $pulse.enabled (not (hasKey .Values.global "pulse")) }}
-{{- fail "kubeadapt-k8s-pulse.enabled is set, but these values were written for an earlier chart release (helm upgrade --reuse-values keeps the previous release's defaults, image tags included). The network monitor needs the images and settings of this release. Upgrade with --reset-then-reuse-values (Helm 3.14 or newer), which keeps your own overrides and takes everything else from this chart, or pass your overrides again with -f." }}
+{{- fail "kubeadapt-k8s-pulse.enabled is set, but these values were written for an earlier chart release (helm upgrade --reuse-values keeps the previous release's defaults, image tags included). The network monitor needs the images and settings of this release. Upgrade with --reset-values -f <your complete values file>, or with --reset-then-reuse-values (Helm 3.14 or newer), which keeps your own overrides and takes everything else from this chart." }}
 {{- end }}

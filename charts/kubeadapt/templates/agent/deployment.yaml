@@ -24,8 +24,13 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "kubeadapt.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: agent
+        {{- /* The selector labels win over a podLabels entry of the same name. */}}
+        {{- $selector := merge (dict "app.kubernetes.io/component" "agent") (include "kubeadapt.selectorLabels" . | fromYaml) }}
+        {{- toYaml (merge $selector (.Values.agent.podLabels | default dict)) | nindent 8 }}
+      {{- with .Values.agent.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "kubeadapt.name" . }}-agent
       {{- with .Values.global.imagePullSecrets }}

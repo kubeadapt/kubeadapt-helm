@@ -57,8 +57,17 @@ measured.
   kubectl -n {{ $ns }} logs <pod> --tail=50
 
    Pending, "Insufficient cpu" or "Insufficient memory" in the events:
-     the node is full. The pod does not preempt workloads by default and
-     starts when room appears. See kubeadapt-k8s-pulse.priorityClass.
+     the node has no room for the pod's requests, and the pod does not evict
+     workloads to make room unless it has a priority class. That node is not
+     measured until the pod starts. All such pods, with their nodes:
+
+  kubectl -n {{ $ns }} get pods -l {{ $selector }} --field-selector status.phase=Pending \
+    -o custom-columns=POD:.metadata.name,NODE:.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].values[0],SINCE:.metadata.creationTimestamp
+
+     This also happens to a pod that was running: when it restarts or is
+     replaced on a full node, a workload pod that was waiting takes the room
+     first. kubeadapt-k8s-pulse.priorityClass.create=true keeps the place by
+     evicting; the values file lists the choices and what each one costs.
    ImagePullBackOff or ErrImagePull:
      the events carry the registry's answer. For a private registry set
      kubeadapt-k8s-pulse.image.repository and global.imagePullSecrets.
@@ -88,6 +97,20 @@ measured.
    system, Fargate, virtual-kubelet), by nodeSelector and affinity, and by a
    taint that tolerations no longer covers.
 
-A change to the DaemonSet reaches {{ dig "updateStrategy" "rollingUpdate" "maxUnavailable" "25%" $pulse }} of the nodes at a time. To turn the
-network monitor off again: --set kubeadapt-k8s-pulse.enabled=false.
+A change to the DaemonSet reaches {{ dig "updateStrategy" "rollingUpdate" "maxUnavailable" "25%" $pulse }} of the nodes at a time. Pods that wait
+Pending count against that share: when that many wait, the rollout stops
+until they start (UPDATED stays below DESIRED).
+
+UPGRADES
+
+  helm upgrade {{ .Release.Name }} <chart> -n {{ $ns }} --reset-values -f <complete values file>
+
+Pass every setting of this release in the file, the agent token setting
+included. On a large cluster, leave out --wait and --atomic for an upgrade
+that turns the network monitor on or changes it, and watch the DaemonSet with
+the command under 1: Helm marks the release failed, and --atomic rolls it
+back, when the rollout is not complete at the timeout.
+
+To turn the network monitor off again, set kubeadapt-k8s-pulse.enabled to
+false in the file.
 {{- end }}

@@ -51,6 +51,12 @@ agent:
     create: true
   service:
     type: ClusterIP
+  # Extra annotations and labels for the agent pod, for example the ones a
+  # policy engine matches on or a scrape configuration selects by. The chart's
+  # own labels (app.kubernetes.io/name, instance and component) cannot be
+  # replaced: the Deployment selects its pod by them.
+  podAnnotations: {}
+  podLabels: {}
   # NetworkPolicy that admits the network monitor to the agent's listener
   # (global.pulse.listenPort). Needed only where the release namespace denies
   # ingress by default, and created only while kubeadapt-k8s-pulse.enabled is
@@ -161,6 +167,16 @@ agent:
     #   kubectl create secret generic kubeadapt-agent-token \
     #     --namespace kubeadapt --from-literal=token='<your-token>'
     # Example: existingSecret: "kubeadapt-agent-token"
+    #
+    # On a release that was installed with config.token, create the new
+    # Secret before the upgrade that sets this, under another name than
+    # <name>-agent: Helm deletes the chart's own <name>-agent Secret in that
+    # upgrade. To copy the token without showing it:
+    #   kubectl -n kubeadapt get secret kubeadapt-agent -o jsonpath='{.data.token}' | base64 --decode \
+    #     | kubectl -n kubeadapt create secret generic kubeadapt-agent-token --from-file=token=/dev/stdin
+    #
+    # One of config.token and config.existingSecret is required; the chart
+    # does not render without.
     existingSecret: ""
 
     # Backend API endpoint
@@ -359,7 +375,7 @@ agent:
 # large or locked-down cluster usually needs, all under this key:
 #   image.repository, imagePullSecrets   a private registry
 #   tolerations, nodeRequirements        which nodes get a pod
-#   priorityClassName, priorityClass     whether it may wait or preempt
+#   priorityClass, priorityClassName     wait on a full node, or evict for room
 #   updateStrategy                       how fast a change rolls out
 #   config.metricsPort                   the node port of its health server
 #   seLinuxOptions, privileged           nodes that enforce SELinux
@@ -373,5 +389,6 @@ kubeadapt-k8s-pulse:
       enabled: true
 
   # By default the DaemonSet runs on every Linux node, tainted ones included,
-  # except AWS Fargate and virtual-kubelet nodes, and never preempts a
-  # workload to get there.
+  # except AWS Fargate and virtual-kubelet nodes, and never evicts a workload
+  # to get there: on a node without room its pod waits and the node is not
+  # measured. priorityClass.create: true gives it a place on every node.
