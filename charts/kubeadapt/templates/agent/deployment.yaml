@@ -1,4 +1,13 @@
 {{- if .Values.agent.enabled }}
+{{- /*
+`helm upgrade --reuse-values` renders these templates with the values of the
+release being upgraded, so a block added after that release is missing rather
+than defaulted. Read the newer blocks through a map that may be empty: a
+missing spool stays off, as it was in that release, and a missing tmp volume
+gets 64Mi.
+*/}}
+{{- $spool := .Values.agent.spool | default dict }}
+{{- $tmpVolume := .Values.agent.tmpVolume | default dict }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,10 +24,19 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "kubeadapt.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: agent
+        {{- /* The selector labels win over a podLabels entry of the same name. */}}
+        {{- $selector := merge (dict "app.kubernetes.io/component" "agent") (include "kubeadapt.selectorLabels" . | fromYaml) }}
+        {{- toYaml (merge $selector (.Values.agent.podLabels | default dict)) | nindent 8 }}
+      {{- with .Values.agent.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "kubeadapt.name" . }}-agent
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.agent.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -37,7 +55,7 @@ spec:
               protocol: TCP
             {{- if include "kubeadapt.pulseConnected" . }}
             - name: pulse
-              containerPort: {{ .Values.global.pulse.listenPort }}
+              containerPort: {{ include "kubeadapt.pulseListenPort" . }}
               protocol: TCP
             {{- end }}
           livenessProbe:
@@ -137,13 +155,13 @@ spec:
                   containerName: agent
                   resource: limits.memory
                   divisor: "1"
-            {{- if .Values.agent.spool.enabled }}
+            {{- if $spool.enabled }}
 
             # Write-ahead spool for network telemetry (emptyDir volume below)
             - name: KUBEADAPT_SPOOL_DIR
-              value: {{ printf "%s/netspool" (trimSuffix "/" (required "agent.spool.mountPath must be set" .Values.agent.spool.mountPath)) | quote }}
+              value: {{ printf "%s/netspool" (trimSuffix "/" (required "agent.spool.mountPath must be set" $spool.mountPath)) | quote }}
             - name: KUBEADAPT_SPOOL_MAX_BYTES
-              value: {{ .Values.agent.spool.maxBytes | quote }}
+              value: {{ $spool.maxBytes | quote }}
             {{- end }}
             {{- if include "kubeadapt.pulseConnected" . }}
 
@@ -152,7 +170,7 @@ spec:
             - name: KUBEADAPT_PULSE_ENABLED
               value: "true"
             - name: KUBEADAPT_PULSE_LISTEN_PORT
-              value: {{ .Values.global.pulse.listenPort | quote }}
+              value: {{ include "kubeadapt.pulseListenPort" . | quote }}
             - name: KUBEADAPT_PULSE_AUTH_TOKEN_FILE
               value: /var/run/secrets/kubeadapt/pulse/token
             {{- end }}
@@ -166,9 +184,9 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            {{- if .Values.agent.spool.enabled }}
+            {{- if $spool.enabled }}
             - name: spool
-              mountPath: {{ required "agent.spool.mountPath must be set" .Values.agent.spool.mountPath | quote }}
+              mountPath: {{ required "agent.spool.mountPath must be set" $spool.mountPath | quote }}
             {{- end }}
             {{- if include "kubeadapt.pulseConnected" . }}
             - name: pulse-token
@@ -249,7 +267,7 @@ spec:
           resources:
             {{- toYaml .Values.agent.autoUpgrade.resources | nindent 12 }}
       {{- end }}
-      {{- if .Values.agent.spool.enabled }}
+      {{- if $spool.enabled }}
       # Room for the agent to drain its spool on SIGTERM before it exits, so a
       # pod replacement does not strand undelivered telemetry.
       terminationGracePeriodSeconds: 120
@@ -258,13 +276,13 @@ spec:
         # Scratch space: the root filesystem is read-only.
         - name: tmp
           emptyDir:
-            sizeLimit: {{ .Values.agent.tmpVolume.sizeLimit | quote }}
-        {{- if .Values.agent.spool.enabled }}
+            sizeLimit: {{ $tmpVolume.sizeLimit | default "64Mi" | quote }}
+        {{- if $spool.enabled }}
         # emptyDir, never a PersistentVolume: the spool has to survive a
         # container restart and an ingestion outage, not a pod replacement.
         - name: spool
           emptyDir:
-            sizeLimit: {{ .Values.agent.spool.sizeLimit | quote }}
+            sizeLimit: {{ $spool.sizeLimit | quote }}
         {{- end }}
         {{- if include "kubeadapt.pulseConnected" . }}
         # Token shared with the network monitor, mounted as a file so that a

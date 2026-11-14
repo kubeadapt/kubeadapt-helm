@@ -62,8 +62,9 @@ default agent endpoint and token Secret.
 Agent listener the traffic records are sent to.
 */}}
 {{- define "kubeadapt-k8s-pulse.agentEndpoint" -}}
-{{- if .Values.config.export.agentEndpoint -}}
-{{- .Values.config.export.agentEndpoint -}}
+{{- $export := (.Values.config | default dict).export | default dict -}}
+{{- if $export.agentEndpoint -}}
+{{- $export.agentEndpoint -}}
 {{- else -}}
 {{- $pulse := (.Values.global | default dict).pulse | default dict -}}
 {{- printf "%s-agent-pulse.%s.svc:%v" (include "kubeadapt-k8s-pulse.parentName" .) .Release.Namespace (default 9091 $pulse.listenPort) -}}
@@ -75,7 +76,8 @@ Secret holding the token presented to the agent.
 */}}
 {{- define "kubeadapt-k8s-pulse.tokenSecretName" -}}
 {{- $pulse := (.Values.global | default dict).pulse | default dict -}}
-{{- coalesce .Values.config.export.tokenSecret $pulse.existingSecret (printf "%s-pulse-token" (include "kubeadapt-k8s-pulse.parentName" .)) -}}
+{{- $export := (.Values.config | default dict).export | default dict -}}
+{{- coalesce $export.tokenSecret $pulse.existingSecret (printf "%s-pulse-token" (include "kubeadapt-k8s-pulse.parentName" .)) -}}
 {{- end }}
 
 {{/*
@@ -95,4 +97,51 @@ Create the name of the service account to use
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
+{{- end }}
+
+{{/*
+Name of the PriorityClass the chart creates. Cluster-scoped, so it carries the
+release namespace like the ClusterRole.
+*/}}
+{{- define "kubeadapt-k8s-pulse.priorityClassName" -}}
+{{- $class := .Values.priorityClass | default dict -}}
+{{- if $class.create -}}
+{{- default (include "kubeadapt-k8s-pulse.clusterRoleName" .) $class.name -}}
+{{- else -}}
+{{- .Values.priorityClassName | default "" -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Affinity of the pods: .Values.affinity with .Values.nodeRequirements added to
+every required node selector term. Terms are alternatives, so the requirements
+go into each of them; with no term of the user's own they form the only one.
+*/}}
+{{- define "kubeadapt-k8s-pulse.affinity" -}}
+{{- $affinity := deepCopy (.Values.affinity | default dict) -}}
+{{- $requirements := .Values.nodeRequirements | default list -}}
+{{- if $requirements -}}
+{{- $node := get $affinity "nodeAffinity" | default dict -}}
+{{- $required := get $node "requiredDuringSchedulingIgnoredDuringExecution" | default dict -}}
+{{- $terms := list -}}
+{{- range (get $required "nodeSelectorTerms" | default (list dict)) -}}
+{{- $terms = append $terms (merge (dict "matchExpressions" (concat (.matchExpressions | default list) $requirements)) .) -}}
+{{- end -}}
+{{- $_ := set $required "nodeSelectorTerms" $terms -}}
+{{- $_ := set $node "requiredDuringSchedulingIgnoredDuringExecution" $required -}}
+{{- $_ := set $affinity "nodeAffinity" $node -}}
+{{- end -}}
+{{- if $affinity -}}
+{{- toYaml $affinity -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Pull secrets: the kubeadapt chart's global list followed by this chart's own.
+*/}}
+{{- define "kubeadapt-k8s-pulse.imagePullSecrets" -}}
+{{- $secrets := concat ((.Values.global | default dict).imagePullSecrets | default list) (.Values.imagePullSecrets | default list) -}}
+{{- if $secrets -}}
+{{- toYaml $secrets -}}
+{{- end -}}
 {{- end }}

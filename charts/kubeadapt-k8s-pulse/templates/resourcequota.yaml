@@ -1,4 +1,5 @@
-{{- if and .Values.enabled (has .Values.priorityClassName (list "system-node-critical" "system-cluster-critical")) }}
+{{- $class := include "kubeadapt-k8s-pulse.priorityClassName" . }}
+{{- if and .Values.enabled (has $class (list "system-node-critical" "system-cluster-critical")) }}
 # Admits pods of the priority class above in this namespace on clusters that
 # allow system-* classes outside kube-system only under a matching quota. It
 # applies to no other pod.
@@ -16,5 +17,5 @@ spec:
       - scopeName: PriorityClass
         operator: In
         values:
-          - {{ .Values.priorityClassName }}
+          - {{ $class }}
 {{- end }}

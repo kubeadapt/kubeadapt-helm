@@ -1,0 +1,14 @@
+{{- $class := .Values.priorityClass | default dict }}
+{{- if and .Values.enabled $class.create }}
+# On a node without room, the scheduler makes room for a pod of this class by
+# evicting pods of a lower priority, as few as the pod's requests need.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "kubeadapt-k8s-pulse.priorityClassName" . }}
+  labels:
+    {{- include "kubeadapt-k8s-pulse.labels" . | nindent 4 }}
+value: {{ $class.value | default 1000000 | int64 }}
+globalDefault: false
+description: Kubeadapt network monitor, one pod per node. May preempt pods of a lower priority on a node without room.
+{{- end }}
