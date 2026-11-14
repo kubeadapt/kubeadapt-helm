@@ -185,10 +185,12 @@ topologySpreadConstraints: []
 # requests when it sizes a node (Karpenter and Cluster Autoscaler do).
 #
 # Choices, from least to most intrusive:
-#   - "" (default): never preempts; a workload with a higher priority class
-#     can preempt pulse.
-#   - priorityClass.create below: never preempts and is not preempted by
-#     ordinary workloads.
+#   - "" (default): never preempts. A workload with a higher priority class
+#     can preempt pulse, and on a full node the room a restarting pulse pod
+#     frees can go to a workload pod that was already waiting.
+#   - priorityClass.create below: never preempts, is not preempted by
+#     ordinary workloads and is placed ahead of them, so it keeps its place
+#     through restarts. A good fit for a busy cluster that runs near full.
 #   - system-node-critical, or a class of your own that preempts: pulse always
 #     gets its place, and on a full node the scheduler evicts lower-priority
 #     pods to make it. While this is a system-* class, the chart also creates
