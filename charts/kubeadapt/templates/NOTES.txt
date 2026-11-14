@@ -70,7 +70,8 @@ measured.
    Running, not ready, the log says the metrics port cannot be bound:
      another process on the node holds port {{ dig "config" "metricsPort" 9090 $pulse }}. Move it with
      kubeadapt-k8s-pulse.config.metricsPort.
-   Running, not ready after three minutes, nothing else in the log:
+   Running, ready at first and not ready after about three minutes, the log
+   reports failed sends:
      its batches do not reach the agent at
      {{ $name }}-agent-pulse.{{ $ns }}.svc:{{ include "kubeadapt.pulseListenPort" . }}. Check the agent pod, and
      any NetworkPolicy in this namespace (agent.networkPolicy).

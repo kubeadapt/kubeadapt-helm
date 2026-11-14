@@ -141,9 +141,22 @@ kubectl -n <namespace> get daemonset <ds>
 
 `READY` should reach `DESIRED`: the number of nodes the DaemonSet targets. `CURRENT` is the number of pods that exist.
 
+### `helm install` or `helm upgrade` Fails With `admission webhook ... denied the request`
+
+A policy engine that also checks workload objects has rejected the DaemonSet itself, so nothing was deployed. Kyverno does this by default; its message lists every policy and rule the pod template fails:
+
+```
+Error: INSTALLATION FAILED: admission webhook "validate.kyverno.svc-fail" denied the request:
+resource DaemonSet/<namespace>/<ds> was blocked due to the following policies
+disallow-host-namespaces:
+  autogen-host-namespaces: ...
+```
+
+Apply an exception for the listed rules ([examples/network-monitor/kyverno-policy-exception.yaml](../../examples/network-monitor/kyverno-policy-exception.yaml)) and run the command again.
+
 ### `CURRENT` Is Lower Than `DESIRED`: Pods Are Not Created
 
-An admission controller has denied the pod: Pod Security Admission, Kyverno, Gatekeeper or a vendor's webhook. The DaemonSet's events carry its answer, with the policy and the field:
+The DaemonSet exists, and an admission controller has denied its pods: Pod Security Admission, Gatekeeper, Kyverno or a vendor's webhook. The DaemonSet's events carry its answer, with the policy and the field:
 
 ```bash
 kubectl -n <namespace> get events --sort-by=.lastTimestamp \
@@ -153,7 +166,7 @@ kubectl -n <namespace> get events --sort-by=.lastTimestamp \
 | The event says | Cause | What to do |
 |----------------|-------|------------|
 | `violates PodSecurity "baseline:latest"` or `"restricted:latest"` | The namespace enforces a Pod Security level | Label the namespace `pod-security.kubernetes.io/enforce=privileged` |
-| `admission webhook "validate.kyverno.svc-fail" denied the request` followed by policy and rule names | A Kyverno policy | Apply a PolicyException for the listed rules |
+| `admission webhook "validate.kyverno.svc-fail" denied the request` followed by policy and rule names | A Kyverno policy that checks pods only | Apply a PolicyException for the listed rules |
 | `admission webhook "validation.gatekeeper.sh" denied the request: [<constraint>]` | A Gatekeeper constraint | Exclude the namespace from the listed constraints |
 | another webhook's name | A vendor admission controller | Add an exclusion for the namespace or the image in that product |
 | `exceeded quota` or `no PriorityClass with name` | `priorityClassName` names a class the namespace may not use, or one that does not exist | Leave it empty, or use `priorityClass.create=true` |

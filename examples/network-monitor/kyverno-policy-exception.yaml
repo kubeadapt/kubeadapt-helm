@@ -15,9 +15,11 @@
 #     with the DaemonSet's name if the release is not called "kubeadapt":
 #       kubectl -n <namespace> get daemonset -l app.kubernetes.io/component=kubeadapt-k8s-pulse
 #   - Keep only the entries for policies the cluster has. The first four are
-#     the baseline profile, the rest the restricted profile. To see which
-#     rules deny the pod today:
-#       kubectl -n <namespace> get events --field-selector involvedObject.kind=DaemonSet
+#     the baseline profile, the rest the restricted profile. Without an
+#     exception, `helm install` or `helm upgrade` fails with
+#       admission webhook "validate.kyverno.svc-fail" denied the request:
+#       resource DaemonSet/<namespace>/<name> was blocked due to the following policies
+#     followed by the policies and rules that apply in your cluster.
 #
 # With kubeadapt-k8s-pulse.seLinuxOptions set, also add disallow-selinux
 # (rules selinux-type and autogen-selinux-type). With

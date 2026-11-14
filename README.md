@@ -101,7 +101,7 @@ Where it runs and how it rolls out:
 - Images can come from your own registry: `agent.image.repository`, `agent.autoUpgrade.image.repository`, `agent.autoUpgrade.jobImage`, `kubeadapt-k8s-pulse.image.repository`, with `global.imagePullSecrets` for credentials.
 - In a namespace that denies ingress by default, `agent.networkPolicy.enabled=true` with `agent.networkPolicy.nodeCIDRs` admits the DaemonSet to the agent's listener. Its connections come from node addresses, so a pod selector cannot match them. On Cilium, node addresses are not matched by an `ipBlock`; allow the `host` and `remote-node` entities to port 9091 of the agent with a CiliumNetworkPolicy instead.
 
-After the install, Helm prints the commands that show whether every node has a ready pod and, when one has not, where the reason is: admission denials in the DaemonSet's events, scheduling and image pulls in the pod's events, node security policy in the pod's log. The chart README's [Troubleshooting](charts/kubeadapt-k8s-pulse/README.md#troubleshooting) section has the full table.
+After the install, Helm prints the commands that show whether every node has a ready pod and, when one has not, where the reason is: admission denials in the DaemonSet's events, scheduling and image pulls in the pod's events, node security policy in the pod's log. A policy engine that checks workload objects, as Kyverno does by default, rejects the DaemonSet itself: the install then fails with the engine's message, which lists the rules to except. The chart README's [Troubleshooting](charts/kubeadapt-k8s-pulse/README.md#troubleshooting) section has the full table.
 
 ## Upgrading
 
