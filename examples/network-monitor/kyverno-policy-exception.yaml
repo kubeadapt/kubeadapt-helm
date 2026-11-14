@@ -8,6 +8,12 @@
 # the host PID or IPC namespace, drops every capability it does not list and
 # does not allow privilege escalation.
 #
+# The exception has to match both kinds, DaemonSet and Pod. Kyverno checks the
+# DaemonSet when Helm creates it and each pod when the DaemonSet creates it,
+# and the two checks do not see the same thing: the host port appears only on
+# the pod. An exception for the DaemonSet alone lets the install succeed and
+# then leaves the DaemonSet without a single pod.
+#
 # Before applying:
 #   - Policy exceptions must be on in Kyverno (features.policyExceptions in
 #     its chart) and allowed in the namespace this object is created in.
@@ -19,7 +25,10 @@
 #     exception, `helm install` or `helm upgrade` fails with
 #       admission webhook "validate.kyverno.svc-fail" denied the request:
 #       resource DaemonSet/<namespace>/<name> was blocked due to the following policies
-#     followed by the policies and rules that apply in your cluster.
+#     followed by the policies and rules that apply in your cluster. That
+#     list is not complete: disallow-host-ports denies only the pods. To see
+#     every objection without creating anything:
+#       helm template ... | kubectl apply --dry-run=server -f -
 #
 # With kubeadapt-k8s-pulse.seLinuxOptions set, also add disallow-selinux
 # (rules selinux-type and autogen-selinux-type). With

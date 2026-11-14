@@ -18,7 +18,7 @@
 
 **Agent:** one Deployment, restricted Pod Security Standard by default (non-root, read-only root filesystem, no capabilities). Needs [metrics-server](https://github.com/kubernetes-sigs/metrics-server) for CPU and memory usage.
 
-**Network monitor:** a DaemonSet on every Linux node, tainted ones included, except AWS Fargate and virtual-kubelet nodes. It has no priority class by default and does not preempt workloads. Disabled by default. It needs:
+**Network monitor:** a DaemonSet on every Linux node, tainted ones included, except AWS Fargate and virtual-kubelet nodes. It has no priority class by default and does not evict workloads; on a node without room its pod waits. Disabled by default. It needs:
 
 - Linux kernel 5.10 or newer
 - the node's network namespace (`hostNetwork`), not its PID namespace

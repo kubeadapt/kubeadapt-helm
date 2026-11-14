@@ -8,7 +8,19 @@
 #
 #      kubectl -n kubeadapt get events --field-selector involvedObject.kind=DaemonSet
 #
-#    Each message starts with the constraint's name in brackets. For each one:
+#    A message names the constraint in one of two forms, depending on how
+#    Gatekeeper enforces its template:
+#
+#      admission webhook "validation.gatekeeper.sh" denied the request: [<constraint>] ...
+#
+#      ValidatingAdmissionPolicy 'gatekeeper-<template>' with binding
+#      'gatekeeper-<template>-<constraint>' denied request: ...
+#
+#    The second form is what Gatekeeper 3.22 and newer produce by default for
+#    most library templates: the API server enforces them itself, and the
+#    constraint's name is the end of the binding's name. Both forms report one
+#    denial at a time, so repeat until the pods are created. For each
+#    constraint:
 #
 #      kubectl get constraints
 #      kubectl patch <kind> <name> --type=json \

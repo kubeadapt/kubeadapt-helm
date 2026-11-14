@@ -125,7 +125,7 @@ When using Kubeadapt Helm charts, we recommend following these security best pra
 - **Cluster RBAC:** list and watch pods, get nodes, list `ciliumenvoyconfigs.cilium.io`. Nothing else.
 - **Token:** the agent accepts traffic records only from a sender that presents a shared bearer token. The chart generates it once into a Secret and keeps it across upgrades, or uses the Secret named in `global.pulse.existingSecret`. Both pods mount it as a file and read it again while running, so changing the Secret rotates it without a restart. The connection is plaintext gRPC inside the cluster network, so the token authenticates the sender but is not encrypted in transit.
 - **Ports:** `9090` for metrics and health, on every node address, without authentication. `kubeadapt-k8s-pulse.config.metricsPort` moves it.
-- **Scheduling:** no priority class by default, so it never causes a workload to be evicted.
+- **Scheduling:** no priority class by default, so it never causes a workload to be evicted. `priorityClass.create` and `priorityClassName` change that.
 
 The network monitor's pod does not meet the baseline Pod Security Standard (host network, host paths, added capabilities), so its namespace must allow the privileged level. The [chart README](charts/kubeadapt-k8s-pulse/README.md#what-the-pod-asks-of-the-node) has one table of every such item with the reason, and [examples/network-monitor](examples/network-monitor) has exceptions for Pod Security Admission, Kyverno and Gatekeeper limited to those items.
 

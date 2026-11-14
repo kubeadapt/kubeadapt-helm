@@ -96,7 +96,7 @@ The [kubeadapt-k8s-pulse chart README](charts/kubeadapt-k8s-pulse/README.md#what
 Where it runs and how it rolls out:
 
 - One pod on every Linux node, tainted pools included. Nodes that cannot run a DaemonSet pod (AWS Fargate, virtual-kubelet) get none. Narrow it with `kubeadapt-k8s-pulse.tolerations` and `kubeadapt-k8s-pulse.nodeRequirements`.
-- It has no priority class by default and never evicts a workload to get onto a node. On a node with no room for its requests (100m CPU, 256Mi) the pod waits, and that node is not measured until it starts. `kubeadapt-k8s-pulse.priorityClass.create=true` keeps ordinary workloads from pushing it out, still without evicting anything; `kubeadapt-k8s-pulse.priorityClassName=system-node-critical` guarantees a place on every node at the price of evicting lower-priority pods on full ones.
+- It has no priority class by default and never evicts a workload to get onto a node. On a node with no room for its requests (100m CPU, 256Mi) the pod waits `Pending`, and that node is not measured until it starts. This also happens to a pod that was running: when it restarts or is replaced on a full node, a workload pod that was waiting takes the room first. `kubeadapt-k8s-pulse.priorityClass.create=true` gives it a place on every node and keeps it, by evicting on a full node as few pods without a priority class as it needs; `kubeadapt-k8s-pulse.priorityClassName=system-node-critical` does the same against pods of any class. The [chart README](charts/kubeadapt-k8s-pulse/README.md#scheduling-and-rollout) compares the three.
 - A later change reaches 25% of the nodes at a time (`kubeadapt-k8s-pulse.updateStrategy`), so a rollout takes minutes on any cluster size.
 - Images can come from your own registry: `agent.image.repository`, `agent.autoUpgrade.image.repository`, `agent.autoUpgrade.jobImage`, `kubeadapt-k8s-pulse.image.repository`, with `global.imagePullSecrets` for credentials.
 - In a namespace that denies ingress by default, `agent.networkPolicy.enabled=true` with `agent.networkPolicy.nodeCIDRs` admits the DaemonSet to the agent's listener. Its connections come from node addresses, so a pod selector cannot match them. On Cilium, node addresses are not matched by an `ipBlock`; allow the `host` and `remote-node` entities to port 9091 of the agent with a CiliumNetworkPolicy instead.
@@ -105,18 +105,44 @@ After the install, Helm prints the commands that show whether every node has a r
 
 ## Upgrading
 
+Keep every setting of the release in one values file and pass the whole file on each upgrade:
+
 ```bash
 helm repo update
 helm upgrade kubeadapt kubeadapt/kubeadapt \
   --namespace kubeadapt \
-  --reset-then-reuse-values
+  --reset-values -f kubeadapt-values.yaml
 ```
 
-`--reset-then-reuse-values` (Helm 3.14 or newer) keeps the settings you made and takes everything else from the new chart. With an older Helm, pass your settings again with `-f` or `--set`.
+The file is then the whole truth: nothing is carried over from the previous release, the result is the same on every Helm version, and the change can be reviewed before it runs. The file has to be complete. A setting it leaves out goes back to the chart's default, the agent's resources and token included; the chart stops with a message when the file names no token.
 
-Do not use `--reuse-values` to move to a new chart version. It also keeps the previous version's defaults, image tags included, so the release would keep running the old images under new templates. With the network monitor off the chart still renders that way and says so in its notes; with `kubeadapt-k8s-pulse.enabled=true` it stops and asks for `--reset-then-reuse-values`, because the network monitor only works with the images and settings of the same release.
+`--reset-then-reuse-values` (Helm 3.14 or newer) is the alternative when there is no file: it keeps the settings made on earlier installs and upgrades and takes everything else from the new chart.
 
-With the network monitor on, give `--wait` a timeout that covers the DaemonSet's rollout (`--timeout 15m`), and on Helm 4 use `--wait=legacy`: the default there waits for a ready pod on every node, which one full node can hold up.
+Do not use `--reuse-values` to move to a new chart version. It also keeps the previous version's defaults, image tags included, so the release would keep running the old images under new templates. With the network monitor off the chart still renders that way and says so in its notes; with `kubeadapt-k8s-pulse.enabled=true` it stops and names the two forms above, because the network monitor only works with the images and settings of the same release.
+
+### Upgrading a large cluster with the network monitor
+
+Leave `--wait` and `--atomic` out of the upgrade that turns the network monitor on or changes it, and watch the DaemonSet instead:
+
+```bash
+kubectl -n kubeadapt get daemonset -l app.kubernetes.io/component=kubeadapt-k8s-pulse \
+  -o custom-columns=DESIRED:.status.desiredNumberScheduled,UPDATED:.status.updatedNumberScheduled,READY:.status.numberReady
+kubectl -n kubeadapt get pods -l app.kubernetes.io/component=kubeadapt-k8s-pulse \
+  --field-selector status.phase=Pending -o wide
+```
+
+`--wait` succeeds only when the rollout has reached every node. A pod that waits `Pending` on a node without room (see [Priority](charts/kubeadapt-k8s-pulse/README.md#scheduling-and-rollout)) can hold it past the timeout: Helm then marks the release `failed` although the agent and every other pod run, and `--atomic` rolls the whole upgrade back. On Helm 4 use `--wait=legacy` if you do wait: the default there needs a ready pod on every node.
+
+### The agent token Secret on an upgrade
+
+With `agent.config.token`, the chart keeps the token in a Secret named `kubeadapt-agent`. When an upgrade sets `agent.config.existingSecret` instead, Helm deletes that Secret. So `existingSecret` must name a Secret of your own that exists before the upgrade, never `kubeadapt-agent`. To move the token of a running release into one without showing it on screen or putting it on a command line:
+
+```bash
+kubectl -n kubeadapt get secret kubeadapt-agent -o jsonpath='{.data.token}' | base64 --decode \
+  | kubectl -n kubeadapt create secret generic kubeadapt-agent-token --from-file=token=/dev/stdin
+```
+
+Then upgrade with `agent.config.existingSecret: kubeadapt-agent-token` in the values file and without `agent.config.token`. A token that was passed with `--set` on an earlier install stays readable in the release history (`helm get values kubeadapt --revision <n>`) until that revision is pruned.
 
 ### Upgrade Jobs left by releases before 1.0.8
 
