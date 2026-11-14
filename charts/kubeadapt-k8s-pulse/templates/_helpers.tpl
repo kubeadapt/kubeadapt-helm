@@ -62,8 +62,9 @@ default agent endpoint and token Secret.
 Agent listener the traffic records are sent to.
 */}}
 {{- define "kubeadapt-k8s-pulse.agentEndpoint" -}}
-{{- if .Values.config.export.agentEndpoint -}}
-{{- .Values.config.export.agentEndpoint -}}
+{{- $export := (.Values.config | default dict).export | default dict -}}
+{{- if $export.agentEndpoint -}}
+{{- $export.agentEndpoint -}}
 {{- else -}}
 {{- $pulse := (.Values.global | default dict).pulse | default dict -}}
 {{- printf "%s-agent-pulse.%s.svc:%v" (include "kubeadapt-k8s-pulse.parentName" .) .Release.Namespace (default 9091 $pulse.listenPort) -}}
@@ -75,7 +76,8 @@ Secret holding the token presented to the agent.
 */}}
 {{- define "kubeadapt-k8s-pulse.tokenSecretName" -}}
 {{- $pulse := (.Values.global | default dict).pulse | default dict -}}
-{{- coalesce .Values.config.export.tokenSecret $pulse.existingSecret (printf "%s-pulse-token" (include "kubeadapt-k8s-pulse.parentName" .)) -}}
+{{- $export := (.Values.config | default dict).export | default dict -}}
+{{- coalesce $export.tokenSecret $pulse.existingSecret (printf "%s-pulse-token" (include "kubeadapt-k8s-pulse.parentName" .)) -}}
 {{- end }}
 
 {{/*
@@ -95,4 +97,90 @@ Create the name of the service account to use
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
+{{- end }}
+
+{{/*
+Name of the PriorityClass the chart creates. Cluster-scoped, so it carries the
+release namespace like the ClusterRole.
+*/}}
+{{- define "kubeadapt-k8s-pulse.priorityClassName" -}}
+{{- $class := .Values.priorityClass | default dict -}}
+{{- if $class.create -}}
+{{- default (include "kubeadapt-k8s-pulse.clusterRoleName" .) $class.name -}}
+{{- else -}}
+{{- .Values.priorityClassName | default "" -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Affinity of the pods: .Values.affinity with .Values.nodeRequirements added to
+every required node selector term. Terms are alternatives, so the requirements
+go into each of them; with no term of the user's own they form the only one.
+*/}}
+{{- define "kubeadapt-k8s-pulse.affinity" -}}
+{{- $affinity := deepCopy (.Values.affinity | default dict) -}}
+{{- $requirements := .Values.nodeRequirements | default list -}}
+{{- if $requirements -}}
+{{- $node := get $affinity "nodeAffinity" | default dict -}}
+{{- $required := get $node "requiredDuringSchedulingIgnoredDuringExecution" | default dict -}}
+{{- $terms := list -}}
+{{- range (get $required "nodeSelectorTerms" | default (list dict)) -}}
+{{- $terms = append $terms (merge (dict "matchExpressions" (concat (.matchExpressions | default list) $requirements)) .) -}}
+{{- end -}}
+{{- $_ := set $required "nodeSelectorTerms" $terms -}}
+{{- $_ := set $node "requiredDuringSchedulingIgnoredDuringExecution" $required -}}
+{{- $_ := set $affinity "nodeAffinity" $node -}}
+{{- end -}}
+{{- if $affinity -}}
+{{- toYaml $affinity -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Pull secrets: the kubeadapt chart's global list followed by this chart's own.
+*/}}
+{{- define "kubeadapt-k8s-pulse.imagePullSecrets" -}}
+{{- $secrets := concat ((.Values.global | default dict).imagePullSecrets | default list) (.Values.imagePullSecrets | default list) -}}
+{{- if $secrets -}}
+{{- toYaml $secrets -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Checks image.tag against the oldest network monitor release this chart may
+run: the kubeadapt.io/minimum-image-version annotation in Chart.yaml. Fails
+the render for an older release tag. Returns nothing for a tag that passes,
+and a few words for a tag whose age cannot be told (a digest, a build tag),
+which the install notes then mention.
+*/}}
+{{- define "kubeadapt-k8s-pulse.imageCheck" -}}
+{{- $min := index .Chart.Annotations "kubeadapt.io/minimum-image-version" | default "" -}}
+{{- $tag := (.Values.image | default dict).tag | default "" | toString -}}
+{{- if $min -}}
+{{- if contains "@" $tag -}}
+pinned by digest
+{{- else if regexMatch "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$" $tag -}}
+{{- if lt ((semver $tag).Compare (semver $min)) 0 -}}
+{{- fail (printf "kubeadapt-k8s-pulse: image tag %s is too old for this chart, which needs network monitor %s or newer. Older images attach to each pod's network interface with a classic tc filter at priority 1, handle 1, the place where CNI plugins and network policy agents keep their own filter, and replace it: Kubernetes network policy then stops being enforced on the node, and stays off after the network monitor is removed. Releases before v3.1.0 do this on every kernel, v3.1.0 on kernels older than 6.6. Set image.tag (kubeadapt-k8s-pulse.image.tag in the kubeadapt chart) to %s or newer, or remove it from your values to get this chart's default." $tag $min $min) -}}
+{{- end -}}
+{{- else -}}
+not a release tag
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Sentences for the install notes about the image's age.
+*/}}
+{{- define "kubeadapt-k8s-pulse.imageNote" -}}
+{{- $min := index .Chart.Annotations "kubeadapt.io/minimum-image-version" | default "" -}}
+{{- if $min -}}
+{{- with include "kubeadapt-k8s-pulse.imageCheck" . }}
+NOTE: the network monitor image tag "{{ $.Values.image.tag }}" is {{ . }}, so the chart
+could not check that it is version {{ $min }} or newer.
+{{ end -}}
+Never run a network monitor image older than {{ $min }} on a cluster whose CNI or
+network policy agent attaches classic tc filters to pod interfaces: older
+images replace those filters, and network policy stops being enforced.
+{{- end -}}
 {{- end }}

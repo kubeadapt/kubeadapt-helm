@@ -1,0 +1,32 @@
+{{- $policy := .Values.agent.networkPolicy | default dict }}
+{{- if and (include "kubeadapt.pulseConnected" .) $policy.enabled }}
+{{- if not $policy.nodeCIDRs }}
+{{- fail "agent.networkPolicy.enabled needs agent.networkPolicy.nodeCIDRs: the address ranges of the cluster's nodes, for example the VPC CIDR. The network monitor uses the node's network, so its connections carry node addresses and no pod selector matches them." }}
+{{- end }}
+# Admits the network monitor to the agent's listener in a namespace that
+# denies ingress by default. The monitor runs in the node's network, so its
+# connections arrive from node addresses: only an ipBlock can name them.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "kubeadapt.name" . }}-agent-pulse
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kubeadapt.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: agent
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        {{- range $policy.nodeCIDRs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ include "kubeadapt.pulseListenPort" . }}
+{{- end }}
