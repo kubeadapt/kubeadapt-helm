@@ -3,6 +3,13 @@ global:
   name: "kubeadapt"
   nameOverride: ""
   fullnameOverride: ""
+  # Pull secrets for a registry that needs credentials, as a list of
+  # {name: <secret>} in the release namespace. Used by the agent pod, the
+  # network monitor and, through its service account, the upgrade Job.
+  # Every image can be taken from your own registry: agent.image.repository,
+  # agent.autoUpgrade.image.repository, agent.autoUpgrade.jobImage and
+  # kubeadapt-k8s-pulse.image.repository.
+  imagePullSecrets: []
   # Shared by the agent and the network monitor (kubeadapt-k8s-pulse). Used
   # only while kubeadapt-k8s-pulse.enabled is true.
   pulse:
@@ -44,6 +51,20 @@ agent:
     create: true
   service:
     type: ClusterIP
+  # NetworkPolicy that admits the network monitor to the agent's listener
+  # (global.pulse.listenPort). Needed only where the release namespace denies
+  # ingress by default, and created only while kubeadapt-k8s-pulse.enabled is
+  # true. Leave it off in a namespace without policies: selecting the agent
+  # pod with any policy closes its other ports to everything the namespace's
+  # policies do not allow.
+  networkPolicy:
+    enabled: false
+    # Address ranges of the cluster's nodes, required when enabled. The
+    # network monitor runs in the node's network, so its connections come from
+    # node addresses and a pod selector never matches them. On EKS, AKS and
+    # GKE this is the VPC or subnet range the nodes take their addresses from.
+    # Example: ["10.0.0.0/16"]
+    nodeCIDRs: []
   # ONE Deployment per cluster, so memory scales with TOTAL cluster size - a
   # DaemonSet's stays flat per node. Peak is the network-flow merge, measured at
   # ~1550 B per inbound flow row plus ~300 MB of caches at 5000 nodes. At 500
@@ -260,11 +281,17 @@ agent:
     # Releases from 1.0.8 on are published to both channels
     channel: "fast"
 
-    # Upgrade timeout - how long to wait for helm upgrade to complete
+    # Upgrade timeout - how long to wait for helm upgrade to complete. The
+    # upgrade waits for the agent and for the network monitor's rollout, and
+    # rolls everything back when the time is up. That rollout takes
+    # (100 / maxUnavailable percent) waves of about a minute each, whatever
+    # the number of nodes; see kubeadapt-k8s-pulse.updateStrategy before
+    # lowering either setting.
     timeout: "15m"
 
     # Helm image for upgrade Job
-    # Contains helm binary for performing upgrades
+    # Contains helm binary for performing upgrades. A full image reference:
+    # point it at your own registry when you mirror images.
     jobImage: "alpine/helm:3.14.3"
 
     # Chart repository URL for Helm upgrades
@@ -325,8 +352,17 @@ agent:
 #   capabilities BPF, PERFMON, NET_ADMIN, SYS_RESOURCE and SYS_PTRACE, which
 #   GKE Autopilot and EKS Fargate do not allow. The namespace must allow the
 #   privileged Pod Security level; on OpenShift, use the privileged SCC.
+#   examples/network-monitor in the chart repository has ready-made
+#   exceptions for Pod Security Admission, Kyverno and Gatekeeper.
 #
-# For all options, see charts/kubeadapt-k8s-pulse/values.yaml.
+# For all options, see charts/kubeadapt-k8s-pulse/values.yaml. The ones a
+# large or locked-down cluster usually needs, all under this key:
+#   image.repository, imagePullSecrets   a private registry
+#   tolerations, nodeRequirements        which nodes get a pod
+#   priorityClassName, priorityClass     whether it may wait or preempt
+#   updateStrategy                       how fast a change rolls out
+#   config.metricsPort                   the node port of its health server
+#   seLinuxOptions, privileged           nodes that enforce SELinux
 kubeadapt-k8s-pulse:
   # Set to true to deploy the network monitor DaemonSet.
   enabled: false
@@ -336,6 +372,6 @@ kubeadapt-k8s-pulse:
       # Send traffic records to this release's agent.
       enabled: true
 
-  # Scheduling (tolerations, priorityClassName, nodeSelector, affinity) is set
-  # in charts/kubeadapt-k8s-pulse/values.yaml. By default the DaemonSet runs on
-  # every node, tainted ones included.
+  # By default the DaemonSet runs on every Linux node, tainted ones included,
+  # except AWS Fargate and virtual-kubelet nodes, and never preempts a
+  # workload to get there.

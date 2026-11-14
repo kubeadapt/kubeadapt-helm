@@ -1,5 +1,6 @@
 {{- if .Values.agent.enabled }}
 {{- if .Values.agent.autoUpgrade.enabled }}
+{{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict }}
 {{- if .Values.agent.autoUpgrade.serviceAccount.create }}
 ---
 apiVersion: v1
@@ -14,6 +15,11 @@ metadata:
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+{{- with .Values.global.imagePullSecrets }}
+# The upgrade Job runs under this account and takes its pull secrets from it.
+imagePullSecrets:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
 {{- end }}
 ---
 {{- if .Values.agent.autoUpgrade.rbac.create }}
@@ -88,7 +94,7 @@ rules:
     resources:
       - poddisruptionbudgets
     verbs: ["get", "list", "create", "update", "patch", "delete"]
-  {{- if (index .Values "kubeadapt-k8s-pulse").enabled }}
+  {{- if $pulse.enabled }}
 
   # The ResourceQuota that admits the network monitor's priority class
   - apiGroups: [""]
@@ -115,7 +121,7 @@ rules:
     resourceNames:
       - "{{ include "kubeadapt.name" . }}-agent{{ include "kubeadapt.clusterResourceSuffix" . }}"
       - "{{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}"
-      {{- if (index .Values "kubeadapt-k8s-pulse").enabled }}
+      {{- if $pulse.enabled }}
       - "{{ include "kubeadapt.pulseClusterRoleName" . }}"
       {{- end }}
     verbs: ["get", "list", "update", "patch", "delete", "escalate"]
@@ -189,7 +195,7 @@ rules:
       - nodepools
       - nodeclaims
     verbs: ["list", "watch"]
-  {{- if (index .Values "kubeadapt-k8s-pulse").enabled }}
+  {{- if $pulse.enabled }}
   # All permissions the kubeadapt-k8s-pulse ClusterRole grants
   - apiGroups: [""]
     resources:
@@ -199,6 +205,19 @@ rules:
     resources:
       - ciliumenvoyconfigs
     verbs: ["list"]
+  {{- end }}
+  {{- with include "kubeadapt.pulsePriorityClassName" . }}
+  # The PriorityClass of the network monitor (kubeadapt-k8s-pulse.priorityClass)
+  - apiGroups: ["scheduling.k8s.io"]
+    resources:
+      - priorityclasses
+    resourceNames:
+      - {{ . | quote }}
+    verbs: ["get", "update", "patch", "delete"]
+  - apiGroups: ["scheduling.k8s.io"]
+    resources:
+      - priorityclasses
+    verbs: ["create"]
   {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

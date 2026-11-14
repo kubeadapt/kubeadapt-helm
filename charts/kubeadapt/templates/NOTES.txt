@@ -1,0 +1,92 @@
+{{- $ns := .Release.Namespace -}}
+{{- $name := include "kubeadapt.name" . -}}
+{{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict -}}
+Kubeadapt chart {{ .Chart.Version }} is deployed as release "{{ .Release.Name }}" in namespace "{{ $ns }}".
+
+{{- if .Values.agent.enabled }}
+
+AGENT
+
+  kubectl -n {{ $ns }} rollout status deployment/{{ $name }}-agent
+  kubectl -n {{ $ns }} logs deployment/{{ $name }}-agent -c agent --tail=20
+
+The cluster appears on the Clusters page within a few minutes of the first
+snapshot.
+{{- end }}
+{{- if not (hasKey .Values.agent "spool") }}
+
+NOTE: this release was rendered with the values of an earlier chart version
+(helm upgrade --reuse-values), so it keeps that version's defaults: the agent
+image is still {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}.
+To take this chart's defaults and keep only your own overrides, run the
+upgrade with --reset-then-reuse-values (Helm 3.14 or newer).
+{{- end }}
+{{- if $pulse.enabled }}
+{{- $ds := include "kubeadapt.pulseFullname" . }}
+{{- $selector := printf "app.kubernetes.io/component=kubeadapt-k8s-pulse,app.kubernetes.io/instance=%s" .Release.Name }}
+
+NETWORK MONITOR
+
+One pod per Linux node, tainted nodes included. AWS Fargate and
+virtual-kubelet nodes get none. A node without a ready pod has no traffic
+measured.
+
+1. Is it running on every node it targets?
+
+  kubectl -n {{ $ns }} get daemonset {{ $ds }}
+
+   READY should reach DESIRED. DESIRED is the number of nodes the DaemonSet
+   targets, CURRENT the number of pods that exist.
+
+2. CURRENT is lower than DESIRED: pods are not being created. An admission
+   controller (Pod Security Admission, Kyverno, Gatekeeper, a vendor webhook)
+   has denied them, and says why in the DaemonSet's events:
+
+  kubectl -n {{ $ns }} get events --sort-by=.lastTimestamp \
+    --field-selector involvedObject.kind=DaemonSet,involvedObject.name={{ $ds }}
+
+   The message names the policy and the field it rejects. The pod needs the
+   node's network, host paths and added capabilities; examples/network-monitor
+   in the chart repository has an exception for each engine.
+
+3. READY is lower than CURRENT: list the pods that are not ready, then ask
+   each one why:
+
+  kubectl -n {{ $ns }} get pods -l {{ $selector }} -o wide --no-headers | awk '$2 != "1/1"'
+  kubectl -n {{ $ns }} describe pod <pod>
+  kubectl -n {{ $ns }} logs <pod> --tail=50
+
+   Pending, "Insufficient cpu" or "Insufficient memory" in the events:
+     the node is full. The pod does not preempt workloads by default and
+     starts when room appears. See kubeadapt-k8s-pulse.priorityClass.
+   ImagePullBackOff or ErrImagePull:
+     the events carry the registry's answer. For a private registry set
+     kubeadapt-k8s-pulse.image.repository and global.imagePullSecrets.
+   Running, not ready, "permission denied" or "operation not permitted" in
+   the log while loading or attaching:
+     a node security policy (SELinux, AppArmor, seccomp) denies the BPF
+     operations. Set kubeadapt-k8s-pulse.seLinuxOptions, or
+     kubeadapt-k8s-pulse.privileged=true.
+   Running, not ready, the log says the metrics port cannot be bound:
+     another process on the node holds port {{ dig "config" "metricsPort" 9090 $pulse }}. Move it with
+     kubeadapt-k8s-pulse.config.metricsPort.
+   Running, not ready after three minutes, nothing else in the log:
+     its batches do not reach the agent at
+     {{ $name }}-agent-pulse.{{ $ns }}.svc:{{ include "kubeadapt.pulseListenPort" . }}. Check the agent pod, and
+     any NetworkPolicy in this namespace (agent.networkPolicy).
+
+4. DESIRED is lower than the number of nodes you expect: list the nodes
+   without a pod, then look at what sets them apart:
+
+  comm -23 \
+    <(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort) \
+    <(kubectl -n {{ $ns }} get pods -l {{ $selector }} -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort)
+  kubectl get node <node> -o jsonpath='{.spec.taints}{"\n"}{.metadata.labels}{"\n"}'
+
+   Nodes are left out by kubeadapt-k8s-pulse.nodeRequirements (operating
+   system, Fargate, virtual-kubelet), by nodeSelector and affinity, and by a
+   taint that tolerations no longer covers.
+
+A change to the DaemonSet reaches {{ dig "updateStrategy" "rollingUpdate" "maxUnavailable" "25%" $pulse }} of the nodes at a time. To turn the
+network monitor off again: --set kubeadapt-k8s-pulse.enabled=false.
+{{- end }}

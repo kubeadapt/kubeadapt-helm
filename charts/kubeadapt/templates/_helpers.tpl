@@ -83,24 +83,49 @@ Secret holding the token the network monitor presents to the agent. The
 kubeadapt-k8s-pulse chart derives the same default name.
 */}}
 {{- define "kubeadapt.pulseTokenSecretName" -}}
-{{- .Values.global.pulse.existingSecret | default (printf "%s-pulse-token" (include "kubeadapt.name" .)) -}}
+{{- (.Values.global.pulse | default dict).existingSecret | default (printf "%s-pulse-token" (include "kubeadapt.name" .)) -}}
+{{- end }}
+
+{{/*
+Port of the agent's listener for the network monitor. The kubeadapt-k8s-pulse
+chart falls back to the same number.
+*/}}
+{{- define "kubeadapt.pulseListenPort" -}}
+{{- (.Values.global.pulse | default dict).listenPort | default 9091 -}}
+{{- end }}
+
+{{/*
+Name of the kubeadapt-k8s-pulse DaemonSet, derived as that chart derives it.
+*/}}
+{{- define "kubeadapt.pulseFullname" -}}
+{{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict -}}
+{{- if $pulse.fullnameOverride -}}
+{{- $pulse.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := default "kubeadapt-k8s-pulse" $pulse.nameOverride -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
 {{- end }}
 
 {{/*
 Name of the kubeadapt-k8s-pulse ClusterRole, derived as that chart derives it.
 */}}
 {{- define "kubeadapt.pulseClusterRoleName" -}}
+{{- printf "%s-%s" (include "kubeadapt.pulseFullname" .) .Release.Namespace | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+
+{{/*
+Name of the PriorityClass the kubeadapt-k8s-pulse chart creates, or empty when
+it creates none.
+*/}}
+{{- define "kubeadapt.pulsePriorityClassName" -}}
 {{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict -}}
-{{- $full := "" -}}
-{{- if $pulse.fullnameOverride -}}
-{{- $full = $pulse.fullnameOverride | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- $name := default "kubeadapt-k8s-pulse" $pulse.nameOverride -}}
-{{- if contains $name .Release.Name -}}
-{{- $full = .Release.Name | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- $full = printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- $class := $pulse.priorityClass | default dict -}}
+{{- if and $pulse.enabled $class.create -}}
+{{- default (include "kubeadapt.pulseClusterRoleName" .) $class.name -}}
 {{- end -}}
-{{- end -}}
-{{- printf "%s-%s" $full .Release.Namespace | trunc 63 | trimSuffix "-" -}}
 {{- end }}
