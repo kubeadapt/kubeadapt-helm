@@ -145,3 +145,42 @@ Pull secrets: the kubeadapt chart's global list followed by this chart's own.
 {{- toYaml $secrets -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Checks image.tag against the oldest network monitor release this chart may
+run: the kubeadapt.io/minimum-image-version annotation in Chart.yaml. Fails
+the render for an older release tag. Returns nothing for a tag that passes,
+and a few words for a tag whose age cannot be told (a digest, a build tag),
+which the install notes then mention.
+*/}}
+{{- define "kubeadapt-k8s-pulse.imageCheck" -}}
+{{- $min := index .Chart.Annotations "kubeadapt.io/minimum-image-version" | default "" -}}
+{{- $tag := (.Values.image | default dict).tag | default "" | toString -}}
+{{- if $min -}}
+{{- if contains "@" $tag -}}
+pinned by digest
+{{- else if regexMatch "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$" $tag -}}
+{{- if lt ((semver $tag).Compare (semver $min)) 0 -}}
+{{- fail (printf "kubeadapt-k8s-pulse: image tag %s is too old for this chart, which needs network monitor %s or newer. Older images attach to each pod's network interface with a classic tc filter at priority 1, handle 1, the place where CNI plugins and network policy agents keep their own filter, and replace it: Kubernetes network policy then stops being enforced on the node, and stays off after the network monitor is removed. Releases before v3.1.0 do this on every kernel, v3.1.0 on kernels older than 6.6. Set image.tag (kubeadapt-k8s-pulse.image.tag in the kubeadapt chart) to %s or newer, or remove it from your values to get this chart's default." $tag $min $min) -}}
+{{- end -}}
+{{- else -}}
+not a release tag
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Sentences for the install notes about the image's age.
+*/}}
+{{- define "kubeadapt-k8s-pulse.imageNote" -}}
+{{- $min := index .Chart.Annotations "kubeadapt.io/minimum-image-version" | default "" -}}
+{{- if $min -}}
+{{- with include "kubeadapt-k8s-pulse.imageCheck" . }}
+NOTE: the network monitor image tag "{{ $.Values.image.tag }}" is {{ . }}, so the chart
+could not check that it is version {{ $min }} or newer.
+{{ end -}}
+Never run a network monitor image older than {{ $min }} on a cluster whose CNI or
+network policy agent attaches classic tc filters to pod interfaces: older
+images replace those filters, and network policy stops being enforced.
+{{- end -}}
+{{- end }}

@@ -84,13 +84,21 @@ Everything the DaemonSet's pod uses beyond an ordinary pod, and why. A platform 
 | Host path `/sys/fs/bpf` | writable, propagation `HostToContainer`, created if missing | The pinned flow table that survives a restart, the lock that keeps one instance per node, and on Cilium its connection tracking maps. | No |
 | Host path `/sys/fs/cgroup` | read-only | Find pod cgroups, attach the cgroup programs, read the container's own memory use. | No |
 | Host path `/etc/cni/net.d` | read-only, at `/host/etc/cni/net.d`, created if missing | Identify the CNI and the encapsulation overhead it adds to each packet. | No |
-| Host path `/var/run/ztunnel` | read-only, at `/host/var/run/ztunnel`, created if missing | Detect an Istio ambient mesh by its socket. | No |
+| Host path `/var/run/ztunnel` | only with `istioAmbient.enabled`: read-only, at `/host/var/run/ztunnel`, created if missing | Detect an Istio ambient mesh by its socket. | Not mounted by default |
 | Seccomp profile | unset (`seccompProfile`) | The runtime's default profile must allow `bpf` and `perf_event_open` before it can be set. | |
 | SELinux label | unset (`seLinuxOptions`) | Set it where the node's policy denies the default container label these operations. | |
 | Kubernetes API | ClusterRole: `list`, `watch` pods; `get` nodes; `list` `ciliumenvoyconfigs.cilium.io` (`rbac.create`) | Pod identity for each node's traffic, the node's UID and zone, Envoy detection on Cilium. | Traffic is then reported without pod and node identity |
 | Agent token | Secret volume, read-only | The token the agent checks on every batch. | Only with export off |
 
 Against the Pod Security Standards, the host network, the host paths, the node port and the added capabilities are outside **baseline**; root and the unset seccomp profile are in addition outside **restricted**. The namespace must therefore allow the privileged level.
+
+## Image Version
+
+Do not run a network monitor image older than the chart's minimum (the `kubeadapt.io/minimum-image-version` annotation in `Chart.yaml`) on a cluster whose CNI or network policy agent attaches classic tc filters to pod interfaces: those images replace that filter, so network policy stops being enforced on the node and stays off after the network monitor is removed. The chart refuses such an image tag. A tag that is not a release version, or one pinned by digest, cannot be compared: it is accepted, and the install notes say so.
+
+## Istio Ambient Mesh
+
+Set `istioAmbient.enabled=true` on a cluster that runs ztunnel. The pod then mounts the node's `/var/run/ztunnel` read-only, which is how the network monitor tells that a node is in ambient mode. It is off by default because mounting a host directory that does not exist creates it, which would leave an empty directory on every node of a cluster without the mesh.
 
 ## Scheduling and Rollout
 
@@ -164,6 +172,7 @@ Set `image.repository` to your copy of the image and, where the registry needs c
 | image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse"` |  |
 | image.tag | string | `"v3.0.1"` |  |
 | imagePullSecrets | list | `[]` |  |
+| istioAmbient.enabled | bool | `false` |  |
 | nodeRequirements[0].key | string | `"kubernetes.io/os"` |  |
 | nodeRequirements[0].operator | string | `"In"` |  |
 | nodeRequirements[0].values[0] | string | `"linux"` |  |

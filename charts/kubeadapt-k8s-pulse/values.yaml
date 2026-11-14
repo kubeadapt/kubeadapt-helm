@@ -7,6 +7,12 @@ enabled: true
 image:
   # Point this at your own registry when you mirror the image.
   repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
+  # The chart refuses a release tag older than the one named in Chart.yaml
+  # (kubeadapt.io/minimum-image-version). Older images replace the tc filter
+  # that CNI plugins and network policy agents attach to each pod's network
+  # interface, and network policy stops being enforced on the node. A tag
+  # that is not a release version, or one pinned by digest ("<tag>@sha256:..."),
+  # cannot be checked and is accepted with a note.
   tag: "v3.0.1"
   # Release tags are never moved, so a node pulls each release once. Always
   # would ask the registry on every pod start, on every node.
@@ -119,6 +125,14 @@ capabilities:
   # removed when the inventory is turned off (EBPF_FINGERPRINT_ENABLED=false
   # in env); without it the inventory lists no containers.
   - SYS_PTRACE
+
+# Istio ambient mesh. Set enabled to true on a cluster that runs ztunnel: the
+# pod then mounts the node's /var/run/ztunnel read-only, which is how the
+# network monitor tells that a node is in ambient mode. Off by default,
+# because mounting a host directory that does not exist creates it, and on a
+# cluster without the mesh that would leave an empty directory on every node.
+istioAmbient:
+  enabled: false
 
 # Seccomp profile of the container. Unset uses the kubelet's default. Set
 # {type: RuntimeDefault} where the container runtime's default profile allows

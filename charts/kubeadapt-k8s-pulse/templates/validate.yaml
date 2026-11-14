@@ -8,3 +8,11 @@ the marker: every values.yaml since the reduced privileges has it.
 {{- if and .Values.enabled (not (hasKey .Values "rbac")) }}
 {{- fail "kubeadapt-k8s-pulse: these values were written for an earlier chart release (helm upgrade --reuse-values keeps the previous release's defaults, image tags included). The network monitor needs the image and settings of this release. Upgrade with --reset-values -f <your complete values file>, or with --reset-then-reuse-values (Helm 3.14 or newer), which keeps your own overrides and takes everything else from this chart." }}
 {{- end }}
+{{- /*
+An image from before the minimum release takes the tc filter slot of the
+node's CNI or network policy agent. The check comes after the one above, so
+that values of an earlier release get that message.
+*/}}
+{{- if .Values.enabled }}
+{{- $_ := include "kubeadapt-k8s-pulse.imageCheck" . }}
+{{- end }}

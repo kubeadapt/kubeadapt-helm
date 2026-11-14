@@ -97,6 +97,13 @@ measured.
    system, Fargate, virtual-kubelet), by nodeSelector and affinity, and by a
    taint that tolerations no longer covers.
 
+{{- with index (.Subcharts | default dict) "kubeadapt-k8s-pulse" }}
+{{- with include "kubeadapt-k8s-pulse.imageNote" . }}
+
+{{ . }}
+{{- end }}
+{{- end }}
+
 A change to the DaemonSet reaches {{ dig "updateStrategy" "rollingUpdate" "maxUnavailable" "25%" $pulse }} of the nodes at a time. Pods that wait
 Pending count against that share: when that many wait, the rollout stops
 until they start (UPDATED stays below DESIRED).

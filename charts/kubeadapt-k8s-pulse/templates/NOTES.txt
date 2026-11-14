@@ -17,6 +17,10 @@ READY should reach DESIRED. When it does not:
   kubectl -n {{ $ns }} logs <pod> --tail=50
 
 The chart README lists each cause and its setting under Troubleshooting.
+{{- with include "kubeadapt-k8s-pulse.imageNote" . }}
+
+{{ . }}
+{{- end }}
 {{- if not (.Values.config.export | default dict).enabled }}
 
 Export to the Kubeadapt agent is off: this release serves Prometheus metrics

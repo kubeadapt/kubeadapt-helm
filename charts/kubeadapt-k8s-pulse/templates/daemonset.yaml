@@ -7,6 +7,7 @@ pointer.
 {{- $config := .Values.config | default dict }}
 {{- $export := $config.export | default dict }}
 {{- $image := .Values.image | default dict }}
+{{- $ambient := (.Values.istioAmbient | default dict).enabled }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -172,11 +173,13 @@ spec:
             - name: cni-conf
               mountPath: /host/etc/cni/net.d
               readOnly: true
+            {{- if $ambient }}
             # Where an Istio ambient mesh places its ztunnel socket. Only the
             # socket's presence is checked.
             - name: ztunnel
               mountPath: /host/var/run/ztunnel
               readOnly: true
+            {{- end }}
             - name: tmp
               mountPath: /tmp
             {{- if $export.enabled }}
@@ -220,10 +223,15 @@ spec:
           hostPath:
             path: /etc/cni/net.d
             type: DirectoryOrCreate
+        {{- if $ambient }}
+        # DirectoryOrCreate so that the pod also starts on a node where
+        # ztunnel is not up yet. Mounted only on request (istioAmbient), so
+        # nothing is created on clusters without the mesh.
         - name: ztunnel
           hostPath:
             path: /var/run/ztunnel
             type: DirectoryOrCreate
+        {{- end }}
         - name: tmp
           emptyDir: {}
         {{- if $export.enabled }}

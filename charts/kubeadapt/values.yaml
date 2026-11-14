@@ -379,6 +379,8 @@ agent:
 #   updateStrategy                       how fast a change rolls out
 #   config.metricsPort                   the node port of its health server
 #   seLinuxOptions, privileged           nodes that enforce SELinux
+#   istioAmbient.enabled                 a cluster with an Istio ambient mesh
+#   podAnnotations, podLabels            policy exemptions, scrape selection
 kubeadapt-k8s-pulse:
   # Set to true to deploy the network monitor DaemonSet.
   enabled: false
