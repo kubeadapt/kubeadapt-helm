@@ -80,6 +80,7 @@ spec:
         readOnly: true
       - pathPrefix: /etc/cni/net.d
         readOnly: true
+      # Mounted only with kubeadapt-k8s-pulse.istioAmbient.enabled.
       - pathPrefix: /var/run/ztunnel
         readOnly: true
 ---

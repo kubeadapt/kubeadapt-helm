@@ -23,7 +23,7 @@
 - Linux kernel 5.10 or newer
 - the node's network namespace (`hostNetwork`), not its PID namespace
 - the Linux capabilities `BPF`, `PERFMON` and `NET_ADMIN`; `SYS_RESOURCE` on kernels older than 5.11 (it can be removed on newer kernels); `SYS_PTRACE` for the container runtime inventory (it can be removed when the inventory is off). Every other capability is dropped, privilege escalation is off and the root filesystem is read-only.
-- the node's `/proc`, cgroup tree, `/etc/cni/net.d` and `/var/run/ztunnel` read-only, and `/sys/fs/bpf` writable
+- the node's `/proc`, cgroup tree and `/etc/cni/net.d` read-only, and `/sys/fs/bpf` writable; `/var/run/ztunnel` read-only when `kubeadapt-k8s-pulse.istioAmbient.enabled` is set
 - read-only RBAC: list and watch pods, get nodes, list `ciliumenvoyconfigs.cilium.io`
 - a namespace that allows the privileged Pod Security level
 

@@ -121,7 +121,8 @@ When using Kubeadapt Helm charts, we recommend following these security best pra
 ### Network monitor (`kubeadapt-k8s-pulse`)
 
 - **Pod:** the node's network namespace, but its own PID namespace. Runs as root with every capability dropped except `BPF`, `PERFMON` and `NET_ADMIN` (loading and attaching its eBPF programs), `SYS_RESOURCE` (needed only on kernels older than 5.11) and `SYS_PTRACE` (the container runtime inventory). No privilege escalation, read-only root filesystem. Each capability is listed with its purpose in `charts/kubeadapt-k8s-pulse/values.yaml`; `privileged: true` is available for platforms whose security policy blocks this set.
-- **Host paths:** `/proc`, `/sys/fs/cgroup`, `/etc/cni/net.d` and `/var/run/ztunnel` read-only; `/sys/fs/bpf` writable for its own pinned map and node lock.
+- **Host paths:** `/proc`, `/sys/fs/cgroup` and `/etc/cni/net.d` read-only; `/sys/fs/bpf` writable for its own pinned map and node lock; `/var/run/ztunnel` read-only only with `istioAmbient.enabled`.
+- **Other programs on the node's network interfaces:** it attaches beside them and leaves their filters in place. Images older than the chart's minimum did not, and the chart refuses them.
 - **Cluster RBAC:** list and watch pods, get nodes, list `ciliumenvoyconfigs.cilium.io`. Nothing else.
 - **Token:** the agent accepts traffic records only from a sender that presents a shared bearer token. The chart generates it once into a Secret and keeps it across upgrades, or uses the Secret named in `global.pulse.existingSecret`. Both pods mount it as a file and read it again while running, so changing the Secret rotates it without a restart. The connection is plaintext gRPC inside the cluster network, so the token authenticates the sender but is not encrypted in transit.
 - **Ports:** `9090` for metrics and health, on every node address, without authentication. `kubeadapt-k8s-pulse.config.metricsPort` moves it.

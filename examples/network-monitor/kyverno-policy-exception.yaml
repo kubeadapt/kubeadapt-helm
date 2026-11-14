@@ -62,7 +62,7 @@ spec:
         - host-namespaces
         - autogen-host-namespaces
     # hostPath volumes: /proc, /sys/fs/bpf, /sys/fs/cgroup, /etc/cni/net.d,
-    # /var/run/ztunnel.
+    # and, with kubeadapt-k8s-pulse.istioAmbient.enabled, /var/run/ztunnel.
     - policyName: disallow-host-path
       ruleNames:
         - host-path

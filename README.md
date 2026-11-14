@@ -88,10 +88,12 @@ What the DaemonSet needs on each node:
 - Linux kernel 5.10 or newer
 - the node's network namespace (`hostNetwork`)
 - the Linux capabilities `BPF`, `PERFMON` and `NET_ADMIN`, plus `SYS_RESOURCE` on kernels older than 5.11 and `SYS_PTRACE` for the container runtime inventory; every other capability is dropped, privilege escalation is off and the root filesystem is read-only
-- read-only access to the node's `/proc`, cgroup tree, CNI configuration (`/etc/cni/net.d`) and Istio ztunnel directory (`/var/run/ztunnel`), and write access to the BPF filesystem (`/sys/fs/bpf`)
+- read-only access to the node's `/proc`, cgroup tree and CNI configuration (`/etc/cni/net.d`), and write access to the BPF filesystem (`/sys/fs/bpf`); on an Istio ambient mesh, with `kubeadapt-k8s-pulse.istioAmbient.enabled=true`, also read-only access to the ztunnel directory (`/var/run/ztunnel`)
 - read-only Kubernetes API access: list and watch pods, get nodes, list CiliumEnvoyConfigs
 
 The [kubeadapt-k8s-pulse chart README](charts/kubeadapt-k8s-pulse/README.md#what-the-pod-asks-of-the-node) lists each of these with the pod field and the reason. The host network, host paths and added capabilities place the pod outside the baseline Pod Security Standard, so its namespace must allow the privileged level, and a policy engine needs an exception for it: [examples/network-monitor](examples/network-monitor) has the namespace label, a Kyverno PolicyException and Gatekeeper constraints, each limited to what the pod uses. Where a node's security policy blocks the reduced capability set, set `kubeadapt-k8s-pulse.seLinuxOptions`, or run it privileged with `kubeadapt-k8s-pulse.privileged=true`.
+
+Do not run a network monitor image older than the chart's minimum on a cluster whose CNI or network policy agent attaches classic tc filters to pod interfaces: those images replace that filter, so network policy stops being enforced on the node and stays off after the network monitor is removed. The chart refuses such an image tag.
 
 Where it runs and how it rolls out:
 
@@ -165,7 +167,7 @@ This removes the agent Deployment, its Services, ServiceAccounts, the chart-crea
 - the `kubeadapt` namespace (Helm does not delete namespaces): `kubectl delete namespace kubeadapt`
 - a token Secret you created yourself for `existingSecret`
 - auto-upgrade Jobs that are still running; finished Jobs delete themselves after their TTL
-- on nodes that did not have them, the empty directories `/etc/cni/net.d` and `/var/run/ztunnel`, which the network monitor creates to mount
+- on nodes that did not have it, the empty directory `/etc/cni/net.d`, which the network monitor creates to mount; with `kubeadapt-k8s-pulse.istioAmbient.enabled=true` the same holds for `/var/run/ztunnel`
 
 Nothing is installed outside the release namespace except the cluster-scoped RBAC objects listed above.
 
