@@ -12,7 +12,8 @@ message: |
   Customer action required:
     1. Read the release notes: https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-1.0.0
     2. Update your values overrides if you renamed the subchart key.
-    3. Run 'helm upgrade kubeadapt kubeadapt/kubeadapt --version 1.0.4' manually.
+    3. Run 'helm upgrade kubeadapt kubeadapt/kubeadapt --version 1.0.4 --reset-values -f values.yaml' manually.
+       Helm then uses only values.yaml and the chart defaults. Put all your settings in values.yaml, also those you passed with --set before, such as agent.config.token.
 
 matchingRules:
   - type: Always
