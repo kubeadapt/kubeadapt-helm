@@ -184,18 +184,9 @@ for chart in $changed; do
   check_upgrade_from
   check_versions_and_images
   check_changes_annotation "$base"
-done
-
-# A parent is checked when it, or any subchart it pins, changed.
-for parent_dir in charts/*/; do
-  parent=$(basename "$parent_dir")
-  for dep in $(yq '.dependencies[].name' "charts/$parent/Chart.yaml" 2>/dev/null || true); do
-    if echo "$changed" | grep -qx -e "$parent" -e "$dep"; then
-      echo "=== $parent subchart pins"
-      check_subchart_pins "$parent"
-      break
-    fi
-  done
+  # Only a changed chart's pins: a subchart is released on its own first,
+  # and its parent raises the pin in the parent's next release.
+  check_subchart_pins "$chart"
 done
 
 if [ "$errors" -gt 0 ]; then
