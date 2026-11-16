@@ -29,10 +29,22 @@ released_versions() {
   git tag -l "$1-[0-9]*" | sed "s/^$1-//" | grep -E "$SEMVER_RE" | sort -t. -k1,1n -k2,2n -k3,3n || true
 }
 
-# image_tag prints the image tag a chart deploys by default.
-image_tag() {
+# image_repo and image_tag print the image a chart deploys by default.
+image_repo() {
   case "$1" in
-    kubeadapt) yq '.agent.image.tag' "charts/$1/values.yaml" ;;
+    kubeadapt) yq '.agent.image.repository' "charts/$1/values.yaml" ;;
+    *) yq '.image.repository' "charts/$1/values.yaml" ;;
+  esac
+}
+
+image_tag() {
+  local tag
+  case "$1" in
+    kubeadapt)
+      # The agent Deployment uses appVersion when agent.image.tag is empty.
+      tag=$(yq '.agent.image.tag // ""' "charts/$1/values.yaml")
+      echo "${tag:-$(yq '.appVersion' "charts/$1/Chart.yaml")}"
+      ;;
     *) yq '.image.tag' "charts/$1/values.yaml" ;;
   esac
 }
@@ -131,11 +143,14 @@ check_upgrade_from() {
 }
 
 check_versions_and_images() {
-  local dir="charts/$chart" app tag img
+  local dir="charts/$chart" app repo tag img
   app=$(yq '.appVersion' "$dir/Chart.yaml")
+  repo=$(image_repo "$chart")
   tag=$(image_tag "$chart")
   [ "${app#v}" = "${tag#v}" ] || fail "appVersion '$app' does not match the default image tag '$tag'"
+  # The list may also name other images, such as the upgrader's.
   for img in $(yq '.annotations."artifacthub.io/images" // ""' "$dir/Chart.yaml" | yq '.[].image' 2>/dev/null || true); do
+    [ "${img%:*}" = "$repo" ] || continue
     [ "${img##*:}" = "$tag" ] || fail "artifacthub.io/images lists $img, but the chart deploys tag $tag"
   done
 }
