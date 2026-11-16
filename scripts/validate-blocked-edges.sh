@@ -7,7 +7,9 @@
 set -euo pipefail
 
 SEMVER_RE='^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'
-PLATFORMS_RE='^(eks|aks|gke|openshift|on-premise)$'
+# The platforms the upgrader reports. A Platform rule for any other never
+# matches a cluster, so its edge blocks nothing.
+PLATFORMS_RE='^(eks|aks|gke|on-premise)$'
 
 cd "$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -42,6 +44,7 @@ for file in blocked-edges/*/*.yaml; do
   fi
 
   from=$(yq '.from' "$file")
+  [ "${#from}" -le 100 ] || fail "'from' is ${#from} characters; ingestion-api ignores patterns over 100"
   set +e
   echo "0.0.0" | grep -Eq "$from"
   [ $? -eq 2 ] && fail "'from' is not a valid regex: $from"
@@ -57,7 +60,7 @@ for file in blocked-edges/*/*.yaml; do
     platforms=$(yq '.matchingRules[] | select(.type == "Platform") | .platforms[]' "$file" 2>/dev/null || true)
     [ -n "$platforms" ] || fail "a Platform matchingRule needs a 'platforms' list"
     for p in $platforms; do
-      echo "$p" | grep -Eq "$PLATFORMS_RE" || warn "unknown platform '$p'"
+      echo "$p" | grep -Eq "$PLATFORMS_RE" || fail "unknown platform '$p' (eks, aks, gke, on-premise)"
     done
   fi
 
