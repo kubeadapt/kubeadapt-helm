@@ -23,7 +23,7 @@ warn() { echo "  warning: $*"; }
 redirects=$(mktemp)
 trap 'rm -f "$redirects"' EXIT
 
-for file in blocked-edges/*/*.yaml; do
+for file in blocked-edges/*/*.yaml blocked-edges/*/*.yml; do
   [ -f "$file" ] || continue
   chart=$(basename "$(dirname "$file")")
   echo "=== $file"

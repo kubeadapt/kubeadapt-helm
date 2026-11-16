@@ -68,7 +68,7 @@ redirect_to: "0.16.1"
 
 ## Validation
 
-All blocked-edge files are validated on every pull request by `scripts/validate-blocked-edges.sh` (the `blocked-edges` job, part of the required `gate` check):
+All blocked-edge files, `.yaml` and `.yml` (ingestion-api reads both), are validated on every pull request by `scripts/validate-blocked-edges.sh` (the `blocked-edges` job, part of the required `gate` check):
 - YAML syntax check
 - Required fields validation
 - Regex validation for `from` field, at most 100 characters (ingestion-api ignores longer patterns)

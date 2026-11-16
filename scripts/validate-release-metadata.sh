@@ -40,7 +40,7 @@ image_tag() {
 # edge_blocks succeeds when a blocked edge stops auto-upgrades from $3 to $2.
 edge_blocks() {
   local f
-  for f in blocked-edges/"$1"/*.yaml; do
+  for f in blocked-edges/"$1"/*.yaml blocked-edges/"$1"/*.yml; do
     [ -f "$f" ] || continue
     [ "$(yq '.to' "$f")" = "$2" ] || continue
     if echo "$3" | grep -Eq "$(yq '.from' "$f")"; then
