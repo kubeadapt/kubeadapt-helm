@@ -6,7 +6,7 @@ Changes are published automatically when merged to `main`. They are not publishe
 Checklist:
 
 * [ ] I have bumped the chart version according to semantic versioning (a new minor or major ships fast-only, see [RELEASE-POLICY.md](../docs/RELEASE-POLICY.md))
-* [ ] `upgrade-metadata.yaml`: `chartVersion`, `upgradeFrom` (latest release first, released versions only), `channels` and `metadata.releaseNotes` match this version
+* [ ] `upgrade-metadata.yaml`: `chartVersion`, `upgradeFrom` (latest release first, exact released versions only), `channels` and `metadata.releaseNotes` match this version
 * [ ] The chart's `RELEASE_NOTES.md` has a `## <version>` section
 * [ ] `artifacthub.io/changes` lists only this release's changes
 * [ ] `appVersion`, the default image tag and `artifacthub.io/images` agree

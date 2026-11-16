@@ -93,7 +93,7 @@ Follow these steps when cutting a release:
 
 2. **Update `upgrade-metadata.yaml`**
    - Set `chartVersion` to match `Chart.yaml` version exactly
-   - Set `upgradeFrom` list (see policy above); the first entry is the latest release, and every entry was actually released
+   - Set `upgradeFrom` list (see policy above); the first entry is the latest release, and every entry is an exact version that was actually released
    - Set `channels: [fast]` or `channels: [stable, fast]`; a new minor or major (`x.y.0`) is fast-only
    - Set `metadata.releaseNotes` to `https://github.com/kubeadapt/kubeadapt-helm/releases/tag/<chart>-<version>`
 

@@ -119,7 +119,7 @@ check_upgrade_from() {
   major=${version%%.*}
   for from in $(yq '.upgradeFrom[]' "$meta"); do
     if ! echo "$from" | grep -Eq "$SEMVER_RE"; then
-      echo "  note: upgradeFrom '$from' is a pattern and is not checked"
+      fail "upgradeFrom '$from' is not an exact version; list released versions only, since ingestion-api matches each entry as a regex"
       continue
     fi
     echo "$released" | grep -qx "$from" ||
