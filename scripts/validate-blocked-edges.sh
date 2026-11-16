@@ -54,10 +54,16 @@ for file in blocked-edges/*/*.yaml blocked-edges/*/*.yml; do
   [ $? -eq 2 ] && fail "'from' is not a valid regex: $from"
   set -e
 
-  for rule_type in $(yq '.matchingRules[].type' "$file" 2>/dev/null || true); do
+  # ingestion-api ignores a rule that is not a map or whose type is neither
+  # Always nor Platform (a missing type counts as Always), and an edge with no
+  # rule it applies blocks nothing.
+  if yq -e '.matchingRules[] | select(tag != "!!map")' "$file" >/dev/null 2>&1; then
+    fail "every matchingRules entry must be a map, such as '- type: Always'"
+  fi
+  for rule_type in $(yq '.matchingRules[] | select(tag == "!!map") | .type // "Always"' "$file" 2>/dev/null || true); do
     case "$rule_type" in
-      Always | Platform | PromQL) ;;
-      *) warn "unknown matchingRules type '$rule_type' (Always, Platform, PromQL)" ;;
+      Always | Platform) ;;
+      *) fail "unknown matchingRules type '$rule_type' (Always or Platform)" ;;
     esac
   done
   if yq -e '.matchingRules[] | select(.type == "Platform")' "$file" >/dev/null 2>&1; then
