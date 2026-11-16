@@ -11,9 +11,11 @@ message: |
 
   Customer action required:
     1. Read the release notes: https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-1.0.0
-    2. Update your values overrides if you renamed the subchart key.
-    3. Run 'helm upgrade kubeadapt kubeadapt/kubeadapt --version 1.0.1 --reset-values -f values.yaml' manually.
-       Helm then uses only values.yaml and the chart defaults. Put all your settings in values.yaml, also those you passed with --set before, such as agent.config.token.
+    2. Save the values of your release, including those you passed with --set:
+       'helm get values kubeadapt --namespace kubeadapt -o yaml > values.yaml'
+       Check that values.yaml has agent.config.token or agent.config.existingSecret, and rename 'ebpf-agent:' to 'kubeadapt-k8s-pulse:' if it is there.
+    3. Run 'helm repo update', then 'helm upgrade kubeadapt kubeadapt/kubeadapt --namespace kubeadapt --version 1.0.1 --reset-values -f values.yaml' manually.
+       Helm then uses only values.yaml and the chart defaults. If you installed under another release name or namespace, use those in both commands.
 
 matchingRules:
   - type: Always
