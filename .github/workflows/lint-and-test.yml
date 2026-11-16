@@ -73,7 +73,7 @@ jobs:
         run: |
           cd charts/kubeadapt
           helm dependency build
-          if [ $(find charts/ -name "kubeadapt-k8s-pulse-*.tgz" | wc -l) -eq 0 ]; then
+          if [ "$(find charts/ -name "kubeadapt-k8s-pulse-*.tgz" | wc -l)" -eq 0 ]; then
             echo "Dependencies not correctly resolved"
             echo "Expected to find kubeadapt-k8s-pulse-*.tgz in charts directory"
             ls -la charts/
