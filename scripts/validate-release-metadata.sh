@@ -49,12 +49,16 @@ image_tag() {
   esac
 }
 
-# edge_blocks succeeds when a blocked edge stops auto-upgrades from $3 to $2.
+# edge_blocks succeeds when a blocked edge stops auto-upgrades from $3 to $2
+# on every platform.
 edge_blocks() {
   local f
   for f in blocked-edges/"$1"/*.yaml blocked-edges/"$1"/*.yml; do
     [ -f "$f" ] || continue
     [ "$(yq '.to' "$f")" = "$2" ] || continue
+    # Only an edge with no rules or an Always rule applies on every platform;
+    # ingestion-api treats a rule without a type as Always.
+    yq -e '(.matchingRules // []) | (length == 0 or any_c(tag == "!!map" and ((.type // "") == "" or .type == "Always")))' "$f" >/dev/null 2>&1 || continue
     if echo "$3" | grep -Eq "$(yq '.from' "$f")"; then
       return 0
     fi
@@ -137,7 +141,7 @@ check_upgrade_from() {
     echo "$released" | grep -qx "$from" ||
       fail "upgradeFrom '$from' was never released (no $chart-$from tag)"
     if [ "${from%%.*}" != "$major" ] && ! edge_blocks "$chart" "$version" "$from"; then
-      fail "upgradeFrom '$from' lets auto-upgrade cross a major version; drop it or add blocked-edges/$chart/$version-<name>.yaml"
+      fail "upgradeFrom '$from' lets auto-upgrade cross a major version; drop it or add blocked-edges/$chart/$version-<name>.yaml with an Always rule"
     fi
   done
 }
