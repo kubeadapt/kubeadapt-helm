@@ -3,7 +3,8 @@
 # from main, so a malformed edge takes effect as soon as it merges.
 #
 # Runs in CI (lint-and-test.yml) and locally: ./scripts/validate-blocked-edges.sh
-# Needs git tags (an edge must target a released version) and mikefarah/yq v4.
+# Needs git tags (an edge targets a released version or the version in
+# charts/<chart>/Chart.yaml) and mikefarah/yq v4.
 set -euo pipefail
 
 SEMVER_RE='^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'
@@ -37,10 +38,13 @@ for file in blocked-edges/*/*.yaml blocked-edges/*/*.yml; do
   done
 
   to=$(yq '.to' "$file")
+  # A release PR may carry the edge for its own version, which is tagged
+  # only when publish.yml runs after the merge.
+  chart_version=$(yq '.version' "charts/$chart/Chart.yaml" 2>/dev/null || true)
   if ! echo "$to" | grep -Eq "$SEMVER_RE"; then
     fail "'to' must be an exact version, got '$to'"
-  elif ! git rev-parse -q --verify "refs/tags/$chart-$to" >/dev/null; then
-    fail "'to' $to was never released (no $chart-$to tag)"
+  elif [ "$to" != "$chart_version" ] && ! git rev-parse -q --verify "refs/tags/$chart-$to" >/dev/null; then
+    fail "'to' $to is neither released (no $chart-$to tag) nor the version in charts/$chart/Chart.yaml"
   fi
 
   from=$(yq '.from' "$file")

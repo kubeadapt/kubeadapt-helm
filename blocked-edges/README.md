@@ -72,7 +72,8 @@ All blocked-edge files, `.yaml` and `.yml` (ingestion-api reads both), are valid
 - YAML syntax check
 - Required fields validation
 - Regex validation for `from` field, at most 100 characters (ingestion-api ignores longer patterns)
-- `to` and `redirect_to` must be exact versions that were released (a `<chart>-<version>` tag exists)
+- `to` must be an exact version that was released (a `<chart>-<version>` tag exists) or the version in `charts/<chart>/Chart.yaml`, so a release PR can add the edge for its own version
+- `redirect_to` must be an exact version that was released
 - `Platform` rules list only `eks`, `aks`, `gke` or `on-premise`, the platforms the upgrader reports
 - `redirect_to` chains must terminate (no cycles)
 

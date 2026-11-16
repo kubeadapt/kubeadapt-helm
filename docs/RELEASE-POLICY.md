@@ -106,7 +106,7 @@ Follow these steps when cutting a release:
 5. **Open a PR**
    The required `gate` check passes only when every job in `lint-and-test.yml` passes. `release-metadata` runs `scripts/validate-release-metadata.sh` on every chart the PR changes and checks steps 1-4, plus:
    - the version is not already released
-   - an `upgradeFrom` entry from another major has a blocked edge for this version
+   - an `upgradeFrom` entry from another major has a blocked edge for this version (add it in the release PR)
    Run the script locally before pushing.
 
 6. **Merge to main**
