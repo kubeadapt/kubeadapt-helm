@@ -107,6 +107,9 @@ rules:
     resourceNames:
       - "{{ include "kubeadapt.name" . }}-agent{{ include "kubeadapt.clusterResourceSuffix" . }}"
       - "{{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}"
+      {{- if (index .Values "kubeadapt-k8s-pulse" | default dict).enabled }}
+      - "{{ include "kubeadapt.pulseClusterRoleName" . }}"
+      {{- end }}
     verbs: ["get", "list", "update", "patch", "delete", "escalate"]
   # Separate rule for create (resourceNames constraint not supported)
   - apiGroups: ["rbac.authorization.k8s.io"]

@@ -36,6 +36,8 @@ annotations:
   artifacthub.io/changes: |
     - kind: fixed
       description: "Auto-upgrade works again. 1.0.8 gave the agent get on nodes/proxy and nodes/stats but not the upgrader, and Kubernetes lets the upgrader update the agent's ClusterRoleBinding only if it holds every rule of the agent's ClusterRole, so every auto-upgrade from 1.0.8 failed and rolled back. The upgrader now holds those two rules as well."
+    - kind: changed
+      description: "With the network monitor enabled, the upgrader may also manage the network monitor's ClusterRole and ClusterRoleBinding. Later releases add both, and an auto-upgrade runs with the installed release's upgrader, so without this the auto-upgrade from 1.0.9 to those releases would stop before it changes anything."
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/license: Apache-2.0
