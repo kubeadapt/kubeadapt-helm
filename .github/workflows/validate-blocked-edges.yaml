@@ -1,0 +1,190 @@
+name: Validate Blocked Edges
+
+# ingestion-api reads blocked-edges/ live from main, so a malformed edge takes
+# effect as soon as it merges. The blocked-edges job of lint-and-test.yml runs
+# this workflow on every pull request, behind the required gate check.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Tags: the checks look up released versions.
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install yq
+        id: yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.47.2/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Validate blocked-edges
+        run: |
+          set -euo pipefail
+
+          SEMVER_RE='^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'
+          # The platforms the upgrader reports. A Platform rule for any other never
+          # matches a cluster, so its edge blocks nothing.
+          PLATFORMS_RE='^(eks|aks|gke|on-premise)$'
+
+          errors=0
+          fail() {
+            echo "  ERROR: $*"
+            errors=$((errors + 1))
+          }
+          warn() { echo "  warning: $*"; }
+
+          # ingestion-api reads both extensions.
+          for file in blocked-edges/*/*.yaml blocked-edges/*/*.yml; do
+            [ -f "$file" ] || continue
+            chart=$(basename "$(dirname "$file")")
+            echo "=== $file"
+
+            # 1. YAML syntax check
+            if ! yq '.' "$file" >/dev/null 2>&1; then
+              fail "invalid YAML"
+              continue
+            fi
+
+            # 2. Required fields
+            for field in to from name message; do
+              yq -e ".$field" "$file" >/dev/null 2>&1 || fail "missing '$field'"
+            done
+
+            # 3. 'to' version format validation
+            to=$(yq '.to' "$file")
+            # A release PR may carry the edge for its own version, which is tagged
+            # only when publish.yml runs after the merge.
+            chart_version=$(yq '.version' "charts/$chart/Chart.yaml" 2>/dev/null || true)
+            if ! echo "$to" | grep -Eq "$SEMVER_RE"; then
+              fail "'to' must be an exact version, got '$to'"
+            elif [ "$to" != "$chart_version" ] && ! git rev-parse -q --verify "refs/tags/$chart-$to" >/dev/null; then
+              fail "'to' $to is neither released (no $chart-$to tag) nor the version in charts/$chart/Chart.yaml"
+            fi
+
+            # 4. 'from' regex validation
+            from=$(yq '.from' "$file")
+            [ "${#from}" -le 100 ] || fail "'from' is ${#from} characters; ingestion-api ignores patterns over 100"
+            set +e
+            echo "0.0.0" | grep -Eq "$from"
+            [ $? -eq 2 ] && fail "'from' is not a valid regex: $from"
+            set -e
+
+            # 5. matchingRules type validation (if exists)
+            # ingestion-api ignores a rule that is not a map or whose type is neither
+            # Always nor Platform (a missing type counts as Always), and an edge with no
+            # rule it applies blocks nothing.
+            if yq -e '.matchingRules[] | select(tag != "!!map")' "$file" >/dev/null 2>&1; then
+              fail "every matchingRules entry must be a map, such as '- type: Always'"
+            fi
+            for rule_type in $(yq '.matchingRules[] | select(tag == "!!map") | .type // "Always"' "$file" 2>/dev/null || true); do
+              case "$rule_type" in
+                Always | Platform) ;;
+                *) fail "unknown matchingRules type '$rule_type' (Always or Platform)" ;;
+              esac
+            done
+            if yq -e '.matchingRules[] | select(.type == "Platform")' "$file" >/dev/null 2>&1; then
+              platforms=$(yq '.matchingRules[] | select(.type == "Platform") | .platforms[]' "$file" 2>/dev/null || true)
+              [ -n "$platforms" ] || fail "a Platform matchingRule needs a 'platforms' list"
+              for p in $platforms; do
+                echo "$p" | grep -Eq "$PLATFORMS_RE" || fail "unknown platform '$p' (eks, aks, gke, on-premise)"
+              done
+            fi
+
+            # 6. redirect_to version format (if exists)
+            redirect=$(yq '.redirect_to // ""' "$file")
+            if [ -n "$redirect" ]; then
+              if ! echo "$redirect" | grep -Eq "$SEMVER_RE"; then
+                fail "'redirect_to' must be an exact version, got '$redirect'"
+              elif ! git rev-parse -q --verify "refs/tags/$chart-$redirect" >/dev/null; then
+                fail "'redirect_to' $redirect was never released (no $chart-$redirect tag)"
+              fi
+            fi
+
+            # 7. Recommended fields (warnings)
+            yq -e '.url' "$file" >/dev/null 2>&1 || warn "no 'url' (recommended)"
+          done
+
+          if [ "$errors" -gt 0 ]; then
+            echo
+            echo "$errors blocked-edge error(s). See blocked-edges/README.md."
+            exit 1
+          fi
+          echo
+          echo "Blocked edges OK."
+
+      # This step and the next one also run when the step above fails, so that
+      # one run reports every problem.
+      - name: Check file naming convention
+        if: ${{ !cancelled() && steps.yq.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+
+          for file in blocked-edges/*/*.yaml blocked-edges/*/*.yml; do
+            [ -f "$file" ] || continue
+            # "Validate blocked-edges" reports a file that is not valid YAML.
+            yq '.' "$file" >/dev/null 2>&1 || continue
+
+            to=$(yq '.to' "$file")
+            case "$(basename "$file" .yaml)" in
+              "$to"-*) ;;
+              *)
+                echo "=== $file"
+                echo "  warning: file name should start with '$to-'"
+                ;;
+            esac
+          done
+
+      - name: Check for redirect_to cycles
+        if: ${{ !cancelled() && steps.yq.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+
+          # Build a map of all blocked edges with redirect_to, one
+          # "<chart> <to> <redirect_to>" line per edge.
+          redirects=$(mktemp)
+          for file in blocked-edges/*/*.yaml blocked-edges/*/*.yml; do
+            [ -f "$file" ] || continue
+            yq '.' "$file" >/dev/null 2>&1 || continue
+            chart=$(basename "$(dirname "$file")")
+            to=$(yq '.to' "$file")
+            redirect=$(yq '.redirect_to // ""' "$file")
+            if [ -n "$redirect" ]; then
+              echo "$chart $to $redirect" >>"$redirects"
+            fi
+          done
+
+          # A redirect chain must terminate: follow every chain and fail on a revisit.
+          errors=0
+          while read -r chart start _; do
+            visited="|$start|"
+            current=$start
+            while next=$(awk -v c="$chart" -v t="$current" '$1 == c && $2 == t { print $3; exit }' "$redirects") && [ -n "$next" ]; do
+              case "$visited" in
+                *"|$next|"*)
+                  echo "=== redirect chains"
+                  echo "  ERROR: $chart redirect cycle: ${visited//|/ } -> $next"
+                  errors=$((errors + 1))
+                  break
+                  ;;
+              esac
+              visited="$visited$next|"
+              current=$next
+            done
+          done <"$redirects"
+
+          if [ "$errors" -gt 0 ]; then
+            echo
+            echo "$errors blocked-edge error(s). See blocked-edges/README.md."
+            exit 1
+          fi
+          echo "✓ No redirect_to cycles detected"

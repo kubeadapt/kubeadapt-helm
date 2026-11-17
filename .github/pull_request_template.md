@@ -13,7 +13,7 @@ Checklist:
 * [ ] A chart that depends on a chart in `charts/` pins that chart's current version
 * [ ] Any new values are backwards compatible and/or have sensible defaults
 * [ ] I have updated the documentation
-* [ ] `./scripts/validate-release-metadata.sh` passes locally and the `gate` check is green
+* [ ] The `gate` check is green
 
 Changes:
 <!-- Please provide a brief description of the changes in this PR -->

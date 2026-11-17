@@ -77,7 +77,7 @@ redirect_to: "0.18.1"   # optional — suggest a safe target
 - `from`: regex matching source versions affected
 - `redirect_to`: optional safe alternative to offer instead
 
-CI validates blocked edge files automatically on every PR that touches them.
+`validate-blocked-edges.yaml` validates the blocked edge files on every PR, as the `blocked-edges` job of `lint-and-test.yml`.
 
 ---
 
@@ -104,10 +104,9 @@ Follow these steps when cutting a release:
    A chart that depends on a chart in `charts/` must pin that chart's current version, or the release ships a stale subchart.
 
 5. **Open a PR**
-   The required `gate` check passes only when every job in `lint-and-test.yml` passes. `release-metadata` runs `scripts/validate-release-metadata.sh` on every chart the PR changes and checks steps 1-4, plus:
+   The required `gate` check passes only when every job in `lint-and-test.yml` passes. Its `release-metadata` job runs `validate-upgrade-metadata.yaml`, which checks steps 1-4 on every chart the PR changes, plus:
    - the version is not already released
    - an `upgradeFrom` entry from another major has a blocked edge for this version that applies on every platform, with an `Always` rule or no `matchingRules` (add it in the release PR)
-   Run the script locally before pushing.
 
 6. **Merge to main**
    `publish.yml` runs: packages the chart, pushes to GHCR, creates a GitHub Release, marks fast-only releases as pre-releases, and keeps "Latest" on the newest stable `kubeadapt` release.
