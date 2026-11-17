@@ -29,6 +29,15 @@ keywords:
 
 # Additional metadata
 annotations:
+  # Oldest network monitor release this chart may run; the templates refuse an
+  # older image.tag. It must be a release that attaches with TCX where the
+  # kernel has it and, on older kernels, with a classic tc filter at its own
+  # priority that never replaces another program's filter. v3.1.0 is the
+  # newest release today and does not qualify (it replaces the filter at
+  # priority 1, handle 1 on kernels older than 6.6), so the number below means
+  # "any release after v3.1.0". When that release is cut, set this to its
+  # version together with image.tag in values.yaml.
+  kubeadapt.io/minimum-image-version: "3.1.1"
   artifacthub.io/signKey: |
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
