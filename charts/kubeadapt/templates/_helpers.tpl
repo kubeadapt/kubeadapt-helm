@@ -66,3 +66,27 @@ Behaviour:
 -{{ .Release.Namespace }}
 {{- end -}}
 {{- end }}
+
+{{/*
+Name of the kubeadapt-k8s-pulse DaemonSet, derived as that chart derives it.
+*/}}
+{{- define "kubeadapt.pulseFullname" -}}
+{{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict -}}
+{{- if $pulse.fullnameOverride -}}
+{{- $pulse.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := default "kubeadapt-k8s-pulse" $pulse.nameOverride -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Name of the kubeadapt-k8s-pulse ClusterRole, derived as that chart derives it.
+*/}}
+{{- define "kubeadapt.pulseClusterRoleName" -}}
+{{- printf "%s-%s" (include "kubeadapt.pulseFullname" .) .Release.Namespace | trunc 63 | trimSuffix "-" -}}
+{{- end }}
