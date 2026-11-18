@@ -17,3 +17,25 @@ spec:
     {{- include "kubeadapt.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: agent
 {{- end }}
+{{- if include "kubeadapt.pulseConnected" . }}
+---
+# The agent's listener for the network monitor, reachable only inside the
+# cluster whatever agent.service.type is.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kubeadapt.name" . }}-agent-pulse
+  labels:
+    {{- include "kubeadapt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.global.pulse.listenPort }}
+      targetPort: pulse
+      protocol: TCP
+      name: pulse
+  selector:
+    {{- include "kubeadapt.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+{{- end }}

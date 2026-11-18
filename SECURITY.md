@@ -2,10 +2,7 @@
 
 ## Supported Versions and Upstream Reporting
 
-Each Helm chart currently supports the designated application version in the Chart.yaml. There is a chance a security issue you've discovered may not be with the Helm chart but with the upstream application. Please visit that application's Security policy document to find out how to report the security issue.
-
-* [Security Policy for Kubeadapt Agent](https://github.com/kubeadapt/kubeadapt-agent/blob/main/SECURITY.md)
-* [Security Policy for eBPF Agent](https://github.com/kubeadapt/ebpf-agent/blob/main/SECURITY.md)
+Each Helm chart currently supports the designated application version in the Chart.yaml. Report security issues in the agent or network monitor images the same way as issues in the charts, as described below.
 
 ## Reporting a Vulnerability
 
@@ -112,6 +109,24 @@ When using Kubeadapt Helm charts, we recommend following these security best pra
 3. Review the values.yaml and understand the security implications of each setting
 4. Follow the principle of least privilege when configuring RBAC
 5. Keep your Helm and Kubernetes versions up to date
+
+## What the Charts Ask For
+
+### Agent (`kubeadapt`)
+
+- **Pod:** meets the Kubernetes restricted Pod Security Standard by default: non-root (UID/GID 65532), RuntimeDefault seccomp, every capability dropped, no privilege escalation, read-only root filesystem.
+- **Cluster RBAC:** list and watch of the inventory it reports (nodes, namespaces, pods, workloads, services, EndpointSlices, storage, autoscalers, policies and the optional VPA and Karpenter groups), list and watch of the metrics API, and `get` on `nodes/stats` and `nodes/proxy` for per-pod network counters from each kubelet. See `charts/kubeadapt/templates/agent/rbac.yaml` for every rule and what it is used for.
+- **Ports:** `8080` for health and metrics. With the network monitor enabled, also `9091` for the monitor's traffic records, on its own ClusterIP Service.
+
+### Network monitor (`kubeadapt-k8s-pulse`)
+
+- **Pod:** the node's network namespace, but its own PID namespace. Runs as root with every capability dropped except `BPF`, `PERFMON` and `NET_ADMIN` (loading and attaching its eBPF programs), `SYS_RESOURCE` (needed only on kernels older than 5.11) and `SYS_PTRACE` (the container runtime inventory). No privilege escalation, read-only root filesystem. Each capability is listed with its purpose in `charts/kubeadapt-k8s-pulse/values.yaml`; `privileged: true` is available for platforms whose security policy blocks this set.
+- **Host paths:** `/proc`, `/sys/fs/cgroup`, `/etc/cni/net.d` and `/var/run/ztunnel` read-only; `/sys/fs/bpf` writable for its own pinned map and node lock.
+- **Cluster RBAC:** list and watch pods, get nodes, list `ciliumenvoyconfigs.cilium.io`. Nothing else.
+- **Token:** the agent accepts traffic records only from a sender that presents a shared bearer token. The chart generates it once into a Secret and keeps it across upgrades, or uses the Secret named in `global.pulse.existingSecret`. Both pods mount it as a file and read it again while running, so changing the Secret rotates it without a restart. The connection is plaintext gRPC inside the cluster network, so the token authenticates the sender but is not encrypted in transit.
+- **Ports:** `9090` for metrics and health, on every node address, without authentication.
+
+The network monitor's pod does not meet the baseline Pod Security Standard (host network, host paths, added capabilities), so its namespace must allow the privileged level.
 
 ## Security Measures
 

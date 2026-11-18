@@ -31,6 +31,12 @@ The agent pod meets the Kubernetes restricted Pod Security Standard by default. 
 `--set agent.podSecurityContext.runAsUser=null --set agent.podSecurityContext.runAsGroup=null --set agent.podSecurityContext.fsGroup=null`
 so the restricted-v2 SCC can assign the user and group.
 
+## Network Monitoring
+
+The network monitor (`kubeadapt-k8s-pulse`) is off by default. `--set kubeadapt-k8s-pulse.enabled=true` deploys its DaemonSet, turns on the agent's listener for it behind the `<name>-agent-pulse` ClusterIP Service, and gives both sides the same token: a Secret the chart creates once and keeps across upgrades, or your own Secret named in `global.pulse.existingSecret` (key `token`). Use your own Secret when a tool renders the chart without cluster access, such as Argo CD.
+
+The DaemonSet needs Linux 5.10 or newer, the node's network namespace, read-only node paths, writable `/sys/fs/bpf` and the capabilities `BPF`, `PERFMON`, `NET_ADMIN`, `SYS_RESOURCE` and `SYS_PTRACE`, so its namespace must allow the privileged Pod Security level. See the [kubeadapt-k8s-pulse chart](../kubeadapt-k8s-pulse) for each requirement.
+
 ## Uninstalling the Chart
 
 ```console

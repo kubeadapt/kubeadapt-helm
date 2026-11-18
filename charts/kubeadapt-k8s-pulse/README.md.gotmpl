@@ -6,16 +6,16 @@
 
 ## Overview
 
-The eBPF agent runs as a DaemonSet on each Kubernetes node, capturing network packets at the Traffic Control (TC) layer to track pod-to-pod traffic. It exports raw IP-based connection metrics to Prometheus.
+The network monitor runs as a DaemonSet on every node. Its eBPF programs count each pod's traffic at the host side of the pod's network interface, and it sends one batch per node per minute to the Kubeadapt agent, which reports it as network cost.
 
 ### Key Features
 
-- **Pod-Level Traffic Tracking**: Monitors network traffic between pods using TC eBPF hooks
-- **Protocol Support**: TCP and UDP traffic with separate tracking
-- **IPv4 and IPv6 Support**: Full dual-stack support on kernel 5.10+
-- **Egress-Only Tracking**: Same-node and cross-node across pods
-- **Multi-Interface Deduplication**: Prevents counting same packet across interface paths
-- **Overflow Protection**: Ringbuffer captures flows when map reaches capacity
+- **Per-pod traffic**: sent and received bytes and packets for each pod, attached with TCX on kernel 6.6 and newer and with classic tc on older kernels
+- **IPv4 and IPv6**: dual-stack accounting on kernel 5.10 and newer
+- **Pod and node identity**: each node's pods are resolved through the Kubernetes API
+- **Delivery to the agent**: batches the agent has not acknowledged are kept and retried
+- **Overflow handling**: flows the kernel table has no room for are carried by a ring buffer instead of being lost
+- **Prometheus metrics** and health endpoints on every node
 
 ## Prerequisites
 
@@ -52,6 +52,8 @@ helm install kubeadapt-k8s-pulse oci://ghcr.io/kubeadapt/kubeadapt-helm/{{ .Name
 
 > **Note:** Using `kubeadapt-k8s-pulse` as release name ensures the service name matches Prometheus scrape configurations.
 
+Installed on its own, the DaemonSet serves only its Prometheus metrics. To report network cost, install it through the `kubeadapt` chart with `kubeadapt-k8s-pulse.enabled=true`, which also turns on the agent's listener and gives both sides a shared token. To send to an agent installed separately, set `config.export.enabled=true`, `config.export.agentEndpoint` and `config.export.tokenSecret` (a Secret with the agent's token under the key `token`).
+
 ## Uninstalling the Chart
 
 To uninstall/delete the deployment:
@@ -62,45 +64,57 @@ helm delete kubeadapt-k8s-pulse -n kubeadapt
 
 ## Security Requirements
 
-The eBPF agent requires privileged access:
+The container runs as root with every Linux capability dropped except these:
 
 ```yaml
 securityContext:
-  privileged: true
+  privileged: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
   capabilities:
+    drop:
+      - ALL
     add:
-      - SYS_ADMIN    # Load/attach eBPF programs
-      - SYS_RESOURCE # Lock memory for BPF maps
-      - NET_ADMIN    # Network namespace operations
+      - BPF           # create BPF maps and load the programs
+      - PERFMON       # required by the kernel verifier to accept the programs
+      - NET_ADMIN     # attach to pod interfaces, follow interface changes, read conntrack
+      - SYS_RESOURCE  # raise the locked-memory limit; kernels older than 5.11 only
+      - SYS_PTRACE    # read other containers' executables for the runtime inventory
 ```
 
-Additionally requires:
-- `hostNetwork: true` - Access host network namespace
-- `hostPID: true` - Track processes for connection attribution
+It also needs:
+
+- `hostNetwork: true`, to attach in the node's network namespace. The pod keeps its own PID namespace.
+- Read-only host paths: `/proc` (at `/host/proc`), `/sys/fs/cgroup`, `/etc/cni/net.d` (at `/host/etc/cni/net.d`) and `/var/run/ztunnel` (at `/host/var/run/ztunnel`). `/sys/fs/bpf` is writable, for the pinned flow table and the one-instance-per-node lock.
+- A ClusterRole with `list` and `watch` on pods, `get` on nodes and `list` on `ciliumenvoyconfigs.cilium.io` (`rbac.create`).
+
+`SYS_RESOURCE` can be removed on kernels 5.11 and newer, and `SYS_PTRACE` when the runtime inventory is turned off (`EBPF_FINGERPRINT_ENABLED=false` in `env`). The pod is outside the baseline Pod Security Standard (host network, host paths, added capabilities), so its namespace must allow the privileged level. Where a security policy blocks this set, `privileged: true` runs a privileged container.
+
+The DaemonSet tolerates every taint and runs at `system-node-critical` priority. While `priorityClassName` is a `system-*` class, the chart creates a ResourceQuota that admits that class in the release namespace.
 
 ## Exported Metrics
 
-### Pod-Level Traffic Metrics
+### Traffic
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `kubeadapt_connection_traffic_bytes_total` | Counter | Cumulative egress bytes (use `rate()` for throughput) |
-| `kubeadapt_connection_traffic_packets_total` | Counter | Cumulative egress packets |
-| `kubeadapt_active_connections` | Gauge | Current active connections |
+| `kubeadapt_connection_traffic_bytes_total` | Counter | Bytes the node's pods sent, by protocol (use `rate()` for throughput) |
+| `kubeadapt_connection_traffic_packets_total` | Counter | Packets the node's pods sent, by protocol |
+| `kubeadapt_overflow_bytes_drained_total` | Counter | Bytes carried by the overflow ring buffer, by protocol; add to the bytes above for the total |
 
-### Internal Monitoring Metrics
+### Health
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `kubeadapt_bpf_load_status` | Gauge | BPF program load status (1=loaded, 0=failed) |
-| `kubeadapt_bpf_load_attempts_total` | Counter | Total BPF load attempts |
-| `kubeadapt_bpf_load_duration_seconds` | Gauge | BPF program load duration |
-| `kubeadapt_bpf_map_utilization_percent` | Gauge | BPF map utilization (0-100%) |
-| `kubeadapt_overflow_flows_total` | Counter | Flows sent to overflow ringbuffer |
-| `kubeadapt_ip_pairs_batch_size` | Gauge | Number of IP pairs in current batch |
-| `kubeadapt_ebpf_collection_duration_seconds` | Histogram | Map collection cycle duration |
-| `kubeadapt_collector_errors_total` | Counter | Collection errors by type |
-| `kubeadapt_connection_tracking_info` | Gauge | Connection tracking configuration info |
+| `kubeadapt_bpf_load_status` | Gauge | 1 when the BPF programs loaded |
+| `kubeadapt_attach_mode` | Gauge | Attach mode in use (TCX or classic tc) |
+| `kubeadapt_veth_coverage_ratio` | Gauge | Share of pod interfaces pulse is attached to |
+| `kubeadapt_bpf_map_utilization_percent` | Gauge | Fill level of the kernel flow table |
+| `kubeadapt_pod_resolver_synced` | Gauge | 1 when pod identity is available |
+| `kubeadapt_duplicate_pulse_instance` | Gauge | 1 when another instance already runs on the node |
+| `kubeadapt_lost_events_total` | Counter | Observations that did not reach a batch, by site |
+| `kubeadapt_pulse_retry_buffer_batches` | Gauge | Batches waiting for the agent |
+| `kubeadapt_pulse_export_acked_batches_total` | Counter | Batches the agent acknowledged |
 
 {{ template "chart.requirementsSection" . }}
 
@@ -117,6 +131,10 @@ uname -r
 # Verify BPF filesystem mounted
 ls /sys/fs/bpf
 ```
+
+### Pod Not Ready With Export On
+
+With export on, `/health/ready` fails once the agent has acknowledged nothing for three export windows (three minutes by default). Check that the agent is running with its listener on (`KUBEADAPT_PULSE_ENABLED`), that the `<name>-agent-pulse` Service has an endpoint, and that both pods mount the same token Secret.
 
 ### No Metrics Appearing
 

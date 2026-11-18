@@ -88,6 +88,14 @@ rules:
     resources:
       - poddisruptionbudgets
     verbs: ["get", "list", "create", "update", "patch", "delete"]
+  {{- if (index .Values "kubeadapt-k8s-pulse").enabled }}
+
+  # The ResourceQuota that admits the network monitor's priority class
+  - apiGroups: [""]
+    resources:
+      - resourcequotas
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -107,6 +115,9 @@ rules:
     resourceNames:
       - "{{ include "kubeadapt.name" . }}-agent{{ include "kubeadapt.clusterResourceSuffix" . }}"
       - "{{ include "kubeadapt.name" . }}-upgrader{{ include "kubeadapt.clusterResourceSuffix" . }}"
+      {{- if (index .Values "kubeadapt-k8s-pulse").enabled }}
+      - "{{ include "kubeadapt.pulseClusterRoleName" . }}"
+      {{- end }}
     verbs: ["get", "list", "update", "patch", "delete", "escalate"]
   # Separate rule for create (resourceNames constraint not supported)
   - apiGroups: ["rbac.authorization.k8s.io"]
@@ -147,6 +158,10 @@ rules:
     resources:
       - poddisruptionbudgets
     verbs: ["list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources:
+      - endpointslices
+    verbs: ["list", "watch"]
   - apiGroups: ["networking.k8s.io"]
     resources:
       - ingresses
@@ -174,6 +189,17 @@ rules:
       - nodepools
       - nodeclaims
     verbs: ["list", "watch"]
+  {{- if (index .Values "kubeadapt-k8s-pulse").enabled }}
+  # All permissions the kubeadapt-k8s-pulse ClusterRole grants
+  - apiGroups: [""]
+    resources:
+      - nodes
+    verbs: ["get"]
+  - apiGroups: ["cilium.io"]
+    resources:
+      - ciliumenvoyconfigs
+    verbs: ["list"]
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

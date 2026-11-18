@@ -6,19 +6,28 @@
 
 ### Supported Platforms
 
-| Platform                 | Kubernetes Versions | Agent (`kubeadapt`) | Network agent (`kubeadapt-k8s-pulse`) | Notes                                                                 |
+| Platform                 | Kubernetes Versions | Agent (`kubeadapt`) | Network monitor (`kubeadapt-k8s-pulse`) | Notes                                                                 |
 | ------------------------ | ------------------- | ------------------- | -------------------------------------- | --------------------------------------------------------------------- |
 | Amazon EKS (EC2 nodes)   | 1.24 - 1.35         | ✓                   | ✓                                      | Full support with IRSA                                                |
 | Amazon EKS on Fargate    | 1.24 - 1.35         | ✓                   | -                                      | Fargate runs no DaemonSets                                            |
 | Azure AKS                | 1.24 - 1.35         | ✓                   | ✓                                      | Full support with Managed Identity                                    |
 | Google GKE Standard      | 1.24 - 1.35         | ✓                   | ✓                                      | Full support with Workload Identity                                   |
-| Google GKE Autopilot     | 1.24 - 1.35         | ✓                   | -                                      | Autopilot does not allow privileged pods                              |
+| Google GKE Autopilot     | 1.24 - 1.35         | ✓                   | -                                      | Autopilot does not allow host network or added capabilities          |
 | Red Hat OpenShift / ROSA | 1.24 - 1.35         | ✓                   | Privileged SCC required                | Unset the agent's fixed UID/GID (see README)                          |
 | On-Premise               | 1.24 - 1.35         | ✓                   | ✓                                      | kubeadm, kops, Rancher, k3s, RKE2                                     |
 
 **Agent:** one Deployment, restricted Pod Security Standard by default (non-root, read-only root filesystem, no capabilities). Needs [metrics-server](https://github.com/kubernetes-sigs/metrics-server) for CPU and memory usage.
 
-**Network agent:** a privileged DaemonSet (`hostNetwork`, `hostPID`), Linux kernel 5.10+ on every node it runs on. Disabled by default.
+**Network monitor:** a DaemonSet on every node, tainted ones included, at `system-node-critical` priority. Disabled by default. It needs:
+
+- Linux kernel 5.10 or newer
+- the node's network namespace (`hostNetwork`), not its PID namespace
+- the Linux capabilities `BPF`, `PERFMON` and `NET_ADMIN`; `SYS_RESOURCE` on kernels older than 5.11 (it can be removed on newer kernels); `SYS_PTRACE` for the container runtime inventory (it can be removed when the inventory is off). Every other capability is dropped, privilege escalation is off and the root filesystem is read-only.
+- the node's `/proc`, cgroup tree, `/etc/cni/net.d` and `/var/run/ztunnel` read-only, and `/sys/fs/bpf` writable
+- read-only RBAC: list and watch pods, get nodes, list `ciliumenvoyconfigs.cilium.io`
+- a namespace that allows the privileged Pod Security level
+
+Where an SELinux or AppArmor policy denies the BPF operations to a container with these capabilities, `kubeadapt-k8s-pulse.privileged=true` runs it privileged.
 
 ### Platform-Specific Requirements
 
@@ -50,9 +59,9 @@
 | Cloud Cost Integration            | ✓   | ✓   | ✓   | Custom     |
 | GPU Monitoring                    | ✓   | ✓   | ✓   | ✓          |
 | Network Cost Monitoring           | ✓   | ✓   | ✓   | -          |
-
-Network cost monitoring needs the network agent, so it is not available on EKS Fargate or GKE Autopilot.
 | Persistent Storage                | ✓   | ✓   | ✓   | ✓          |
+
+Network cost monitoring needs the network monitor, so it is not available on EKS Fargate or GKE Autopilot.
 
 For issues or questions, please visit:
 
