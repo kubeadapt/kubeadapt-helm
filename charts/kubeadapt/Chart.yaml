@@ -10,7 +10,7 @@ appVersion: "v3.0.1"
 # Dependencies
 dependencies:
   - name: kubeadapt-k8s-pulse
-    version: "1.0.1"
+    version: "1.0.2"
     repository: "oci://ghcr.io/kubeadapt/kubeadapt-helm"
     condition: kubeadapt-k8s-pulse.enabled
 
@@ -38,6 +38,8 @@ annotations:
       description: "Auto-upgrade works again. 1.0.8 gave the agent get on nodes/proxy and nodes/stats but not the upgrader, and Kubernetes lets the upgrader update the agent's ClusterRoleBinding only if it holds every rule of the agent's ClusterRole, so every auto-upgrade from 1.0.8 failed and rolled back. The upgrader now holds those two rules as well."
     - kind: changed
       description: "With the network monitor enabled, the upgrader may also manage the network monitor's ClusterRole and ClusterRoleBinding. Later releases add both, and an auto-upgrade runs with the installed release's upgrader, so without this the auto-upgrade from 1.0.9 to those releases would stop before it changes anything."
+    - kind: changed
+      description: "The network monitor subchart (kubeadapt-k8s-pulse) moves from 1.0.1 to 1.0.2, which was released on its own in September and never pinned here. 1.0.2 sets EBPF_RETRY_BUFFER_SIZE to 120; the pulse image this chart deploys, v3.0.1, does not read it, so the network monitor runs as before."
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/license: Apache-2.0

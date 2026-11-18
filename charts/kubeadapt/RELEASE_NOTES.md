@@ -2,6 +2,7 @@
 
 - Fixed: auto-upgrade failed on every release from 1.0.8. 1.0.8 gave the agent `get` on `nodes/proxy` and `nodes/stats`, but not the upgrader, and Kubernetes lets the upgrader update the agent's ClusterRoleBinding only if it holds every rule of the agent's ClusterRole. The upgrade Job stopped with "attempting to grant RBAC permissions not currently held" and rolled back. The upgrader now holds those two rules too. The upgrader of a 1.0.8 install takes this release on its own: it updates its own ClusterRole first, then the binding.
 - Changed: with the network monitor enabled (`kubeadapt-k8s-pulse.enabled`), the upgrader may also get, update and delete the network monitor's ClusterRole and ClusterRoleBinding. Later releases add these two objects. Helm reads each object before it creates it, and an auto-upgrade runs with the permissions of the installed release's upgrader. Without this change, every auto-upgrade from 1.0.9 to those releases would stop before it changes anything on a cluster that runs the network monitor.
+- Changed: the network monitor subchart (`kubeadapt-k8s-pulse`) moves from 1.0.1 to 1.0.2, which was released on its own in September and never pinned here. 1.0.2 sets `EBPF_RETRY_BUFFER_SIZE` to 120; the pulse image this chart deploys, `v3.0.1`, does not read it, so the network monitor runs as before.
 
 ## 1.0.8
 

@@ -43,7 +43,7 @@ The namespace and any token Secret you created yourself stay behind; delete them
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.0.1 |
+| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.0.2 |
 
 ## Values
 
