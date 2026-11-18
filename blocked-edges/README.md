@@ -8,7 +8,7 @@ This directory contains YAML files that define blocked upgrade paths. When a pro
 blocked-edges/
 ├── kubeadapt/           # Blocked edges for kubeadapt chart
 │   └── {version}-{issue-name}.yaml
-├── ebpf-agent/          # Blocked edges for ebpf-agent chart
+├── kubeadapt-k8s-pulse/ # Blocked edges for kubeadapt-k8s-pulse chart
 │   └── {version}-{issue-name}.yaml
 └── README.md
 ```
@@ -68,8 +68,14 @@ redirect_to: "0.16.1"
 
 ## Validation
 
-All blocked-edge files are validated by CI:
+All blocked-edge files, `.yaml` and `.yml` (ingestion-api reads both), are validated on every pull request by the `validate-blocked-edges.yaml` workflow (the `blocked-edges` job of `lint-and-test.yml`, part of the required `gate` check):
 - YAML syntax check
 - Required fields validation
-- Regex validation for `from` field
-- Version existence check (warning only)
+- Regex validation for `from` field, at most 100 characters (ingestion-api ignores longer patterns)
+- `to` must be an exact version that was released (a `<chart>-<version>` tag exists) or the version in `charts/<chart>/Chart.yaml`, so a release PR can add the edge for its own version
+- `redirect_to` must be an exact version that was released
+- `matchingRules` entries are maps of type `Always` or `Platform`; ingestion-api applies no other type, so such an edge blocks nothing
+- `Platform` rules list only `eks`, `aks`, `gke` or `on-premise`, the platforms the upgrader reports
+- `redirect_to` chains must terminate (no cycles)
+
+ingestion-api reads this directory live from `main`, so a merged edge takes effect without a chart release. An edge blocks exactly one `to` version: to block a source range from several releases, add one file per target version. ingestion-api matches `from` anywhere in the cluster's version, so `"1\\.0\\.1"` also matches 1.0.10; write `"^1\\.0\\.1$"` to match one version only.
