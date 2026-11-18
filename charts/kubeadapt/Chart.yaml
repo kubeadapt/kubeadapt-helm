@@ -34,6 +34,8 @@ annotations:
     fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
+    - kind: changed
+      description: "Installs on 1.0.0 to 1.0.7 need one manual helm upgrade to this release. Their upgrader, v3.0.1, starts the upgrade Job under the service account kubeadapt-k8s-upgrader, which the chart does not create, so those Jobs never start. Auto-upgrade works from this release on."
     - kind: fixed
       description: "Auto-upgrade works again. 1.0.8 gave the agent get on nodes/proxy and nodes/stats but not the upgrader, and Kubernetes lets the upgrader update the agent's ClusterRoleBinding only if it holds every rule of the agent's ClusterRole, so every auto-upgrade from 1.0.8 failed and rolled back. The upgrader now holds those two rules as well."
     - kind: changed
