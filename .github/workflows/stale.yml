@@ -23,7 +23,11 @@ jobs:
         days-before-close: 7
         # Issues with these labels will never be considered stale
         exempt-issue-labels: "security,pinned,bug"
-        exempt-pr-labels: "security,pinned,dependencies"
+        exempt-pr-labels: "security,pinned,dependencies,in-progress"
+        # PRs are marked stale but never closed by the bot: open chart work
+        # (pulse wiring, RBAC, upgrade gates) was closed while still wanted.
+        days-before-pr-close: -1
+        exempt-draft-pr: true
         # Comment to post when marking an issue as stale
         stale-issue-message: >
           This issue has been automatically marked as stale because it has not had
@@ -32,9 +36,9 @@ jobs:
           to keep it open. Thank you for your contributions to Kubeadapt.
         stale-pr-message: >
           This pull request has been automatically marked as stale because it has not had
-          recent activity in the last 14 days. It will be closed in 7 days if no
-          further activity occurs. If this PR is still relevant, please update it or
-          add a comment to keep it open. Thank you for your contributions to Kubeadapt.
+          recent activity in the last 14 days. If this PR is still relevant, please
+          update it or add a comment to remove the stale label. Thank you for your
+          contributions to Kubeadapt.
         # Labels to use when marking as stale
         stale-issue-label: 'no-issue-activity'
         stale-pr-label: 'no-pr-activity'
