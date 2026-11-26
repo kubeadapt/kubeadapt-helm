@@ -1,119 +1,237 @@
 name: Validate Upgrade Metadata
 
+# Validates the release metadata of every chart the pull request changes:
+# upgrade-metadata.yaml, RELEASE_NOTES.md, Chart.yaml annotations and the
+# chart's subchart pins. The release-metadata job of lint-and-test.yml runs
+# this workflow on every pull request, behind the required gate check.
 on:
-  pull_request:
-    paths:
-      - 'charts/**/upgrade-metadata.yaml'
-      - 'charts/**/Chart.yaml'
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   validate:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v4
+      # Full history and tags: the checks diff against the merge base and look
+      # up released versions.
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
 
       - name: Install yq
         run: |
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.47.2/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      - name: Validate upgrade-metadata.yaml
+      - name: Validate release metadata
         run: |
-          set -e
+          set -euo pipefail
 
-          for chart_dir in charts/*/; do
-            CHART=$(basename "$chart_dir")
-            META_FILE="${chart_dir}upgrade-metadata.yaml"
-            CHART_FILE="${chart_dir}Chart.yaml"
+          REPO_URL="https://github.com/kubeadapt/kubeadapt-helm"
+          SEMVER_RE='^[0-9]+\.[0-9]+\.[0-9]+$'
 
-            echo "=== Validating $CHART ==="
+          errors=0
+          chart=""
+          fail() {
+            echo "  ERROR: $*"
+            errors=$((errors + 1))
+          }
 
-            # Check if upgrade-metadata.yaml exists
-            if [ ! -f "$META_FILE" ]; then
-              echo "WARNING: $META_FILE not found (may be first release)"
-              continue
-            fi
+          # released_versions prints every released version of a chart, ascending.
+          released_versions() {
+            git tag -l "$1-[0-9]*" | sed "s/^$1-//" | grep -E "$SEMVER_RE" | sort -t. -k1,1n -k2,2n -k3,3n || true
+          }
 
-            # 1. Required fields check
-            echo "Checking required fields..."
-            yq -e '.chartVersion' "$META_FILE" > /dev/null || { echo "ERROR: Missing chartVersion"; exit 1; }
-            yq -e '.upgradeFrom' "$META_FILE" > /dev/null || { echo "ERROR: Missing upgradeFrom"; exit 1; }
-            yq -e '.channels' "$META_FILE" > /dev/null || { echo "ERROR: Missing channels"; exit 1; }
+          # image_repo and image_tag print the image a chart deploys by default.
+          image_repo() {
+            case "$1" in
+              kubeadapt) yq '.agent.image.repository' "charts/$1/values.yaml" ;;
+              *) yq '.image.repository' "charts/$1/values.yaml" ;;
+            esac
+          }
 
-            # 2. Version match check
-            echo "Checking version match..."
-            META_VERSION=$(yq '.chartVersion' "$META_FILE" | tr -d '"')
-            CHART_VERSION=$(yq '.version' "$CHART_FILE" | tr -d '"')
+          image_tag() {
+            local tag
+            case "$1" in
+              kubeadapt)
+                # The agent Deployment uses appVersion when agent.image.tag is empty.
+                tag=$(yq '.agent.image.tag // ""' "charts/$1/values.yaml")
+                echo "${tag:-$(yq '.appVersion' "charts/$1/Chart.yaml")}"
+                ;;
+              *) yq '.image.tag' "charts/$1/values.yaml" ;;
+            esac
+          }
 
-            if [ "$META_VERSION" != "$CHART_VERSION" ]; then
-              echo "ERROR: Version mismatch!"
-              echo "  upgrade-metadata.yaml: $META_VERSION"
-              echo "  Chart.yaml: $CHART_VERSION"
-              exit 1
-            fi
-            echo "✓ Versions match: $CHART_VERSION"
-
-            # 3. Channel validation
-            echo "Checking channels..."
-            CHANNELS=$(yq '.channels[]' "$META_FILE")
-            for channel in $CHANNELS; do
-              if [[ ! "$channel" =~ ^(stable|fast)$ ]]; then
-                echo "ERROR: Invalid channel '$channel'. Must be 'stable' or 'fast'"
-                exit 1
+          # edge_blocks succeeds when a blocked edge stops auto-upgrades from $3 to $2
+          # on every platform.
+          edge_blocks() {
+            local f
+            for f in blocked-edges/"$1"/*.yaml blocked-edges/"$1"/*.yml; do
+              [ -f "$f" ] || continue
+              [ "$(yq '.to' "$f")" = "$2" ] || continue
+              # Only an edge with no rules or an Always rule applies on every platform;
+              # ingestion-api treats a rule without a type as Always.
+              yq -e '(.matchingRules // []) | (length == 0 or any_c(tag == "!!map" and ((.type // "") == "" or .type == "Always")))' "$f" >/dev/null 2>&1 || continue
+              if echo "$3" | grep -Eq "$(yq '.from' "$f")"; then
+                return 0
               fi
             done
-            echo "✓ Channels valid: $CHANNELS"
+            return 1
+          }
 
-            # 4. Channel-based maturity check
-            echo "Checking channel consistency..."
-            HAS_STABLE=$(yq -e '.channels[] | select(. == "stable")' "$META_FILE" > /dev/null 2>&1 && echo "true" || echo "false")
-            HAS_FAST=$(yq -e '.channels[] | select(. == "fast")' "$META_FILE" > /dev/null 2>&1 && echo "true" || echo "false")
+          check_upgrade_metadata() {
+            local dir="charts/$chart" version meta channels prerelease
+            meta="$dir/upgrade-metadata.yaml"
+            version=$(yq '.version' "$dir/Chart.yaml")
 
-            if [ "$HAS_STABLE" = "false" ] && [ "$HAS_FAST" = "false" ]; then
-              echo "ERROR: At least one channel (stable or fast) must be specified"
-              exit 1
+            if [ ! -f "$meta" ]; then
+              fail "missing $meta"
+              return
+            fi
+            [ "$(yq '.chartVersion' "$meta")" = "$version" ] ||
+              fail "upgrade-metadata chartVersion $(yq '.chartVersion' "$meta") does not match Chart.yaml version $version"
+
+            if git rev-parse -q --verify "refs/tags/$chart-$version" >/dev/null; then
+              fail "$chart-$version is already released; bump the chart version"
             fi
 
-            # If stable, should also be in fast (stable releases are also in fast)
-            if [ "$HAS_STABLE" = "true" ] && [ "$HAS_FAST" = "false" ]; then
-              echo "WARNING: Stable releases should typically also be in fast channel"
+            channels=$(yq '.channels[]' "$meta" 2>/dev/null || true)
+            [ -n "$channels" ] || fail "channels is empty"
+            for c in $channels; do
+              case "$c" in
+                stable | fast) ;;
+                *) fail "invalid channel '$c' (stable or fast)" ;;
+              esac
+            done
+            prerelease=$(yq '.annotations."artifacthub.io/prerelease"' "$dir/Chart.yaml")
+            # RELEASE-POLICY.md: a new minor or major lands on fast first; a later
+            # patch promotes it to stable.
+            if [ "${version##*.}" = "0" ] && echo "$channels" | grep -qx stable; then
+              fail "$version is a new minor or major; release it fast-only and promote it with a patch release"
             fi
-            echo "✓ Channel consistency OK"
-
-            # 5. ArtifactHub annotation sync check
-            echo "Checking ArtifactHub annotation sync..."
-            ARTIFACTHUB_PRERELEASE=$(yq '.annotations."artifacthub.io/prerelease"' "$CHART_FILE" | tr -d '"')
-
-            if [ "$HAS_STABLE" = "true" ]; then
-              # Stable release should have prerelease: "false"
-              if [ "$ARTIFACTHUB_PRERELEASE" = "true" ]; then
-                echo "ERROR: Channel includes 'stable' but artifacthub.io/prerelease is 'true'"
-                echo "  Fix: Set artifacthub.io/prerelease: \"false\" in Chart.yaml"
-                exit 1
-              fi
+            if echo "$channels" | grep -qx stable; then
+              [ "$prerelease" = "false" ] || fail "channels include stable, so artifacthub.io/prerelease must be \"false\" (is $prerelease)"
             else
-              # Fast-only release should have prerelease: "true"
-              if [ "$ARTIFACTHUB_PRERELEASE" != "true" ]; then
-                echo "ERROR: Channel is fast-only but artifacthub.io/prerelease is not 'true'"
-                echo "  Fix: Set artifacthub.io/prerelease: \"true\" in Chart.yaml"
-                exit 1
+              [ "$prerelease" = "true" ] || fail "a fast-only release must set artifacthub.io/prerelease: \"true\" (is $prerelease)"
+            fi
+
+            local expected_url="$REPO_URL/releases/tag/$chart-$version"
+            [ "$(yq '.metadata.releaseNotes' "$meta")" = "$expected_url" ] ||
+              fail "metadata.releaseNotes is $(yq '.metadata.releaseNotes' "$meta"); expected $expected_url"
+          }
+
+          check_release_notes() {
+            local dir="charts/$chart" version notes
+            version=$(yq '.version' "$dir/Chart.yaml")
+            notes="$dir/RELEASE_NOTES.md"
+            # chart-releaser publishes this file from the package as the GitHub
+            # release body (.github/configs/cr.yaml), and ingestion-api serves that body.
+            if [ ! -f "$notes" ]; then
+              fail "missing $notes"
+            elif ! grep -qx "## $version" "$notes"; then
+              fail "$notes has no '## $version' section"
+            fi
+          }
+
+          check_upgrade_from() {
+            local dir="charts/$chart" version meta released latest first major from
+            meta="$dir/upgrade-metadata.yaml"
+            [ -f "$meta" ] || return 0
+            version=$(yq '.version' "$dir/Chart.yaml")
+            released=$(released_versions "$chart")
+            latest=$(echo "$released" | tail -1)
+            first=$(yq '.upgradeFrom[0]' "$meta")
+            if [ -n "$latest" ] && [ "$first" != "$latest" ]; then
+              fail "upgradeFrom[0] is '$first'; it must be the latest release, $latest"
+            fi
+
+            major=${version%%.*}
+            for from in $(yq '.upgradeFrom[]' "$meta"); do
+              if ! echo "$from" | grep -Eq "$SEMVER_RE"; then
+                fail "upgradeFrom '$from' is not an exact version; list released versions only, since ingestion-api matches each entry as a regex"
+                continue
               fi
-            fi
-            echo "✓ ArtifactHub annotation sync OK"
+              echo "$released" | grep -qx "$from" ||
+                fail "upgradeFrom '$from' was never released (no $chart-$from tag)"
+              if [ "${from%%.*}" != "$major" ] && ! edge_blocks "$chart" "$version" "$from"; then
+                fail "upgradeFrom '$from' lets auto-upgrade cross a major version; drop it or add blocked-edges/$chart/$version-<name>.yaml with an Always rule"
+              fi
+            done
+          }
 
-            # 6. upgradeFrom versions exist (warning only)
-            echo "Checking upgradeFrom versions..."
-            UPGRADE_FROM_COUNT=$(yq '.upgradeFrom | length' "$META_FILE")
-            if [ "$UPGRADE_FROM_COUNT" -gt 0 ]; then
-              for version in $(yq '.upgradeFrom[]' "$META_FILE" | tr -d '"'); do
-                echo "ℹ upgradeFrom version: $version"
-              done
-            else
-              echo "ℹ No upgradeFrom versions specified (initial release)"
-            fi
+          check_versions_and_images() {
+            local dir="charts/$chart" app repo tag img
+            app=$(yq '.appVersion' "$dir/Chart.yaml")
+            repo=$(image_repo "$chart")
+            tag=$(image_tag "$chart")
+            [ "${app#v}" = "${tag#v}" ] || fail "appVersion '$app' does not match the default image tag '$tag'"
+            # The list may also name other images, such as the upgrader's.
+            for img in $(yq '.annotations."artifacthub.io/images" // ""' "$dir/Chart.yaml" | yq '.[].image' 2>/dev/null || true); do
+              [ "${img%:*}" = "$repo" ] || continue
+              [ "${img##*:}" = "$tag" ] || fail "artifacthub.io/images lists $img, but the chart deploys tag $tag"
+            done
+          }
 
-            echo "=== $CHART validation passed ==="
-            echo ""
+          check_changes_annotation() {
+            local dir="charts/$chart" base="$1" old new carried
+            git cat-file -e "$base:$dir/Chart.yaml" 2>/dev/null || return 0
+            old=$(git show "$base:$dir/Chart.yaml" | yq '.annotations."artifacthub.io/changes" // ""' | yq '.[].description' 2>/dev/null | sort -u || true)
+            new=$(yq '.annotations."artifacthub.io/changes" // ""' "$dir/Chart.yaml" | yq '.[].description' 2>/dev/null | sort -u || true)
+            [ -n "$new" ] || {
+              fail "artifacthub.io/changes is empty"
+              return
+            }
+            carried=$(comm -12 <(echo "$old") <(echo "$new") | grep -c . || true)
+            [ "$carried" -eq 0 ] ||
+              fail "artifacthub.io/changes repeats $carried entry(ies) from the previous release; list only this release's changes"
+          }
+
+          # check_subchart_pins fails when a chart pins a local subchart at a version
+          # other than the one in this repository, which ships a stale subchart.
+          check_subchart_pins() {
+            local parent="$1" dep pin repo local_version
+            for dep in $(yq '.dependencies[].name' "charts/$parent/Chart.yaml" 2>/dev/null || true); do
+              [ -f "charts/$dep/Chart.yaml" ] || continue
+              pin=$(yq ".dependencies[] | select(.name == \"$dep\") | .version" "charts/$parent/Chart.yaml")
+              repo=$(yq ".dependencies[] | select(.name == \"$dep\") | .repository" "charts/$parent/Chart.yaml")
+              local_version=$(yq '.version' "charts/$dep/Chart.yaml")
+              if [ "$pin" != "$local_version" ]; then
+                fail "dependency $dep is pinned at $pin ($repo) but charts/$dep is $local_version"
+              fi
+            done
+          }
+
+          base=$(git merge-base "$BASE_REF" HEAD)
+          changed=$(git diff --name-only "$base" HEAD -- charts/ | cut -d/ -f2 | sort -u)
+          if [ -z "$changed" ]; then
+            echo "No chart changed against $BASE_REF; nothing to validate."
+            exit 0
+          fi
+
+          for chart in $changed; do
+            [ -f "charts/$chart/Chart.yaml" ] || continue
+            echo "=== $chart $(yq '.version' "charts/$chart/Chart.yaml")"
+            check_upgrade_metadata
+            check_release_notes
+            check_upgrade_from
+            check_versions_and_images
+            check_changes_annotation "$base"
+            # Only a changed chart's pins: a subchart is released on its own first,
+            # and its parent raises the pin in the parent's next release.
+            check_subchart_pins "$chart"
           done
+
+          if [ "$errors" -gt 0 ]; then
+            echo
+            echo "$errors release metadata error(s). See docs/RELEASE-POLICY.md."
+            exit 1
+          fi
+          echo
+          echo "Release metadata OK."
         env:
-          GH_TOKEN: ${{ github.token }}
+          BASE_REF: origin/${{ github.base_ref }}
