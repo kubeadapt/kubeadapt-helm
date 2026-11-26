@@ -197,6 +197,83 @@ entries:
   - annotations:
       artifacthub.io/changes: |
         - kind: changed
+          description: "Deploys agent v3.2.0 and the network monitor chart kubeadapt-k8s-pulse 1.1.0 with network monitor v3.2.0. Earlier network monitor images replace the classic tc filter at priority 1, handle 1 on each pod's network interface; the chart refuses image tags older than v3.2.0."
+        - kind: added
+          description: "With kubeadapt-k8s-pulse.enabled, the network monitor sends its traffic records to the agent. The agent's listener runs behind the <name>-agent-pulse ClusterIP Service, and both sides read the same token from a Secret the chart creates once and keeps across upgrades, or from global.pulse.existingSecret."
+        - kind: added
+          description: "The agent may list and watch EndpointSlices, which agent v3.2.0 reads to name addresses no pod or node has, such as the API server's. Without the rule it runs with partial data."
+        - kind: changed
+          description: "The upgrader holds every rule of the network monitor's ClusterRole, and may manage its ResourceQuota and PriorityClass when the chart creates them, so auto-upgrades with the network monitor enabled can update its binding."
+        - kind: added
+          description: "global.imagePullSecrets for the agent, the network monitor and the upgrade Job, agent.podAnnotations and agent.podLabels, and an optional NetworkPolicy (agent.networkPolicy) that admits the network monitor to the agent in a namespace that denies ingress by default."
+        - kind: changed
+          description: "The chart stops rendering without an agent token, and when the network monitor is turned on with values written for an earlier release (helm upgrade --reuse-values). Auto-upgrade uses --reset-then-reuse-values and is not affected."
+        - kind: removed
+          description: "agent.config.bufferMaxBytes (KUBEADAPT_BUFFER_MAX_BYTES), which agent v3.2.0 does not read."
+      artifacthub.io/compatibility: |
+        kubernetes:
+          platforms:
+            eks:
+              versions: ["1.24-1.35"]
+              tested: true
+            aks:
+              versions: ["1.24-1.35"]
+              tested: true
+            gke:
+              versions: ["1.24-1.35"]
+              tested: true
+            on-premise:
+              versions: ["1.24-1.35"]
+              tested: true
+      artifacthub.io/containsSecurityUpdates: "false"
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: Documentation
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/README.md
+        - name: Compatibility Matrix
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/COMPATIBILITY.md
+        - name: Security Policy
+          url: https://github.com/kubeadapt/kubeadapt-helm/blob/main/SECURITY.md
+      artifacthub.io/platforms: |
+        - eks
+        - aks
+        - gke
+        - openshift
+        - on-premise
+      artifacthub.io/prerelease: "true"
+      artifacthub.io/signKey: |
+        fingerprint: 3C8109B607AD3E119B7033D8948AD9EDA6BD626E
+        url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
+    apiVersion: v2
+    appVersion: v3.2.0
+    created: "2026-11-26T23:22:13.83410663Z"
+    dependencies:
+    - condition: kubeadapt-k8s-pulse.enabled
+      name: kubeadapt-k8s-pulse
+      repository: oci://ghcr.io/kubeadapt/kubeadapt-helm
+      version: 1.1.0
+    description: A Helm chart for Kubeadapt
+    digest: 5c5797af44941661d9338a6860f6197d1035d98a05beb9b2818b0abc55fe4318
+    keywords:
+    - kubernetes
+    - resource optimization
+    - cost optimization
+    - monitoring
+    - cloud native
+    - multi-cloud
+    maintainers:
+    - email: ugurcan@kubeadapt.io
+      name: ugurcancaykara
+    - email: authors@kubeadapt.io
+      name: Kubeadapt
+    name: kubeadapt
+    type: application
+    urls:
+    - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-1.1.0/kubeadapt-1.1.0.tgz
+    version: 1.1.0
+  - annotations:
+      artifacthub.io/changes: |
+        - kind: changed
           description: "Installs on 1.0.0 to 1.0.7 need one manual helm upgrade to this release. Their upgrader, v3.0.1, starts the upgrade Job under the service account kubeadapt-k8s-upgrader, which the chart does not create, so those Jobs never start. Auto-upgrade works from this release on."
         - kind: fixed
           description: "Auto-upgrade works again. 1.0.8 gave the agent get on nodes/proxy and nodes/stats but not the upgrader, and Kubernetes lets the upgrader update the agent's ClusterRoleBinding only if it holds every rule of the agent's ClusterRole, so every auto-upgrade from 1.0.8 failed and rolled back. The upgrader now holds those two rules as well."
@@ -3673,4 +3750,4 @@ entries:
     urls:
     - https://github.com/kubeadapt/kubeadapt-helm/releases/download/kubeadapt-k8s-pulse-1.0.0/kubeadapt-k8s-pulse-1.0.0.tgz
     version: 1.0.0
-generated: "2026-11-26T23:14:05.8150302Z"
+generated: "2026-11-26T23:22:13.834354853Z"
