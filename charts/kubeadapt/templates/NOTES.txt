@@ -46,7 +46,7 @@ measured.
     --field-selector involvedObject.kind=DaemonSet,involvedObject.name={{ $ds }}
 
    The message names the policy and the field it rejects. The pod needs the
-   node's network, host paths and added capabilities; examples/network-monitor
+   node's network, host paths and a privileged container; examples/network-monitor
    in the chart repository has an exception for each engine.
 
 3. READY is lower than CURRENT: list the pods that are not ready, then ask

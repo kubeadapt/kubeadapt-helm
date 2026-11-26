@@ -115,8 +115,6 @@ spec:
               value: {{ .Values.agent.config.maxRetries | quote }}
             - name: KUBEADAPT_REQUEST_TIMEOUT
               value: {{ .Values.agent.config.requestTimeout | quote }}
-            - name: KUBEADAPT_BUFFER_MAX_BYTES
-              value: {{ .Values.agent.config.bufferMaxBytes | quote }}
 
             # Observability & Debugging
             - name: KUBEADAPT_HEALTH_PORT

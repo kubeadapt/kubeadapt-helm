@@ -2,30 +2,25 @@
 # Defines explicit upgrade paths for this chart version.
 # This file is embedded in the chart package and used by KubeAdapt auto-upgrade system.
 
-chartVersion: "1.0.9"
+chartVersion: "1.1.0"
 
 # Versions that can upgrade to this version
+# Only 1.0.9: its upgrader may read and update the network monitor's
+# ClusterRole and ClusterRoleBinding by name, which this release adds.
+# Earlier releases reach 1.1.0 through 1.0.9.
 upgradeFrom:
-  - "1.0.8"
-  - "1.0.7"
-  - "1.0.6"
-  - "1.0.4"
-  - "1.0.3"
-  - "1.0.2"
-  - "1.0.1"
-  - "1.0.0"
+  - "1.0.9"
 
 # Channels this version is available in
 # - stable: Production-ready releases
 # - fast: Early access releases
 channels:
-  - stable
   - fast
-  # Note: In both channels because artifacthub.io/prerelease: "false"
+  # Note: fast only because artifacthub.io/prerelease: "true"; a new minor is promoted to stable with a patch release
 
 # Optional metadata
 metadata:
-  releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-1.0.9"
+  releaseNotes: "https://github.com/kubeadapt/kubeadapt-helm/releases/tag/kubeadapt-1.1.0"
   containsSecurityUpdates: false
   minKubernetesVersion: "1.24.0"
   breakingChanges: []

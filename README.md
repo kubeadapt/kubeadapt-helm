@@ -19,7 +19,7 @@ The agent is a single Deployment that reads the Kubernetes API and the metrics A
 | Red Hat OpenShift / ROSA | Supported (see below) | Requires the `privileged` SCC |
 | Self-managed (kubeadm, kops, Rancher, k3s, RKE2) | Supported, Kubernetes 1.24 - 1.35 | Supported |
 
-The network monitor needs Linux kernel 5.10 or newer on every node it runs on, the node's network namespace and a small set of Linux capabilities. It is disabled by default. See [Network monitoring](#network-monitoring).
+The network monitor needs Linux kernel 5.10 or newer on every node it runs on, the node's network namespace and a privileged container. It is disabled by default. See [Network monitoring](#network-monitoring).
 
 **Requirements:**
 - Kubernetes 1.24+
@@ -87,17 +87,17 @@ What the DaemonSet needs on each node:
 
 - Linux kernel 5.10 or newer
 - the node's network namespace (`hostNetwork`)
-- the Linux capabilities `BPF`, `PERFMON` and `NET_ADMIN`, plus `SYS_RESOURCE` on kernels older than 5.11 and `SYS_PTRACE` for the container runtime inventory; every other capability is dropped, privilege escalation is off and the root filesystem is read-only
+- a privileged container with a read-only root filesystem. With `kubeadapt-k8s-pulse.privileged=false` it runs instead with only the Linux capabilities `BPF`, `PERFMON` and `NET_ADMIN`, plus `SYS_RESOURCE` on kernels older than 5.11 and `SYS_PTRACE` for the container runtime inventory, and no privilege escalation
 - read-only access to the node's `/proc`, cgroup tree and CNI configuration (`/etc/cni/net.d`), and write access to the BPF filesystem (`/sys/fs/bpf`); on an Istio ambient mesh, with `kubeadapt-k8s-pulse.istioAmbient.enabled=true`, also read-only access to the ztunnel directory (`/var/run/ztunnel`)
 - read-only Kubernetes API access: list and watch pods, get nodes, list CiliumEnvoyConfigs
 
-The [kubeadapt-k8s-pulse chart README](charts/kubeadapt-k8s-pulse/README.md#what-the-pod-asks-of-the-node) lists each of these with the pod field and the reason. The host network, host paths and added capabilities place the pod outside the baseline Pod Security Standard, so its namespace must allow the privileged level, and a policy engine needs an exception for it: [examples/network-monitor](examples/network-monitor) has the namespace label, a Kyverno PolicyException and Gatekeeper constraints, each limited to what the pod uses. Where a node's security policy blocks the reduced capability set, set `kubeadapt-k8s-pulse.seLinuxOptions`, or run it privileged with `kubeadapt-k8s-pulse.privileged=true`.
+The [kubeadapt-k8s-pulse chart README](charts/kubeadapt-k8s-pulse/README.md#what-the-pod-asks-of-the-node) lists each of these with the pod field and the reason. The privileged container, host network and host paths place the pod outside the baseline Pod Security Standard, so its namespace must allow the privileged level, and a policy engine needs an exception for it: [examples/network-monitor](examples/network-monitor) has the namespace label, a Kyverno PolicyException and Gatekeeper constraints, each limited to what the pod uses. Where a platform does not allow privileged containers, `kubeadapt-k8s-pulse.privileged=false` runs it with the reduced capability set; if the node's security policy blocks that set too, set `kubeadapt-k8s-pulse.seLinuxOptions`.
 
 Do not run a network monitor image older than the chart's minimum on a cluster whose CNI or network policy agent attaches classic tc filters to pod interfaces: those images replace that filter, so network policy stops being enforced on the node and stays off after the network monitor is removed. The chart refuses such an image tag.
 
 Where it runs and how it rolls out:
 
-- One pod on every Linux node, tainted pools included. Nodes that cannot run a DaemonSet pod (AWS Fargate, virtual-kubelet) get none. Narrow it with `kubeadapt-k8s-pulse.tolerations` and `kubeadapt-k8s-pulse.nodeRequirements`.
+- One pod on every Linux node without taints. Nodes that cannot run a DaemonSet pod (AWS Fargate, virtual-kubelet) get none. Add tainted pools with `kubeadapt-k8s-pulse.tolerations` (`[{operator: Exists}]` for every taint), and leave pools out with `kubeadapt-k8s-pulse.nodeRequirements`.
 - It has no priority class by default and never evicts a workload to get onto a node. On a node with no room for its requests (100m CPU, 256Mi) the pod waits `Pending`, and that node is not measured until it starts. This also happens to a pod that was running: when it restarts or is replaced on a full node, a workload pod that was waiting takes the room first. `kubeadapt-k8s-pulse.priorityClass.create=true` gives it a place on every node and keeps it, by evicting on a full node as few pods without a priority class as it needs; `kubeadapt-k8s-pulse.priorityClassName=system-node-critical` does the same against pods of any class. The [chart README](charts/kubeadapt-k8s-pulse/README.md#scheduling-and-rollout) compares the three.
 - A later change reaches 25% of the nodes at a time (`kubeadapt-k8s-pulse.updateStrategy`), so a rollout takes minutes on any cluster size.
 - Images can come from your own registry: `agent.image.repository`, `agent.autoUpgrade.image.repository`, `agent.autoUpgrade.jobImage`, `kubeadapt-k8s-pulse.image.repository`, with `global.imagePullSecrets` for credentials.

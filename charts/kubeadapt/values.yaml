@@ -32,7 +32,7 @@ agent:
   image:
     # renovate: datasource=docker depName=public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
     repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
-    tag: "v3.0.1"
+    tag: "v3.2.0"
     pullPolicy: IfNotPresent
   # ============================================================
   # Service Account Configuration
@@ -213,9 +213,6 @@ agent:
     # Timeout for HTTP requests to backend (Go duration or seconds).
     requestTimeout: "30s"
 
-    # Max buffer size in bytes (default: 50 MB).
-    bufferMaxBytes: "52428800"
-
     # ============================================================
     # Observability & Debugging
     # ============================================================
@@ -364,10 +361,11 @@ agent:
 #
 # Prerequisites:
 # - Linux kernel 5.10 or newer on every node it runs on
-# - The node's network namespace, host paths and the Linux
-#   capabilities BPF, PERFMON, NET_ADMIN, SYS_RESOURCE and SYS_PTRACE, which
-#   GKE Autopilot and EKS Fargate do not allow. The namespace must allow the
-#   privileged Pod Security level; on OpenShift, use the privileged SCC.
+# - A privileged container (or, with privileged: false, the Linux
+#   capabilities BPF, PERFMON, NET_ADMIN, SYS_RESOURCE and SYS_PTRACE), the
+#   node's network namespace and host paths, which GKE Autopilot and EKS
+#   Fargate do not allow. The namespace must allow the privileged Pod
+#   Security level; on OpenShift, use the privileged SCC.
 #   examples/network-monitor in the chart repository has ready-made
 #   exceptions for Pod Security Admission, Kyverno and Gatekeeper.
 #
@@ -390,7 +388,8 @@ kubeadapt-k8s-pulse:
       # Send traffic records to this release's agent.
       enabled: true
 
-  # By default the DaemonSet runs on every Linux node, tainted ones included,
-  # except AWS Fargate and virtual-kubelet nodes, and never evicts a workload
-  # to get there: on a node without room its pod waits and the node is not
-  # measured. priorityClass.create: true gives it a place on every node.
+  # By default the DaemonSet runs on every Linux node without taints, except
+  # AWS Fargate and virtual-kubelet nodes, and never evicts a workload to get
+  # there: on a node without room its pod waits and the node is not measured.
+  # tolerations covers tainted pools; priorityClass.create: true gives it a
+  # place on every node.

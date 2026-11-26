@@ -43,6 +43,12 @@
 #
 # A constraint written in-house needs only step 1, and so does the library's
 # seccomp constraint while the pod sets no seccomp profile.
+#
+# The chart runs the pod as a privileged container by default. Step 1 then
+# also covers the library's privileged-container constraint
+# (K8sPSPPrivilegedContainer), and the K8sPSPCapabilities constraint below
+# applies only with kubeadapt-k8s-pulse.privileged=false: a privileged
+# container drops no capabilities, so leave it out otherwise.
 apiVersion: constraints.gatekeeper.sh/v1beta1
 kind: K8sPSPHostNetworkingPorts
 metadata:

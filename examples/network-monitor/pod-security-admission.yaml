@@ -1,8 +1,9 @@
 # Pod Security Admission for the namespace of a release that runs the network
 # monitor (kubeadapt-k8s-pulse.enabled=true).
 #
-# The network monitor's pod uses the node's network, host paths, a host port
-# and five added capabilities, which the baseline and restricted levels
+# The network monitor's pod is a privileged container (with
+# kubeadapt-k8s-pulse.privileged=false, five added capabilities) and uses the
+# node's network, host paths and a host port, which the baseline and restricted levels
 # reject, so the namespace has to enforce the privileged level. Pod Security
 # Admission works per namespace and cannot exempt one workload. The agent pod
 # and the upgrade Job in the same namespace keep meeting the restricted level

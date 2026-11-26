@@ -18,16 +18,16 @@
 
 **Agent:** one Deployment, restricted Pod Security Standard by default (non-root, read-only root filesystem, no capabilities). Needs [metrics-server](https://github.com/kubernetes-sigs/metrics-server) for CPU and memory usage.
 
-**Network monitor:** a DaemonSet on every Linux node, tainted ones included, except AWS Fargate and virtual-kubelet nodes. It has no priority class by default and does not evict workloads; on a node without room its pod waits. Disabled by default. It needs:
+**Network monitor:** a DaemonSet on every Linux node without taints (`kubeadapt-k8s-pulse.tolerations` adds tainted pools), except AWS Fargate and virtual-kubelet nodes. It has no priority class by default and does not evict workloads; on a node without room its pod waits. Disabled by default. It needs:
 
 - Linux kernel 5.10 or newer
 - the node's network namespace (`hostNetwork`), not its PID namespace
-- the Linux capabilities `BPF`, `PERFMON` and `NET_ADMIN`; `SYS_RESOURCE` on kernels older than 5.11 (it can be removed on newer kernels); `SYS_PTRACE` for the container runtime inventory (it can be removed when the inventory is off). Every other capability is dropped, privilege escalation is off and the root filesystem is read-only.
+- a privileged container with a read-only root filesystem. With `kubeadapt-k8s-pulse.privileged=false`: the Linux capabilities `BPF`, `PERFMON` and `NET_ADMIN`; `SYS_RESOURCE` on kernels older than 5.11 (it can be removed on newer kernels); `SYS_PTRACE` for the container runtime inventory (it can be removed when the inventory is off); every other capability dropped and no privilege escalation.
 - the node's `/proc`, cgroup tree and `/etc/cni/net.d` read-only, and `/sys/fs/bpf` writable; `/var/run/ztunnel` read-only when `kubeadapt-k8s-pulse.istioAmbient.enabled` is set
 - read-only RBAC: list and watch pods, get nodes, list `ciliumenvoyconfigs.cilium.io`
 - a namespace that allows the privileged Pod Security level
 
-Where an SELinux or AppArmor policy denies the BPF operations to a container with these capabilities, set `kubeadapt-k8s-pulse.seLinuxOptions`, or run it privileged with `kubeadapt-k8s-pulse.privileged=true`. Exceptions for Pod Security Admission, Kyverno and Gatekeeper are in [examples/network-monitor](examples/network-monitor).
+Where a platform does not allow privileged containers, set `kubeadapt-k8s-pulse.privileged=false`; where an SELinux or AppArmor policy then denies the BPF operations to the reduced capability set, set `kubeadapt-k8s-pulse.seLinuxOptions`. Exceptions for Pod Security Admission, Kyverno and Gatekeeper are in [examples/network-monitor](examples/network-monitor).
 
 ### Platform-Specific Requirements
 
