@@ -1,6 +1,6 @@
 # kubeadapt-k8s-pulse
 
-![Version: 1.0.2](https://img.shields.io/badge/Version-1.0.2-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.0.1](https://img.shields.io/badge/AppVersion-3.0.1-informational?style=flat-square)
+![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: 3.2.0](https://img.shields.io/badge/AppVersion-3.2.0-informational?style=flat-square)
 
 High-performance eBPF-based network metrics agent for Kubernetes
 
@@ -33,7 +33,7 @@ helm repo update
 Or use OCI registry:
 
 ```console
-helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.0.2
+helm pull oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt-k8s-pulse --version 1.1.0
 ```
 
 ## Installing the Chart
@@ -71,14 +71,14 @@ Everything the DaemonSet's pod uses beyond an ordinary pod, and why. A platform 
 | Node's network namespace | `hostNetwork: true` | The programs attach to the host side of every pod's network interface and follow interfaces as pods come and go. Both exist only in the node's network namespace. | No |
 | A port of the node | container port `9090` (`config.metricsPort`) | Health probes and Prometheus metrics. A port of the node only because the pod uses the node's network. Open on every node address, without authentication. | The number can be changed |
 | Node's PID and IPC namespaces | not used | | |
-| Privileged container | `privileged: false`, `allowPrivilegeEscalation: false` | | `privileged: true` is a fallback for nodes whose security policy blocks the capability set |
+| Privileged container | `privileged: true` (default) | Load and attach the BPF programs, read the node's processes and cgroups. | `privileged: false` runs it with only the five capabilities below and `allowPrivilegeEscalation: false`, where the node's security policy allows that set |
 | Root user | `runAsUser: 0` | The BPF filesystem and the cgroup tree are owned by root. | No |
-| Capability `BPF` | `capabilities.add` | Create BPF maps and load the programs. | No |
-| Capability `PERFMON` | `capabilities.add` | The kernel verifier accepts the programs only with it. | No |
-| Capability `NET_ADMIN` | `capabilities.add` | Attach to pod network interfaces, follow interface changes, read connection tracking. | No |
-| Capability `SYS_RESOURCE` | `capabilities.add` | Raise the locked-memory limit for BPF maps. | Yes, on kernel 5.11 and newer |
-| Capability `SYS_PTRACE` | `capabilities.add` | Read other containers' executables for the runtime inventory. | Yes, with `EBPF_FINGERPRINT_ENABLED=false` in `env` |
-| Every other capability | `capabilities.drop: [ALL]` | | |
+| Capability `BPF` | `capabilities.add`, with `privileged: false` | Create BPF maps and load the programs. | No |
+| Capability `PERFMON` | `capabilities.add`, with `privileged: false` | The kernel verifier accepts the programs only with it. | No |
+| Capability `NET_ADMIN` | `capabilities.add`, with `privileged: false` | Attach to pod network interfaces, follow interface changes, read connection tracking. | No |
+| Capability `SYS_RESOURCE` | `capabilities.add`, with `privileged: false` | Raise the locked-memory limit for BPF maps. | Yes, on kernel 5.11 and newer |
+| Capability `SYS_PTRACE` | `capabilities.add`, with `privileged: false` | Read other containers' executables for the runtime inventory. | Yes, with `EBPF_FINGERPRINT_ENABLED=false` in `env` |
+| Every other capability | `capabilities.drop: [ALL]`, with `privileged: false` | | |
 | Root filesystem | `readOnlyRootFilesystem: true` | Writes go to an `emptyDir` at `/tmp`. | |
 | Host path `/proc` | read-only, at `/host/proc` | The node's processes, for the container runtime inventory. | No |
 | Host path `/sys/fs/bpf` | writable, propagation `HostToContainer`, created if missing | The pinned flow table that survives a restart, the lock that keeps one instance per node, and on Cilium its connection tracking maps. | No |
@@ -90,7 +90,7 @@ Everything the DaemonSet's pod uses beyond an ordinary pod, and why. A platform 
 | Kubernetes API | ClusterRole: `list`, `watch` pods; `get` nodes; `list` `ciliumenvoyconfigs.cilium.io` (`rbac.create`) | Pod identity for each node's traffic, the node's UID and zone, Envoy detection on Cilium. | Traffic is then reported without pod and node identity |
 | Agent token | Secret volume, read-only | The token the agent checks on every batch. | Only with export off |
 
-Against the Pod Security Standards, the host network, the host paths, the node port and the added capabilities are outside **baseline**; root and the unset seccomp profile are in addition outside **restricted**. The namespace must therefore allow the privileged level.
+Against the Pod Security Standards, the privileged container, the host network, the host paths and the node port are outside **baseline** (with `privileged: false`, the added capabilities are); root and the unset seccomp profile are in addition outside **restricted**. The namespace must therefore allow the privileged level.
 
 ## Image Version
 
@@ -102,7 +102,7 @@ Set `istioAmbient.enabled=true` on a cluster that runs ztunnel. The pod then mou
 
 ## Scheduling and Rollout
 
-- **Which nodes.** One pod per Linux node. The default `tolerations` tolerate every taint, so dedicated and tainted pools are measured too; replace the list to narrow it. `nodeRequirements` keeps the DaemonSet off nodes where its pod can never start (AWS Fargate, virtual-kubelet, other operating systems): no pod is created for them, so none stays Pending. It is applied on top of `nodeSelector` and `affinity`.
+- **Which nodes.** One pod per Linux node without taints. The default `tolerations` is empty, so tainted pools (control plane, GPU, spot and other dedicated pools) are not measured; add their taints, or `[{operator: Exists}]` for every taint. `nodeRequirements` keeps the DaemonSet off nodes where its pod can never start (AWS Fargate, virtual-kubelet, other operating systems): no pod is created for them, so none stays Pending. It is applied on top of `nodeSelector` and `affinity`.
 - **Priority.** The pod requests 100m CPU and 256Mi. A node whose capacity is already requested has no room for it, when the network monitor is first turned on and again whenever its pod there restarts or is replaced: the DaemonSet deletes the old pod before it creates the new one, nothing holds the room in between, and a workload pod that was waiting takes it within the same second. Kubernetes has no way to keep the room without evicting for it, so there are three choices, described in full in `values.yaml`:
 
   | | `priorityClassName: ""` (default) | `priorityClass.create: true` | `priorityClassName: system-node-critical` |
@@ -170,7 +170,7 @@ Set `image.repository` to your copy of the image and, where the registry needs c
 | env[0].value | string | `"120"` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse"` |  |
-| image.tag | string | `"v3.0.1"` |  |
+| image.tag | string | `"v3.2.0"` |  |
 | imagePullSecrets | list | `[]` |  |
 | istioAmbient.enabled | bool | `false` |  |
 | nodeRequirements[0].key | string | `"kubernetes.io/os"` |  |
@@ -189,7 +189,7 @@ Set `image.repository` to your copy of the image and, where the registry needs c
 | priorityClass.name | string | `""` |  |
 | priorityClass.value | int | `1000000` |  |
 | priorityClassName | string | `""` |  |
-| privileged | bool | `false` |  |
+| privileged | bool | `true` |  |
 | rbac.create | bool | `true` |  |
 | resources.limits.cpu | string | `"500m"` |  |
 | resources.limits.memory | string | `"384Mi"` |  |
@@ -201,7 +201,7 @@ Set `image.repository` to your copy of the image and, where the registry needs c
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
 | terminationGracePeriodSeconds | int | `45` |  |
-| tolerations[0].operator | string | `"Exists"` |  |
+| tolerations | list | `[]` |  |
 | topologySpreadConstraints | list | `[]` |  |
 | updateStrategy.rollingUpdate.maxUnavailable | string | `"25%"` |  |
 | updateStrategy.type | string | `"RollingUpdate"` |  |
@@ -260,7 +260,7 @@ kubectl -n <namespace> logs <pod> --tail=50
 |------------|-----------|-------|------------|
 | `Pending` | event `Insufficient cpu` or `Insufficient memory` | The node has no room for the pod's requests and the pod has no priority class to evict for it. Also happens to a pod that was running, after a restart or a rollout on a full node | It starts when room appears; until then the node is not measured. For a guaranteed place, see Priority under Scheduling and Rollout |
 | `Pending` | event `didn't have free ports` | Another pod on the node has declared the same host port | `config.metricsPort` |
-| `Pending` | event `node(s) had untolerated taint` | `tolerations` was narrowed | Add the taint, or leave the pool out with `nodeRequirements` |
+| `Pending` | event `node(s) had untolerated taint` | The node has a taint that `tolerations` does not cover | Add the taint to `tolerations`, or leave the pool out with `nodeRequirements` |
 | `ImagePullBackOff`, `ErrImagePull` | the registry's answer in the events (`toomanyrequests`, `unauthorized`, `no match for platform`) | Rate limit, missing credentials, or an image without the node's architecture in a private copy | `image.repository`, `imagePullSecrets`; copy all platforms of the image |
 | `CreateContainerError`, `RunContainerError` | a host path or security option in the message | The node or its runtime refuses a mount or an option | Compare with the table under "What the Pod Asks of the Node" |
 | `Running`, not ready | log: `permission denied` or `operation not permitted` while loading or attaching the programs | A node security policy (SELinux, AppArmor, seccomp) denies the BPF operations. On an SELinux node the node's audit log has a matching `avc: denied` line | `seLinuxOptions`, `seccompProfile`, or `privileged: true` |

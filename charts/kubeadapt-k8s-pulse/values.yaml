@@ -13,7 +13,7 @@ image:
   # interface, and network policy stops being enforced on the node. A tag
   # that is not a release version, or one pinned by digest ("<tag>@sha256:..."),
   # cannot be checked and is accepted with a note.
-  tag: "v3.0.1"
+  tag: "v3.2.0"
   # Release tags are never moved, so a node pulls each release once. Always
   # would ask the registry on every pod start, on every node.
   pullPolicy: IfNotPresent
@@ -100,15 +100,16 @@ config:
 # ============================================================
 # Privileges
 # ============================================================
-# The container runs as root in its own PID namespace with every Linux
-# capability dropped except the ones below, no privilege escalation and a
+# The container runs privileged, as root in its own PID namespace, with a
 # read-only root filesystem. It shares the node's network namespace and mounts
 # the node paths it reads (see templates/daemonset.yaml).
 #
-# Platforms where the reduced set is not enough (an SELinux or AppArmor policy
-# that denies the BPF operations, for example) can return to a fully
-# privileged container with privileged: true.
-privileged: false
+# privileged: false runs it with every Linux capability dropped except the
+# ones listed under capabilities, and no privilege escalation. That set is not
+# enough on every platform: an SELinux or AppArmor policy can deny the BPF
+# operations, and a runtime's default seccomp profile can deny the bpf and
+# perf_event_open system calls (see seccompProfile and seLinuxOptions).
+privileged: true
 
 # Capabilities added to the container when privileged is false.
 capabilities:
@@ -163,11 +164,11 @@ resources:
 # ============================================================
 # Scheduling Configuration
 # ============================================================
-# A node without pulse has no traffic measured at all. The default tolerates
-# every taint so that control-plane, GPU, spot and other dedicated node pools
-# are covered too. To narrow it, replace the list with the taints you accept.
-tolerations:
-  - operator: Exists
+# A node without pulse has no traffic measured at all. By default pulse runs
+# only on nodes without taints. To cover control-plane, GPU, spot and other
+# dedicated node pools, add the taints you accept, or [{operator: Exists}] for
+# every taint.
+tolerations: []
 
 nodeSelector: {}
 
@@ -180,9 +181,9 @@ affinity: {}
 # the DaemonSet whatever affinity says. The DaemonSet controller creates no
 # pod at all for a node that fails one of them. The defaults keep it to Linux
 # nodes backed by a real machine: on AWS Fargate and on virtual-kubelet nodes
-# a DaemonSet pod can never start, and with the blanket toleration above it
-# would stay Pending for good, which also makes `helm upgrade --wait` time
-# out. Add an expression to leave out another pool; an empty list removes the
+# a DaemonSet pod can never start, and with a toleration that matches their
+# taint it would stay Pending for good, which also makes `helm upgrade --wait`
+# time out. Add an expression to leave out another pool; an empty list removes the
 # rule.
 nodeRequirements:
   - key: kubernetes.io/os
