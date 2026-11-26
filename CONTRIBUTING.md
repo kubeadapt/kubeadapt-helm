@@ -130,7 +130,7 @@ helm install kubeadapt ./charts/kubeadapt --dry-run --set agent.config.token=tes
 helm install kubeadapt ./charts/kubeadapt \
   --set agent.config.token=test \
   --set agent.autoUpgrade.enabled=true \
-  --set ebpf-agent.enabled=true \
+  --set kubeadapt-k8s-pulse.enabled=true \
   --dry-run
 ```
 
