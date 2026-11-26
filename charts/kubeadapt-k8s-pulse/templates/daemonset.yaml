@@ -1,4 +1,13 @@
 {{- if .Values.enabled }}
+{{- /*
+Settings are read through maps that may be empty, so that values written for
+an earlier release (see validate.yaml) end in its message, not in a nil
+pointer.
+*/}}
+{{- $config := .Values.config | default dict }}
+{{- $export := $config.export | default dict }}
+{{- $image := .Values.image | default dict }}
+{{- $ambient := (.Values.istioAmbient | default dict).enabled }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -10,30 +19,38 @@ spec:
     matchLabels:
       {{- include "kubeadapt-k8s-pulse.selectorLabels" . | nindent 6 }}
   updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
+    {{- toYaml (.Values.updateStrategy | default (dict "type" "RollingUpdate" "rollingUpdate" (dict "maxUnavailable" "25%"))) | nindent 4 }}
   template:
     metadata:
       labels:
-        {{- include "kubeadapt-k8s-pulse.selectorLabels" . | nindent 8 }}
+        {{- /* The selector labels win over a podLabels entry of the same name. */}}
+        {{- toYaml (merge (include "kubeadapt-k8s-pulse.selectorLabels" . | fromYaml) (.Values.podLabels | default dict)) | nindent 8 }}
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: {{ .Values.config.metricsPort | quote }}
-        prometheus.io/path: "/metrics"
+        {{- /* The scrape annotations are defaults: podAnnotations can replace each of them. */}}
+        {{- $scrape := dict "prometheus.io/scrape" "true" "prometheus.io/port" ($config.metricsPort | toString) "prometheus.io/path" "/metrics" }}
+        {{- toYaml (merge (deepCopy (.Values.podAnnotations | default dict)) $scrape) | nindent 8 }}
     spec:
       serviceAccountName: {{ include "kubeadapt-k8s-pulse.serviceAccountName" . }}
-      # Required for eBPF: access to host network namespace
+      # The node's network namespace: pulse attaches to the host side of
+      # each pod's network interface and follows interface changes there.
       hostNetwork: true
-      # Required for eBPF: access to host PID namespace for process tracking
-      hostPID: true
+      dnsPolicy: {{ .Values.dnsPolicy | default "ClusterFirstWithHostNet" }}
+      {{- with include "kubeadapt-k8s-pulse.priorityClassName" . }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 45 }}
+      {{- with include "kubeadapt-k8s-pulse.imagePullSecrets" . }}
+      imagePullSecrets:
+        {{- . | nindent 8 }}
+      {{- end }}
       containers:
         - name: kubeadapt-k8s-pulse
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ $image.repository }}:{{ $image.tag }}"
+          imagePullPolicy: {{ $image.pullPolicy | default "IfNotPresent" }}
           ports:
+            # With hostNetwork this is a port of the node itself.
             - name: metrics
-              containerPort: {{ .Values.config.metricsPort }}
+              containerPort: {{ $config.metricsPort }}
               protocol: TCP
           env:
             # DaemonSet pod identity (for Prometheus metric labels)
@@ -58,31 +75,44 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            # This container's memory limit in bytes. Pulse sizes its kernel
+            # maps and Go memory limit from it; in its own PID namespace it
+            # cannot find its cgroup on the node to read the limit there.
+            - name: KUBEADAPT_MEMORY_LIMIT_BYTES
+              valueFrom:
+                resourceFieldRef:
+                  containerName: kubeadapt-k8s-pulse
+                  resource: limits.memory
+                  divisor: "1"
 
             # ============================================================
             # eBPF Agent Configuration
             # ============================================================
             - name: EBPF_LOG_LEVEL
-              value: {{ .Values.config.logLevel | quote }}
+              value: {{ $config.logLevel | quote }}
             - name: EBPF_LOG_FORMAT
-              value: {{ .Values.config.logFormat | quote }}
+              value: {{ $config.logFormat | quote }}
             - name: EBPF_METRICS_PORT
-              value: {{ .Values.config.metricsPort | quote }}
-            - name: EBPF_COLLECTION_INTERVAL
-              value: {{ .Values.config.collectionInterval | quote }}
+              value: {{ $config.metricsPort | quote }}
             - name: EBPF_CONNECTION_TRACKING
-              value: {{ .Values.config.connectionTracking | quote }}
+              value: {{ $config.connectionTracking | quote }}
+            {{- if $export.enabled }}
+
+            # Export to the Kubeadapt agent
+            - name: EBPF_EXPORT_ENABLED
+              value: "true"
+            - name: EBPF_AGENT_ENDPOINT
+              value: {{ include "kubeadapt-k8s-pulse.agentEndpoint" . | quote }}
+            - name: EBPF_AGENT_AUTH_TOKEN_FILE
+              value: /var/run/secrets/kubeadapt/pulse/token
+            {{- end }}
 
             # Debug options
-            {{- if .Values.config.enableProfiling }}
+            {{- if $config.enableProfiling }}
             - name: EBPF_ENABLE_PROFILING
               value: "true"
             - name: EBPF_PROFILING_PORT
-              value: {{ .Values.config.profilingPort | quote }}
-            {{- end }}
-            {{- if .Values.config.dumpBPFMaps }}
-            - name: EBPF_DUMP_BPF_MAPS
-              value: "true"
+              value: {{ $config.profilingPort | quote }}
             {{- end }}
 
             {{- if .Values.env }}
@@ -91,41 +121,77 @@ spec:
             {{- end }}
 
           securityContext:
-            # eBPF agents require privileged mode for:
-            # - BPF syscalls and map operations
-            # - Bidirectional mount propagation for BPF maps
-            # - Kernel tracepoint attachment
+            {{- if .Values.privileged }}
             privileged: true
+            {{- else }}
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              {{- with .Values.capabilities }}
+              add:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+            {{- end }}
             readOnlyRootFilesystem: true
+            # Root, because the BPF filesystem and the cgroup tree pulse uses
+            # are owned by root.
             runAsNonRoot: false
             runAsUser: 0
+            {{- with .Values.seccompProfile }}
+            seccompProfile:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            {{- with .Values.seLinuxOptions }}
+            seLinuxOptions:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
 
           volumeMounts:
-            - name: sys
-              mountPath: /sys
-              readOnly: true
+            # The node's processes, read for the container runtime inventory.
             - name: proc
               mountPath: /host/proc
               readOnly: true
+            # Writable: pulse pins its flow table here so a restart resumes
+            # it, and holds the lock that keeps one instance per node. On
+            # Cilium it also reads Cilium's connection tracking maps here.
+            # HostToContainer shows a BPF filesystem the node mounts later.
             - name: bpf-maps
               mountPath: /sys/fs/bpf
-              mountPropagation: Bidirectional
+              mountPropagation: HostToContainer
+            # The node's cgroup tree: finding pod cgroups, attaching the
+            # cgroup programs, reading this container's memory usage.
             - name: cgroup
               mountPath: /sys/fs/cgroup
               readOnly: true
-            - name: debugfs
-              mountPath: /sys/kernel/debug
+            # The node's CNI configuration, read to identify the CNI and the
+            # encapsulation overhead it adds to each packet.
+            - name: cni-conf
+              mountPath: /host/etc/cni/net.d
               readOnly: true
+            {{- if $ambient }}
+            # Where an Istio ambient mesh places its ztunnel socket. Only the
+            # socket's presence is checked.
+            - name: ztunnel
+              mountPath: /host/var/run/ztunnel
+              readOnly: true
+            {{- end }}
             - name: tmp
               mountPath: /tmp
+            {{- if $export.enabled }}
+            - name: agent-token
+              mountPath: /var/run/secrets/kubeadapt/pulse
+              readOnly: true
+            {{- end }}
 
           livenessProbe:
             httpGet:
               path: /health/live
-              port: {{ .Values.config.metricsPort }}
+              port: {{ $config.metricsPort }}
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 5
@@ -134,17 +200,13 @@ spec:
           readinessProbe:
             httpGet:
               path: /health/ready
-              port: {{ .Values.config.metricsPort }}
+              port: {{ $config.metricsPort }}
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
 
       volumes:
-        - name: sys
-          hostPath:
-            path: /sys
-            type: Directory
         - name: proc
           hostPath:
             path: /proc
@@ -157,12 +219,31 @@ spec:
           hostPath:
             path: /sys/fs/cgroup
             type: Directory
-        - name: debugfs
+        - name: cni-conf
           hostPath:
-            path: /sys/kernel/debug
+            path: /etc/cni/net.d
             type: DirectoryOrCreate
+        {{- if $ambient }}
+        # DirectoryOrCreate so that the pod also starts on a node where
+        # ztunnel is not up yet. Mounted only on request (istioAmbient), so
+        # nothing is created on clusters without the mesh.
+        - name: ztunnel
+          hostPath:
+            path: /var/run/ztunnel
+            type: DirectoryOrCreate
+        {{- end }}
         - name: tmp
           emptyDir: {}
+        {{- if $export.enabled }}
+        # Token presented to the agent, mounted as a file so that a changed
+        # Secret is picked up on the next send.
+        - name: agent-token
+          secret:
+            secretName: {{ include "kubeadapt-k8s-pulse.tokenSecretName" . }}
+            items:
+              - key: token
+                path: token
+        {{- end }}
 
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -172,9 +253,9 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with include "kubeadapt-k8s-pulse.affinity" . }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- . | nindent 8 }}
       {{- end }}
       {{- with .Values.topologySpreadConstraints }}
       topologySpreadConstraints:
