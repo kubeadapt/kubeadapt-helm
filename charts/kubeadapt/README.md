@@ -1,6 +1,6 @@
 # kubeadapt
 
-![Version: 1.0.9](https://img.shields.io/badge/Version-1.0.9-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: v3.0.1](https://img.shields.io/badge/AppVersion-v3.0.1-informational?style=flat-square)
+![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square)  ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)  ![AppVersion: v3.2.0](https://img.shields.io/badge/AppVersion-v3.2.0-informational?style=flat-square)
 
 A Helm chart for Kubeadapt
 
@@ -31,6 +31,24 @@ The agent pod meets the Kubernetes restricted Pod Security Standard by default. 
 `--set agent.podSecurityContext.runAsUser=null --set agent.podSecurityContext.runAsGroup=null --set agent.podSecurityContext.fsGroup=null`
 so the restricted-v2 SCC can assign the user and group.
 
+## Network Monitoring
+
+The network monitor (`kubeadapt-k8s-pulse`) is off by default. `--set kubeadapt-k8s-pulse.enabled=true` deploys its DaemonSet, turns on the agent's listener for it behind the `<name>-agent-pulse` ClusterIP Service, and gives both sides the same token: a Secret the chart creates once and keeps across upgrades, or your own Secret named in `global.pulse.existingSecret` (key `token`). Use your own Secret when a tool renders the chart without cluster access, such as Argo CD.
+
+The DaemonSet needs Linux 5.10 or newer, a privileged container (or, with `kubeadapt-k8s-pulse.privileged=false`, the capabilities `BPF`, `PERFMON`, `NET_ADMIN`, `SYS_RESOURCE` and `SYS_PTRACE`), the node's network namespace, read-only node paths and writable `/sys/fs/bpf`, so its namespace must allow the privileged Pod Security level. See the [kubeadapt-k8s-pulse chart](../kubeadapt-k8s-pulse) for each requirement, for scheduling, rollout and private registries, and for troubleshooting; [examples/network-monitor](../../examples/network-monitor) has policy exceptions.
+
+It runs on every Linux node without taints except AWS Fargate and virtual-kubelet nodes (`kubeadapt-k8s-pulse.tolerations` covers tainted pools) and by default never evicts a workload: on a node without room its pod waits and the node is not measured (`kubeadapt-k8s-pulse.priorityClass.create=true` changes that, see the kubeadapt-k8s-pulse chart). In a namespace that denies ingress by default, set `agent.networkPolicy.enabled=true` and `agent.networkPolicy.nodeCIDRs` so the DaemonSet, which connects from node addresses, can reach the agent.
+
+## Upgrading
+
+```console
+helm upgrade kubeadapt kubeadapt/kubeadapt --namespace kubeadapt --reset-values -f kubeadapt-values.yaml
+```
+
+Pass one complete values file on every upgrade: a setting it leaves out goes back to the chart's default, and the chart stops when the file names no agent token. Without a file, `--reset-then-reuse-values` (Helm 3.14 or newer) keeps your earlier settings and takes everything else from the new chart. `--reuse-values` also keeps the previous version's defaults, image tags included: with the network monitor off the chart renders and notes it, with `kubeadapt-k8s-pulse.enabled=true` it stops and names the two forms above.
+
+With the network monitor on a large cluster, leave `--wait` and `--atomic` out and watch the DaemonSet; see [Upgrading](../../README.md#upgrading) in the repository README, which also covers moving the agent token into a Secret of your own before `agent.config.existingSecret` is set.
+
 ## Uninstalling the Chart
 
 ```console
@@ -43,7 +61,7 @@ The namespace and any token Secret you created yourself stay behind; delete them
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.0.2 |
+| oci://ghcr.io/kubeadapt/kubeadapt-helm | kubeadapt-k8s-pulse | 1.1.0 |
 
 ## Values
 
@@ -74,7 +92,6 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | agent.autoUpgrade.serviceAccount.name | string | `""` |  |
 | agent.autoUpgrade.timeout | string | `"15m"` |  |
 | agent.config.backendUrl | string | `"https://ingest.kubeadapt.io"` |  |
-| agent.config.bufferMaxBytes | string | `"52428800"` |  |
 | agent.config.compressionLevel | int | `3` |  |
 | agent.config.dcgmEndpoints | string | `""` |  |
 | agent.config.dcgmNamespace | string | `""` |  |
@@ -93,8 +110,12 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | agent.env | list | `[]` |  |
 | agent.image.pullPolicy | string | `"IfNotPresent"` |  |
 | agent.image.repository | string | `"public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent"` |  |
-| agent.image.tag | string | `"v3.0.1"` |  |
+| agent.image.tag | string | `"v3.2.0"` |  |
+| agent.networkPolicy.enabled | bool | `false` |  |
+| agent.networkPolicy.nodeCIDRs | list | `[]` |  |
 | agent.nodeSelector | object | `{}` |  |
+| agent.podAnnotations | object | `{}` |  |
+| agent.podLabels | object | `{}` |  |
 | agent.podSecurityContext.fsGroup | int | `65532` |  |
 | agent.podSecurityContext.runAsGroup | int | `65532` |  |
 | agent.podSecurityContext.runAsNonRoot | bool | `true` |  |
@@ -120,10 +141,10 @@ The namespace and any token Secret you created yourself stay behind; delete them
 | agent.tolerations | list | `[]` |  |
 | agent.topologySpreadConstraints | list | `[]` |  |
 | global.fullnameOverride | string | `""` |  |
+| global.imagePullSecrets | list | `[]` |  |
 | global.name | string | `"kubeadapt"` |  |
 | global.nameOverride | string | `""` |  |
-| kubeadapt-k8s-pulse.affinity | object | `{}` |  |
+| global.pulse.existingSecret | string | `""` |  |
+| global.pulse.listenPort | int | `9091` |  |
+| kubeadapt-k8s-pulse.config.export.enabled | bool | `true` |  |
 | kubeadapt-k8s-pulse.enabled | bool | `false` |  |
-| kubeadapt-k8s-pulse.nodeSelector | object | `{}` |  |
-| kubeadapt-k8s-pulse.tolerations | list | `[]` |  |
-| kubeadapt-k8s-pulse.topologySpreadConstraints | list | `[]` |  |

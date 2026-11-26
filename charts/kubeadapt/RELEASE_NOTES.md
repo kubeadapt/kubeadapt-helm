@@ -1,3 +1,14 @@
+## 1.1.0
+
+- Deploys agent `v3.2.0` and the network monitor chart `kubeadapt-k8s-pulse` 1.1.0, which runs network monitor `v3.2.0`. Earlier network monitor images attach to each pod's network interface by replacing the classic tc filter at priority 1, handle 1, the slot where some CNI plugins and network policy agents keep their own filter; `v3.2.0` adds its own filter instead. The chart refuses network monitor image tags older than `v3.2.0`.
+- Added: with `kubeadapt-k8s-pulse.enabled=true`, the network monitor sends its traffic records to the agent. The agent's listener runs behind the `<name>-agent-pulse` ClusterIP Service on port 9091 (`global.pulse.listenPort`). Both sides read the same token from a file: a Secret the chart creates on first install and keeps across upgrades, or your own Secret named in `global.pulse.existingSecret` (key `token`). Use your own Secret when a tool renders the chart without cluster access, such as Argo CD; otherwise each render generates a new token.
+- Added: the agent may `list` and `watch` EndpointSlices. Agent `v3.2.0` reads them to name addresses that belong to no pod or node, such as the API server's.
+- Changed: the upgrader holds every rule of the network monitor's ClusterRole, and may manage its ResourceQuota and PriorityClass when the network monitor chart creates them (both off by default), so an auto-upgrade with the network monitor enabled can create and update its binding.
+- Added: `global.imagePullSecrets` for the agent, the network monitor and the upgrade Job; `agent.podAnnotations` and `agent.podLabels`; `agent.networkPolicy`, an optional NetworkPolicy that admits the network monitor, which connects from node addresses, to the agent in a namespace that denies ingress by default.
+- Changed: the chart stops rendering without an agent token (`agent.config.token` or `agent.config.existingSecret`), and when the network monitor is turned on with values written for an earlier release (`helm upgrade --reuse-values`). Use `--reset-then-reuse-values` (Helm 3.14 or newer) or `--reset-values -f <your values file>`. Auto-upgrade already uses `--reset-then-reuse-values`.
+- Removed: `agent.config.bufferMaxBytes` (`KUBEADAPT_BUFFER_MAX_BYTES`); agent `v3.2.0` does not read it.
+- Auto-upgrade reaches 1.1.0 only from 1.0.9. Installs on 1.0.8 auto-upgrade to 1.0.9 first; installs on 1.0.0 to 1.0.7 need one manual `helm upgrade` (see 1.0.9). 1.1.0 is on the fast channel only.
+
 ## 1.0.9
 
 - Upgrading from 1.0.0 to 1.0.7: run `helm upgrade` to 1.0.9 once by hand. The upgrader those releases deploy, `kubeadapt-k8s-upgrader:v3.0.1`, starts the upgrade Job under the service account `kubeadapt-k8s-upgrader`, which the chart does not create (it creates `kubeadapt-upgrader`), so their upgrade Jobs never start. Auto-upgrade works from 1.0.9 on.

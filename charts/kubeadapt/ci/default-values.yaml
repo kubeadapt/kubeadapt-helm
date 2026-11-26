@@ -8,7 +8,7 @@ agent:
   enabled: true
   image:
     repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
-    tag: "v3.0.1"
+    tag: "v3.2.0"
     pullPolicy: IfNotPresent
   serviceAccount:
     create: true
@@ -35,7 +35,6 @@ agent:
     compressionLevel: 3
     maxRetries: 3
     requestTimeout: "30s"
-    bufferMaxBytes: 52428800
     healthPort: 8080
     debugEndpoints: false
     gpuMetricsEnabled: true

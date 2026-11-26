@@ -90,6 +90,8 @@ Follow these steps when cutting a release:
    - Set `artifacthub.io/prerelease: "true"` for fast-only, `"false"` for stable
    - Keep `appVersion` equal to the default image tag (a leading `v` is ignored) and `artifacthub.io/images` on that tag
    - Replace `artifacthub.io/changes` with this release's changes only
+   - **When `charts/kubeadapt-k8s-pulse` changed, release it first, in its own merge.** The `kubeadapt` chart is packaged with the network monitor chart downloaded from the registry at the version under `dependencies`, not with the one in the tree. So: give `charts/kubeadapt-k8s-pulse` a new version and merge that alone; after its release, set the `dependencies` version in `charts/kubeadapt/Chart.yaml` to it together with the `kubeadapt` version bump. Both bumps in one merge cannot be packaged, and a stale `dependencies` version releases a `kubeadapt` chart with an old network monitor. `scripts/check-release.sh` checks this in every pull request and again in `publish.yml` before packaging; run it locally before opening the release PR.
+   - **`charts/kubeadapt-k8s-pulse`: the image.** Set `image.tag` in `values.yaml` and in `ci/default-values.yaml` to the network monitor release, and the `kubeadapt.io/minimum-image-version` annotation in `Chart.yaml` to the oldest release that chart may run. The templates refuse an older tag, because images from before the minimum replace the tc filter of the node's CNI or network policy agent. `scripts/check-release.sh` fails when the chart's own default does not pass.
 
 2. **Update `upgrade-metadata.yaml`**
    - Set `chartVersion` to match `Chart.yaml` version exactly
@@ -109,7 +111,16 @@ Follow these steps when cutting a release:
    - an `upgradeFrom` entry from another major has a blocked edge for this version that applies on every platform, with an `Always` rule or no `matchingRules` (add it in the release PR)
 
 6. **Merge to main**
-   `publish.yml` runs: packages the chart, pushes to GHCR, creates a GitHub Release, marks fast-only releases as pre-releases, and keeps "Latest" on the newest stable `kubeadapt` release.
+   `publish.yml` runs: runs the release checks (`scripts/check-release.sh`), packages the chart, pushes to GHCR, creates a GitHub Release, marks fast-only releases as pre-releases, and keeps "Latest" on the newest stable `kubeadapt` release.
 
 7. **Verify on GitHub**
    Confirm the release appears with the correct badge: "Pre-release" for fast-only, "Latest" for stable.
+
+8. **Verify the published package**
+   Render the chart from the registry, not from the source tree, with the network monitor on, and check that the DaemonSet is the one this release describes:
+   ```bash
+   helm template kubeadapt oci://ghcr.io/kubeadapt/kubeadapt-helm/kubeadapt --version <version> \
+     --set agent.config.token=x --set kubeadapt-k8s-pulse.enabled=true \
+     | grep -E 'privileged:|EBPF_EXPORT_ENABLED|image:'
+   ```
+   Expect `privileged: true` (unless the release changed that default), `EBPF_EXPORT_ENABLED` and the image tags of this release.

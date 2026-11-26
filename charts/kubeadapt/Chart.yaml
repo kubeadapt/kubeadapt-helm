@@ -2,15 +2,15 @@ apiVersion: v2
 name: kubeadapt
 description: A Helm chart for Kubeadapt
 type: application
-version: 1.0.9
+version: 1.1.0
 # The agent release this chart deploys (agent.image.tag). Keep in step with
 # that tag; it is also the image tag used when agent.image.tag is empty.
-appVersion: "v3.0.1"
+appVersion: "v3.2.0"
 
 # Dependencies
 dependencies:
   - name: kubeadapt-k8s-pulse
-    version: "1.0.2"
+    version: "1.1.0"
     repository: "oci://ghcr.io/kubeadapt/kubeadapt-helm"
     condition: kubeadapt-k8s-pulse.enabled
 
@@ -35,15 +35,21 @@ annotations:
     url: https://kubeadapt.github.io/kubeadapt-helm/pgp_keys.asc
   artifacthub.io/changes: |
     - kind: changed
-      description: "Installs on 1.0.0 to 1.0.7 need one manual helm upgrade to this release. Their upgrader, v3.0.1, starts the upgrade Job under the service account kubeadapt-k8s-upgrader, which the chart does not create, so those Jobs never start. Auto-upgrade works from this release on."
-    - kind: fixed
-      description: "Auto-upgrade works again. 1.0.8 gave the agent get on nodes/proxy and nodes/stats but not the upgrader, and Kubernetes lets the upgrader update the agent's ClusterRoleBinding only if it holds every rule of the agent's ClusterRole, so every auto-upgrade from 1.0.8 failed and rolled back. The upgrader now holds those two rules as well."
+      description: "Deploys agent v3.2.0 and the network monitor chart kubeadapt-k8s-pulse 1.1.0 with network monitor v3.2.0. Earlier network monitor images replace the classic tc filter at priority 1, handle 1 on each pod's network interface; the chart refuses image tags older than v3.2.0."
+    - kind: added
+      description: "With kubeadapt-k8s-pulse.enabled, the network monitor sends its traffic records to the agent. The agent's listener runs behind the <name>-agent-pulse ClusterIP Service, and both sides read the same token from a Secret the chart creates once and keeps across upgrades, or from global.pulse.existingSecret."
+    - kind: added
+      description: "The agent may list and watch EndpointSlices, which agent v3.2.0 reads to name addresses no pod or node has, such as the API server's. Without the rule it runs with partial data."
     - kind: changed
-      description: "With the network monitor enabled, the upgrader may also manage the network monitor's ClusterRole and ClusterRoleBinding. Later releases add both, and an auto-upgrade runs with the installed release's upgrader, so without this the auto-upgrade from 1.0.9 to those releases would stop before it changes anything."
+      description: "The upgrader holds every rule of the network monitor's ClusterRole, and may manage its ResourceQuota and PriorityClass when the chart creates them, so auto-upgrades with the network monitor enabled can update its binding."
+    - kind: added
+      description: "global.imagePullSecrets for the agent, the network monitor and the upgrade Job, agent.podAnnotations and agent.podLabels, and an optional NetworkPolicy (agent.networkPolicy) that admits the network monitor to the agent in a namespace that denies ingress by default."
     - kind: changed
-      description: "The network monitor subchart (kubeadapt-k8s-pulse) moves from 1.0.1 to 1.0.2, which was released on its own in September and never pinned here. 1.0.2 sets EBPF_RETRY_BUFFER_SIZE to 120; the pulse image this chart deploys, v3.0.1, does not read it, so the network monitor runs as before."
+      description: "The chart stops rendering without an agent token, and when the network monitor is turned on with values written for an earlier release (helm upgrade --reuse-values). Auto-upgrade uses --reset-then-reuse-values and is not affected."
+    - kind: removed
+      description: "agent.config.bufferMaxBytes (KUBEADAPT_BUFFER_MAX_BYTES), which agent v3.2.0 does not read."
   artifacthub.io/containsSecurityUpdates: "false"
-  artifacthub.io/prerelease: "false"
+  artifacthub.io/prerelease: "true"
   artifacthub.io/license: Apache-2.0
   artifacthub.io/platforms: |
     - eks

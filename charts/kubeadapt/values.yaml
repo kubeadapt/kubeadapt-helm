@@ -3,13 +3,36 @@ global:
   name: "kubeadapt"
   nameOverride: ""
   fullnameOverride: ""
+  # Pull secrets for a registry that needs credentials, as a list of
+  # {name: <secret>} in the release namespace. Used by the agent pod, the
+  # network monitor and, through its service account, the upgrade Job.
+  # Every image can be taken from your own registry: agent.image.repository,
+  # agent.autoUpgrade.image.repository, agent.autoUpgrade.jobImage and
+  # kubeadapt-k8s-pulse.image.repository.
+  imagePullSecrets: []
+  # Shared by the agent and the network monitor (kubeadapt-k8s-pulse). Used
+  # only while kubeadapt-k8s-pulse.enabled is true.
+  pulse:
+    # Port of the agent's in-cluster listener that the network monitor sends
+    # its traffic records to. Served by the <name>-agent-pulse ClusterIP Service.
+    listenPort: 9091
+    # The agent accepts records only from a sender that presents this token.
+    # Empty: the chart creates the Secret <name>-pulse-token with a random
+    # token on first install and keeps the same token on every helm upgrade.
+    # Set this to use your own Secret instead, with the token under the key
+    # "token". Set it as well when a tool renders the chart without cluster
+    # access (helm template, for example), since the chart then cannot read
+    # the existing token and would create a new one on every render.
+    # Both pods mount the token as a file and read it again while running, so
+    # changing the Secret rotates the token without a restart.
+    existingSecret: ""
 
 agent:
   enabled: true
   image:
     # renovate: datasource=docker depName=public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
     repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-agent
-    tag: "v3.0.1"
+    tag: "v3.2.0"
     pullPolicy: IfNotPresent
   # ============================================================
   # Service Account Configuration
@@ -28,6 +51,26 @@ agent:
     create: true
   service:
     type: ClusterIP
+  # Extra annotations and labels for the agent pod, for example the ones a
+  # policy engine matches on or a scrape configuration selects by. The chart's
+  # own labels (app.kubernetes.io/name, instance and component) cannot be
+  # replaced: the Deployment selects its pod by them.
+  podAnnotations: {}
+  podLabels: {}
+  # NetworkPolicy that admits the network monitor to the agent's listener
+  # (global.pulse.listenPort). Needed only where the release namespace denies
+  # ingress by default, and created only while kubeadapt-k8s-pulse.enabled is
+  # true. Leave it off in a namespace without policies: selecting the agent
+  # pod with any policy closes its other ports to everything the namespace's
+  # policies do not allow.
+  networkPolicy:
+    enabled: false
+    # Address ranges of the cluster's nodes, required when enabled. The
+    # network monitor runs in the node's network, so its connections come from
+    # node addresses and a pod selector never matches them. On EKS, AKS and
+    # GKE this is the VPC or subnet range the nodes take their addresses from.
+    # Example: ["10.0.0.0/16"]
+    nodeCIDRs: []
   # ONE Deployment per cluster, so memory scales with TOTAL cluster size - a
   # DaemonSet's stays flat per node. Peak is the network-flow merge, measured at
   # ~1550 B per inbound flow row plus ~300 MB of caches at 5000 nodes. At 500
@@ -91,13 +134,11 @@ agent:
   # Network Telemetry Spool
   # ============================================================
   spool:
-    # Write-ahead spool for network telemetry: it is meant to survive container
-    # restarts and ingestion outages, and a pod replacement drains it during the
-    # termination grace period. No PersistentVolume is ever created.
-    #
-    # Chart-side plumbing. The volume and the KUBEADAPT_SPOOL_* variables below
-    # take effect once an agent release that writes to the spool ships; agent
-    # images that predate it ignore them and leave the volume empty.
+    # Write-ahead spool for network telemetry, on an emptyDir. It keeps the
+    # batches the backend has not acknowledged through a container restart and
+    # an ingestion outage; when the pod is replaced, the agent tries to deliver
+    # them within the termination grace period. The agent's restart-surviving
+    # caches share the volume. No PersistentVolume is ever created.
     enabled: true
     # Ceiling the kubelet enforces on the emptyDir itself. Kept above maxBytes
     # so the agent's own bound is what evicts, not a pod eviction.
@@ -126,6 +167,16 @@ agent:
     #   kubectl create secret generic kubeadapt-agent-token \
     #     --namespace kubeadapt --from-literal=token='<your-token>'
     # Example: existingSecret: "kubeadapt-agent-token"
+    #
+    # On a release that was installed with config.token, create the new
+    # Secret before the upgrade that sets this, under another name than
+    # <name>-agent: Helm deletes the chart's own <name>-agent Secret in that
+    # upgrade. To copy the token without showing it:
+    #   kubectl -n kubeadapt get secret kubeadapt-agent -o jsonpath='{.data.token}' | base64 --decode \
+    #     | kubectl -n kubeadapt create secret generic kubeadapt-agent-token --from-file=token=/dev/stdin
+    #
+    # One of config.token and config.existingSecret is required; the chart
+    # does not render without.
     existingSecret: ""
 
     # Backend API endpoint
@@ -161,9 +212,6 @@ agent:
 
     # Timeout for HTTP requests to backend (Go duration or seconds).
     requestTimeout: "30s"
-
-    # Max buffer size in bytes (default: 50 MB).
-    bufferMaxBytes: "52428800"
 
     # ============================================================
     # Observability & Debugging
@@ -246,11 +294,17 @@ agent:
     # Releases from 1.0.8 on are published to both channels
     channel: "fast"
 
-    # Upgrade timeout - how long to wait for helm upgrade to complete
+    # Upgrade timeout - how long to wait for helm upgrade to complete. The
+    # upgrade waits for the agent and for the network monitor's rollout, and
+    # rolls everything back when the time is up. That rollout takes
+    # (100 / maxUnavailable percent) waves of about a minute each, whatever
+    # the number of nodes; see kubeadapt-k8s-pulse.updateStrategy before
+    # lowering either setting.
     timeout: "15m"
 
     # Helm image for upgrade Job
-    # Contains helm binary for performing upgrades
+    # Contains helm binary for performing upgrades. A full image reference:
+    # point it at your own registry when you mirror images.
     jobImage: "alpine/helm:3.14.3"
 
     # Chart repository URL for Helm upgrades
@@ -296,34 +350,46 @@ agent:
   topologySpreadConstraints: []
 
 # ============================================================
-# eBPF Agent Configuration (Network Cost Tracking)
+# Network Monitor (Network Cost Tracking)
 # ============================================================
-# Deploys a DaemonSet that uses eBPF to track pod-to-pod network traffic
+# Deploys a DaemonSet that measures each pod's network traffic with eBPF and
+# sends it to the agent, which reports it to Kubeadapt as network cost.
+#
+# When enabled, the chart also turns on the agent's listener for it, exposes
+# that listener on the <name>-agent-pulse ClusterIP Service, and gives both
+# sides the same token (see global.pulse).
 #
 # Prerequisites:
-# - Linux kernel >= 5.10 on every node it runs on
-# - Privileged container access (hostNetwork, hostPID) - not available on
-#   GKE Autopilot or EKS Fargate; OpenShift needs the privileged SCC
+# - Linux kernel 5.10 or newer on every node it runs on
+# - A privileged container (or, with privileged: false, the Linux
+#   capabilities BPF, PERFMON, NET_ADMIN, SYS_RESOURCE and SYS_PTRACE), the
+#   node's network namespace and host paths, which GKE Autopilot and EKS
+#   Fargate do not allow. The namespace must allow the privileged Pod
+#   Security level; on OpenShift, use the privileged SCC.
+#   examples/network-monitor in the chart repository has ready-made
+#   exceptions for Pod Security Admission, Kyverno and Gatekeeper.
 #
-# This chart version does not connect the DaemonSet to the agent, so on its own
-# it reports nothing to Kubeadapt. Leave it disabled unless Kubeadapt support
-# has set up network monitoring for your cluster.
-#
-# For full configuration options, see: charts/kubeadapt-k8s-pulse/values.yaml
+# For all options, see charts/kubeadapt-k8s-pulse/values.yaml. The ones a
+# large or locked-down cluster usually needs, all under this key:
+#   image.repository, imagePullSecrets   a private registry
+#   tolerations, nodeRequirements        which nodes get a pod
+#   priorityClass, priorityClassName     wait on a full node, or evict for room
+#   updateStrategy                       how fast a change rolls out
+#   config.metricsPort                   the node port of its health server
+#   seLinuxOptions, privileged           nodes that enforce SELinux
+#   istioAmbient.enabled                 a cluster with an Istio ambient mesh
+#   podAnnotations, podLabels            policy exemptions, scrape selection
 kubeadapt-k8s-pulse:
-  # Set to true to deploy the eBPF agent DaemonSet for network cost tracking
+  # Set to true to deploy the network monitor DaemonSet.
   enabled: false
 
-  # Override defaults if needed - see charts/kubeadapt-k8s-pulse/values.yaml for all options
-  # config:
-  #   logLevel: "info"
-  #   collectionInterval: "25s"
+  config:
+    export:
+      # Send traffic records to this release's agent.
+      enabled: true
 
-  # Scheduling - configure as needed for your cluster
-  tolerations: []
-
-  nodeSelector: {}
-
-  affinity: {}
-
-  topologySpreadConstraints: []
+  # By default the DaemonSet runs on every Linux node without taints, except
+  # AWS Fargate and virtual-kubelet nodes, and never evicts a workload to get
+  # there: on a node without room its pod waits and the node is not measured.
+  # tolerations covers tainted pools; priorityClass.create: true gives it a
+  # place on every node.
