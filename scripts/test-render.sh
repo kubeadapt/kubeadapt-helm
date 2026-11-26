@@ -193,6 +193,11 @@ render "auto-upgrade" "$NEW" "${ON[@]}" --set agent.autoUpgrade.enabled=true
 hasnt "an object named kubeadapt-k8s-upgrader" 'name: kubeadapt-k8s-upgrader$'
 
 echo "== values of earlier releases (helm upgrade --reuse-values)"
+# at_least <version> <minimum>: true when version >= minimum. Values of 1.1.0
+# and later carry the markers the guards check (global.pulse in the kubeadapt
+# chart, rbac in the network monitor chart), so they render; earlier ones are
+# refused.
+at_least() { [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -1)" = "$2" ]; }
 tags="$(git -C "$ROOT" tag -l 'kubeadapt-1.*' | sort -V)"
 [ -n "$tags" ] || { echo "FAIL  no kubeadapt-1.* tags found: fetch tags first"; exit 1; }
 for tag in $tags; do
@@ -201,11 +206,17 @@ for tag in $tags; do
   git -C "$ROOT" show "$tag:charts/kubeadapt/values.yaml" >"$old/kubeadapt/values.yaml"
   render "$tag" "$old/kubeadapt"
   render "$tag, auto-upgrade on" "$old/kubeadapt" --set agent.autoUpgrade.enabled=true
+  git -C "$ROOT" show "$tag:charts/kubeadapt-k8s-pulse/values.yaml" >"$WORK/$tag-pulse-values.yaml"
+  if at_least "${tag#kubeadapt-}" 1.1.0; then
+    render "$tag, network monitor turned on" "$old/kubeadapt" "${ON[@]}"
+    cp "$WORK/$tag-pulse-values.yaml" "$old/kubeadapt/charts/kubeadapt-k8s-pulse/values.yaml"
+    render "$tag, network monitor was already on" "$old/kubeadapt" "${ON[@]}"
+    continue
+  fi
   # The old defaults (image tags, tolerations, no connection to the agent)
   # cannot run the network monitor.
   refused "$tag, network monitor turned on" "$old/kubeadapt" "${ON[@]}"
-  git -C "$ROOT" show "$tag:charts/kubeadapt-k8s-pulse/values.yaml" \
-    >"$old/kubeadapt/charts/kubeadapt-k8s-pulse/values.yaml"
+  cp "$WORK/$tag-pulse-values.yaml" "$old/kubeadapt/charts/kubeadapt-k8s-pulse/values.yaml"
   refused "$tag, network monitor was already on" "$old/kubeadapt" "${ON[@]}"
 done
 
@@ -213,7 +224,11 @@ for tag in $(git -C "$ROOT" tag -l 'kubeadapt-k8s-pulse-1.*' | sort -V); do
   old="$WORK/$tag"
   stage "$old"
   git -C "$ROOT" show "$tag:charts/kubeadapt-k8s-pulse/values.yaml" >"$old/kubeadapt-k8s-pulse/values.yaml"
-  refused "$tag on its own" "$old/kubeadapt-k8s-pulse"
+  if at_least "${tag#kubeadapt-k8s-pulse-}" 1.1.0; then
+    render "$tag on its own" "$old/kubeadapt-k8s-pulse"
+  else
+    refused "$tag on its own" "$old/kubeadapt-k8s-pulse"
+  fi
 done
 
 if [ "$FAILED" -ne 0 ]; then
