@@ -45,6 +45,12 @@ jobs:
         with:
           version: v3.13.3
 
+      # Stops the release when the network monitor chart defaults to an image
+      # older than its minimum, or when the kubeadapt chart would be packaged
+      # with a network monitor chart other than the one in this commit.
+      - name: Release checks
+        run: ./scripts/check-release.sh
+
       # Import GPG private key for chart signing
       - name: Prepare PGP key
         run: |

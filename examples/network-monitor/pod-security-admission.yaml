@@ -1,0 +1,27 @@
+# Pod Security Admission for the namespace of a release that runs the network
+# monitor (kubeadapt-k8s-pulse.enabled=true).
+#
+# The network monitor's pod uses the node's network, host paths, a host port
+# and five added capabilities, which the baseline and restricted levels
+# reject, so the namespace has to enforce the privileged level. Pod Security
+# Admission works per namespace and cannot exempt one workload. The agent pod
+# and the upgrade Job in the same namespace keep meeting the restricted level
+# on their own.
+#
+# Without this, the DaemonSet exists but has no pods, and its events say
+#   violates PodSecurity "baseline:latest": host namespaces (hostNetwork=true), ...
+#
+# Change the name if the release lives in another namespace. On an existing
+# namespace the same is done with:
+#   kubectl label namespace kubeadapt --overwrite \
+#     pod-security.kubernetes.io/enforce=privileged \
+#     pod-security.kubernetes.io/audit=privileged \
+#     pod-security.kubernetes.io/warn=privileged
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubeadapt
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

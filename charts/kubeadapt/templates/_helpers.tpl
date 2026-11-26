@@ -68,6 +68,33 @@ Behaviour:
 {{- end }}
 
 {{/*
+"true" when the network monitor is deployed and sends to this release's agent:
+the agent's listener, its Service and the shared token exist only then.
+*/}}
+{{- define "kubeadapt.pulseConnected" -}}
+{{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict -}}
+{{- if and .Values.agent.enabled $pulse.enabled (dig "config" "export" "enabled" false $pulse) -}}
+true
+{{- end -}}
+{{- end }}
+
+{{/*
+Secret holding the token the network monitor presents to the agent. The
+kubeadapt-k8s-pulse chart derives the same default name.
+*/}}
+{{- define "kubeadapt.pulseTokenSecretName" -}}
+{{- (.Values.global.pulse | default dict).existingSecret | default (printf "%s-pulse-token" (include "kubeadapt.name" .)) -}}
+{{- end }}
+
+{{/*
+Port of the agent's listener for the network monitor. The kubeadapt-k8s-pulse
+chart falls back to the same number.
+*/}}
+{{- define "kubeadapt.pulseListenPort" -}}
+{{- (.Values.global.pulse | default dict).listenPort | default 9091 -}}
+{{- end }}
+
+{{/*
 Name of the kubeadapt-k8s-pulse DaemonSet, derived as that chart derives it.
 */}}
 {{- define "kubeadapt.pulseFullname" -}}
@@ -89,4 +116,16 @@ Name of the kubeadapt-k8s-pulse ClusterRole, derived as that chart derives it.
 */}}
 {{- define "kubeadapt.pulseClusterRoleName" -}}
 {{- printf "%s-%s" (include "kubeadapt.pulseFullname" .) .Release.Namespace | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+
+{{/*
+Name of the PriorityClass the kubeadapt-k8s-pulse chart creates, or empty when
+it creates none.
+*/}}
+{{- define "kubeadapt.pulsePriorityClassName" -}}
+{{- $pulse := index .Values "kubeadapt-k8s-pulse" | default dict -}}
+{{- $class := $pulse.priorityClass | default dict -}}
+{{- if and $pulse.enabled $class.create -}}
+{{- default (include "kubeadapt.pulseClusterRoleName" .) $class.name -}}
+{{- end -}}
 {{- end }}
