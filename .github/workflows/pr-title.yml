@@ -35,9 +35,10 @@ jobs:
           scopes: |
             agent
             kubeadapt-k8s-pulse
-            prometheus
-            opencost
+            upgrader
             chart
+            rbac
+            release
             deps
             github
             docs

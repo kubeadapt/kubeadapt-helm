@@ -73,7 +73,7 @@ jobs:
         run: |
           cd charts/kubeadapt
           helm dependency build
-          if [ $(find charts/ -name "kubeadapt-k8s-pulse-*.tgz" | wc -l) -eq 0 ]; then
+          if [ "$(find charts/ -name "kubeadapt-k8s-pulse-*.tgz" | wc -l)" -eq 0 ]; then
             echo "Dependencies not correctly resolved"
             echo "Expected to find kubeadapt-k8s-pulse-*.tgz in charts directory"
             ls -la charts/
@@ -136,3 +136,31 @@ jobs:
       - name: Run chart-testing (install)
         run: ct install --config ./.github/configs/ct-install.yaml
         if: steps.list-changed.outputs.changed == 'true'
+
+  release-metadata:
+    uses: ./.github/workflows/validate-upgrade-metadata.yaml
+
+  blocked-edges:
+    uses: ./.github/workflows/validate-blocked-edges.yaml
+
+  # The one required status check. Every job above runs on every pull
+  # request, so a required check never waits on a workflow that path
+  # filters skipped; a job that skips its own steps still passes.
+  gate:
+    if: always()
+    needs:
+      - linter-artifacthub
+      - chart-test
+      - release-metadata
+      - blocked-edges
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every check to pass
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -Eq '"(failure|cancelled)"'; then
+            echo "A required check failed."
+            exit 1
+          fi
