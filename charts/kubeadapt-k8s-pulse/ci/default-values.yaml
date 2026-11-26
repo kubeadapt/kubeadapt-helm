@@ -6,7 +6,7 @@ enabled: true
 
 image:
   repository: public.ecr.aws/k2x0t8t6/kubeadapt/app/kubeadapt-k8s-pulse
-  tag: "v3.0.1"
+  tag: "v3.2.0"
   pullPolicy: Always  # Always pull to avoid stale cache in CI
 
 serviceAccount:
@@ -18,9 +18,6 @@ config:
   # Metrics port
   metricsPort: 9090
 
-  # Use shorter collection interval for CI tests
-  collectionInterval: "15s"
-
   # Debug logging for CI
   logLevel: "debug"
   logFormat: "json"
@@ -30,7 +27,6 @@ config:
 
   # Debug options disabled in CI
   enableProfiling: false
-  dumpBPFMaps: false
 
 # Minimal resources for CI environment (Kind cluster)
 resources:

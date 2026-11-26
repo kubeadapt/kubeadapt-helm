@@ -6,16 +6,16 @@
 
 ## Overview
 
-The eBPF agent runs as a DaemonSet on each Kubernetes node, capturing network packets at the Traffic Control (TC) layer to track pod-to-pod traffic. It exports raw IP-based connection metrics to Prometheus.
+The network monitor runs as a DaemonSet on every node. Its eBPF programs count each pod's traffic at the host side of the pod's network interface, and it sends one batch per node per minute to the Kubeadapt agent, which reports it as network cost.
 
 ### Key Features
 
-- **Pod-Level Traffic Tracking**: Monitors network traffic between pods using TC eBPF hooks
-- **Protocol Support**: TCP and UDP traffic with separate tracking
-- **IPv4 and IPv6 Support**: Full dual-stack support on kernel 5.10+
-- **Egress-Only Tracking**: Same-node and cross-node across pods
-- **Multi-Interface Deduplication**: Prevents counting same packet across interface paths
-- **Overflow Protection**: Ringbuffer captures flows when map reaches capacity
+- **Per-pod traffic**: sent and received bytes and packets for each pod, attached with TCX on kernel 6.6 and newer and with classic tc on older kernels
+- **IPv4 and IPv6**: dual-stack accounting on kernel 5.10 and newer
+- **Pod and node identity**: each node's pods are resolved through the Kubernetes API
+- **Delivery to the agent**: batches the agent has not acknowledged are kept and retried
+- **Overflow handling**: flows the kernel table has no room for are carried by a ring buffer instead of being lost
+- **Prometheus metrics** and health endpoints on every node
 
 ## Prerequisites
 
@@ -52,6 +52,8 @@ helm install kubeadapt-k8s-pulse oci://ghcr.io/kubeadapt/kubeadapt-helm/{{ .Name
 
 > **Note:** Using `kubeadapt-k8s-pulse` as release name ensures the service name matches Prometheus scrape configurations.
 
+Installed on its own, the DaemonSet serves only its Prometheus metrics. To report network cost, install it through the `kubeadapt` chart with `kubeadapt-k8s-pulse.enabled=true`, which also turns on the agent's listener and gives both sides a shared token. To send to an agent installed separately, set `config.export.enabled=true`, `config.export.agentEndpoint` and `config.export.tokenSecret` (a Secret with the agent's token under the key `token`).
+
 ## Uninstalling the Chart
 
 To uninstall/delete the deployment:
@@ -60,47 +62,88 @@ To uninstall/delete the deployment:
 helm delete kubeadapt-k8s-pulse -n kubeadapt
 ```
 
-## Security Requirements
+## What the Pod Asks of the Node
 
-The eBPF agent requires privileged access:
+Everything the DaemonSet's pod uses beyond an ordinary pod, and why. A platform team can write a policy exception from this table; [examples/network-monitor](../../examples/network-monitor) has one each for Pod Security Admission, Kyverno and Gatekeeper.
 
-```yaml
-securityContext:
-  privileged: true
-  capabilities:
-    add:
-      - SYS_ADMIN    # Load/attach eBPF programs
-      - SYS_RESOURCE # Lock memory for BPF maps
-      - NET_ADMIN    # Network namespace operations
-```
+| What | In the pod spec | Why | Can it go? |
+|------|-----------------|-----|------------|
+| Node's network namespace | `hostNetwork: true` | The programs attach to the host side of every pod's network interface and follow interfaces as pods come and go. Both exist only in the node's network namespace. | No |
+| A port of the node | container port `9090` (`config.metricsPort`) | Health probes and Prometheus metrics. A port of the node only because the pod uses the node's network. Open on every node address, without authentication. | The number can be changed |
+| Node's PID and IPC namespaces | not used | | |
+| Privileged container | `privileged: true` (default) | Load and attach the BPF programs, read the node's processes and cgroups. | `privileged: false` runs it with only the five capabilities below and `allowPrivilegeEscalation: false`, where the node's security policy allows that set |
+| Root user | `runAsUser: 0` | The BPF filesystem and the cgroup tree are owned by root. | No |
+| Capability `BPF` | `capabilities.add`, with `privileged: false` | Create BPF maps and load the programs. | No |
+| Capability `PERFMON` | `capabilities.add`, with `privileged: false` | The kernel verifier accepts the programs only with it. | No |
+| Capability `NET_ADMIN` | `capabilities.add`, with `privileged: false` | Attach to pod network interfaces, follow interface changes, read connection tracking. | No |
+| Capability `SYS_RESOURCE` | `capabilities.add`, with `privileged: false` | Raise the locked-memory limit for BPF maps. | Yes, on kernel 5.11 and newer |
+| Capability `SYS_PTRACE` | `capabilities.add`, with `privileged: false` | Read other containers' executables for the runtime inventory. | Yes, with `EBPF_FINGERPRINT_ENABLED=false` in `env` |
+| Every other capability | `capabilities.drop: [ALL]`, with `privileged: false` | | |
+| Root filesystem | `readOnlyRootFilesystem: true` | Writes go to an `emptyDir` at `/tmp`. | |
+| Host path `/proc` | read-only, at `/host/proc` | The node's processes, for the container runtime inventory. | No |
+| Host path `/sys/fs/bpf` | writable, propagation `HostToContainer`, created if missing | The pinned flow table that survives a restart, the lock that keeps one instance per node, and on Cilium its connection tracking maps. | No |
+| Host path `/sys/fs/cgroup` | read-only | Find pod cgroups, attach the cgroup programs, read the container's own memory use. | No |
+| Host path `/etc/cni/net.d` | read-only, at `/host/etc/cni/net.d`, created if missing | Identify the CNI and the encapsulation overhead it adds to each packet. | No |
+| Host path `/var/run/ztunnel` | only with `istioAmbient.enabled`: read-only, at `/host/var/run/ztunnel`, created if missing | Detect an Istio ambient mesh by its socket. | Not mounted by default |
+| Seccomp profile | unset (`seccompProfile`) | The runtime's default profile must allow `bpf` and `perf_event_open` before it can be set. | |
+| SELinux label | unset (`seLinuxOptions`) | Set it where the node's policy denies the default container label these operations. | |
+| Kubernetes API | ClusterRole: `list`, `watch` pods; `get` nodes; `list` `ciliumenvoyconfigs.cilium.io` (`rbac.create`) | Pod identity for each node's traffic, the node's UID and zone, Envoy detection on Cilium. | Traffic is then reported without pod and node identity |
+| Agent token | Secret volume, read-only | The token the agent checks on every batch. | Only with export off |
 
-Additionally requires:
-- `hostNetwork: true` - Access host network namespace
-- `hostPID: true` - Track processes for connection attribution
+Against the Pod Security Standards, the privileged container, the host network, the host paths and the node port are outside **baseline** (with `privileged: false`, the added capabilities are); root and the unset seccomp profile are in addition outside **restricted**. The namespace must therefore allow the privileged level.
+
+## Image Version
+
+Do not run a network monitor image older than the chart's minimum (the `kubeadapt.io/minimum-image-version` annotation in `Chart.yaml`) on a cluster whose CNI or network policy agent attaches classic tc filters to pod interfaces: those images replace that filter, so network policy stops being enforced on the node and stays off after the network monitor is removed. The chart refuses such an image tag. A tag that is not a release version, or one pinned by digest, cannot be compared: it is accepted, and the install notes say so.
+
+## Istio Ambient Mesh
+
+Set `istioAmbient.enabled=true` on a cluster that runs ztunnel. The pod then mounts the node's `/var/run/ztunnel` read-only, which is how the network monitor tells that a node is in ambient mode. It is off by default because mounting a host directory that does not exist creates it, which would leave an empty directory on every node of a cluster without the mesh.
+
+## Scheduling and Rollout
+
+- **Which nodes.** One pod per Linux node without taints. The default `tolerations` is empty, so tainted pools (control plane, GPU, spot and other dedicated pools) are not measured; add their taints, or `[{operator: Exists}]` for every taint. `nodeRequirements` keeps the DaemonSet off nodes where its pod can never start (AWS Fargate, virtual-kubelet, other operating systems): no pod is created for them, so none stays Pending. It is applied on top of `nodeSelector` and `affinity`.
+- **Priority.** The pod requests 100m CPU and 256Mi. A node whose capacity is already requested has no room for it, when the network monitor is first turned on and again whenever its pod there restarts or is replaced: the DaemonSet deletes the old pod before it creates the new one, nothing holds the room in between, and a workload pod that was waiting takes it within the same second. Kubernetes has no way to keep the room without evicting for it, so there are three choices, described in full in `values.yaml`:
+
+  | | `priorityClassName: ""` (default) | `priorityClass.create: true` | `priorityClassName: system-node-critical` |
+  |---|---|---|---|
+  | Evicts workload pods | never | on a node without room: as few as needed, lowest priority and most recently started first, only below `priorityClass.value` (1000000) | on a node without room: any pod below the node-critical ones |
+  | First enable on a full node | pod `Pending`, node not measured until room appears | one workload pod evicted in tests; the network monitor starts when that pod has ended (2 s in tests, at most its termination grace period) | same |
+  | Restart or rollout on a full node with workload pods waiting | a waiting pod takes the room, network monitor `Pending` | the pod that just took the room is evicted before its container starts, network monitor back in 2 s | same |
+  | Can be evicted by | any workload with a priority class | workloads with a class above `priorityClass.value` | no workload |
+  | Rollout and `helm upgrade --wait` | stop when the waiting pods fill the `maxUnavailable` share | complete | complete |
+  | Under node memory pressure | ends like any workload container | ends like any workload container | workload containers are ended first |
+
+- **Rollout.** A change reaches `updateStrategy.rollingUpdate.maxUnavailable` of the nodes at a time, `25%` by default: four waves of well under a minute each, on any number of nodes. A pod that fails to become ready counts against that share, so a bad release stops there; so does a pod that waits `Pending` on a node without room. A restart leaves a short gap in that node's measurements and does not touch pod traffic. `maxSurge` cannot be used, because the pod uses the node's network and only one instance per node attaches. A rollout that is held by waiting pods continues when they start; to push it through, raise the share for that one upgrade (`--set updateStrategy.rollingUpdate.maxUnavailable=50%`, under `kubeadapt-k8s-pulse.` in the `kubeadapt` chart).
+- **`helm upgrade --wait`.** Helm waits until the rollout has reached every node, so pods that wait `Pending` can hold it until the timeout; the release is then marked `failed` although everything else runs, and `--atomic` rolls it back. On a large cluster, leave `--wait` and `--atomic` out of the upgrade that turns the network monitor on or changes it, and watch the DaemonSet (see Troubleshooting). Helm 4 in addition needs every pod ready by default; `--wait=legacy` gives the Helm 3 rule.
+
+## Private Registries
+
+Set `image.repository` to your copy of the image and, where the registry needs credentials, `imagePullSecrets` (or `global.imagePullSecrets` in the `kubeadapt` chart, which also covers the agent and the upgrade Job). The pull policy is `IfNotPresent`: release tags are not moved, and a pull on every pod start on every node runs into registry rate limits on a large cluster.
 
 ## Exported Metrics
 
-### Pod-Level Traffic Metrics
+### Traffic
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `kubeadapt_connection_traffic_bytes_total` | Counter | Cumulative egress bytes (use `rate()` for throughput) |
-| `kubeadapt_connection_traffic_packets_total` | Counter | Cumulative egress packets |
-| `kubeadapt_active_connections` | Gauge | Current active connections |
+| `kubeadapt_connection_traffic_bytes_total` | Counter | Bytes the node's pods sent, by protocol (use `rate()` for throughput) |
+| `kubeadapt_connection_traffic_packets_total` | Counter | Packets the node's pods sent, by protocol |
+| `kubeadapt_overflow_bytes_drained_total` | Counter | Bytes carried by the overflow ring buffer, by protocol; add to the bytes above for the total |
 
-### Internal Monitoring Metrics
+### Health
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `kubeadapt_bpf_load_status` | Gauge | BPF program load status (1=loaded, 0=failed) |
-| `kubeadapt_bpf_load_attempts_total` | Counter | Total BPF load attempts |
-| `kubeadapt_bpf_load_duration_seconds` | Gauge | BPF program load duration |
-| `kubeadapt_bpf_map_utilization_percent` | Gauge | BPF map utilization (0-100%) |
-| `kubeadapt_overflow_flows_total` | Counter | Flows sent to overflow ringbuffer |
-| `kubeadapt_ip_pairs_batch_size` | Gauge | Number of IP pairs in current batch |
-| `kubeadapt_ebpf_collection_duration_seconds` | Histogram | Map collection cycle duration |
-| `kubeadapt_collector_errors_total` | Counter | Collection errors by type |
-| `kubeadapt_connection_tracking_info` | Gauge | Connection tracking configuration info |
+| `kubeadapt_bpf_load_status` | Gauge | 1 when the BPF programs loaded |
+| `kubeadapt_attach_mode` | Gauge | Attach mode in use (TCX or classic tc) |
+| `kubeadapt_veth_coverage_ratio` | Gauge | Share of pod interfaces pulse is attached to |
+| `kubeadapt_bpf_map_utilization_percent` | Gauge | Fill level of the kernel flow table |
+| `kubeadapt_pod_resolver_synced` | Gauge | 1 when pod identity is available |
+| `kubeadapt_duplicate_pulse_instance` | Gauge | 1 when another instance already runs on the node |
+| `kubeadapt_lost_events_total` | Counter | Observations that did not reach a batch, by site |
+| `kubeadapt_pulse_retry_buffer_batches` | Gauge | Batches waiting for the agent |
+| `kubeadapt_pulse_export_acked_batches_total` | Counter | Batches the agent acknowledged |
 
 {{ template "chart.requirementsSection" . }}
 
@@ -108,27 +151,106 @@ Additionally requires:
 
 ## Troubleshooting
 
-### Agent Won't Start
+`<ds>` is the DaemonSet's name: `kubectl -n <namespace> get daemonset -l app.kubernetes.io/component=kubeadapt-k8s-pulse`.
 
 ```bash
-# Check kernel version (needs 5.10+)
-uname -r
-
-# Verify BPF filesystem mounted
-ls /sys/fs/bpf
+kubectl -n <namespace> get daemonset <ds>
 ```
 
-### No Metrics Appearing
+`READY` should reach `DESIRED`: the number of nodes the DaemonSet targets. `CURRENT` is the number of pods that exist.
 
-On the **worker node** (via SSH):
+### `helm install` or `helm upgrade` Fails With `admission webhook ... denied the request`
+
+A policy engine that also checks workload objects has rejected the DaemonSet itself, so nothing was deployed. Kyverno does this by default; its message lists every policy and rule the pod template fails:
+
+```
+Error: INSTALLATION FAILED: admission webhook "validate.kyverno.svc-fail" denied the request:
+resource DaemonSet/<namespace>/<ds> was blocked due to the following policies
+disallow-host-namespaces:
+  autogen-host-namespaces: ...
+```
+
+Apply an exception for the listed rules ([examples/network-monitor/kyverno-policy-exception.yaml](../../examples/network-monitor/kyverno-policy-exception.yaml)) and run the command again. The exception has to match the DaemonSet and its pods: the list above comes from the check of the DaemonSet, which does not see the host port, and an exception for the DaemonSet alone lets the install succeed and leaves it without pods. `helm template ... | kubectl apply --dry-run=server -f -` shows the objections without creating anything.
+
+### `CURRENT` Is Lower Than `DESIRED`: Pods Are Not Created
+
+The DaemonSet exists, and an admission controller has denied its pods: Pod Security Admission, Gatekeeper, Kyverno or a vendor's webhook. The DaemonSet's events carry its answer, with the policy and the field:
+
+```bash
+kubectl -n <namespace> get events --sort-by=.lastTimestamp \
+  --field-selector involvedObject.kind=DaemonSet,involvedObject.name=<ds>
+```
+
+| The event says | Cause | What to do |
+|----------------|-------|------------|
+| `violates PodSecurity "baseline:latest"` or `"restricted:latest"` | The namespace enforces a Pod Security level | Label the namespace `pod-security.kubernetes.io/enforce=privileged` |
+| `admission webhook "validate.kyverno.svc-fail" denied the request` followed by policy and rule names | A Kyverno policy that checks pods only | Apply a PolicyException for the listed rules |
+| `admission webhook "validation.gatekeeper.sh" denied the request: [<constraint>]`, or `ValidatingAdmissionPolicy 'gatekeeper-<template>' with binding 'gatekeeper-<template>-<constraint>' denied request` (the default from Gatekeeper 3.22) | A Gatekeeper constraint | Exclude the namespace from the named constraint; one denial is reported at a time, so repeat |
+| another webhook's name | A vendor admission controller | Add an exclusion for the namespace or the image in that product |
+| `exceeded quota` or `no PriorityClass with name` | `priorityClassName` names a class the namespace may not use, or one that does not exist | Leave it empty, or use `priorityClass.create=true` |
+
+[examples/network-monitor](../../examples/network-monitor) has the namespace label, the Kyverno exception and the Gatekeeper constraints.
+
+### `READY` Is Lower Than `CURRENT`: Pods Exist and Are Not Ready
+
+```bash
+kubectl -n <namespace> get pods -l app.kubernetes.io/component=kubeadapt-k8s-pulse -o wide --no-headers | awk '$2 != "1/1"'
+kubectl -n <namespace> describe pod <pod>
+kubectl -n <namespace> logs <pod> --tail=50
+```
+
+| The pod is | And shows | Cause | What to do |
+|------------|-----------|-------|------------|
+| `Pending` | event `Insufficient cpu` or `Insufficient memory` | The node has no room for the pod's requests and the pod has no priority class to evict for it. Also happens to a pod that was running, after a restart or a rollout on a full node | It starts when room appears; until then the node is not measured. For a guaranteed place, see Priority under Scheduling and Rollout |
+| `Pending` | event `didn't have free ports` | Another pod on the node has declared the same host port | `config.metricsPort` |
+| `Pending` | event `node(s) had untolerated taint` | The node has a taint that `tolerations` does not cover | Add the taint to `tolerations`, or leave the pool out with `nodeRequirements` |
+| `ImagePullBackOff`, `ErrImagePull` | the registry's answer in the events (`toomanyrequests`, `unauthorized`, `no match for platform`) | Rate limit, missing credentials, or an image without the node's architecture in a private copy | `image.repository`, `imagePullSecrets`; copy all platforms of the image |
+| `CreateContainerError`, `RunContainerError` | a host path or security option in the message | The node or its runtime refuses a mount or an option | Compare with the table under "What the Pod Asks of the Node" |
+| `Running`, not ready | log: `permission denied` or `operation not permitted` while loading or attaching the programs | A node security policy (SELinux, AppArmor, seccomp) denies the BPF operations. On an SELinux node the node's audit log has a matching `avc: denied` line | `seLinuxOptions`, `seccompProfile`, or `privileged: true` |
+| `Running`, not ready | log: the metrics port cannot be bound | Another process on the node holds the port | `config.metricsPort` |
+| `Running`, ready at first, then not | log: sends to the agent fail | Nothing is acknowledged for three export windows (three minutes): the agent is down, its listener is off, the token differs, or a NetworkPolicy blocks node addresses | Check the agent pod and the `<name>-agent-pulse` Service's endpoint; see `agent.networkPolicy` in the `kubeadapt` chart |
+| `CrashLoopBackOff` | log of the previous run: `kubectl logs <pod> --previous` | Kernel older than 5.10 | See Prerequisites |
+
+### Pods `Pending` on Nodes Without Room
+
+```bash
+kubectl -n <namespace> get pods -l app.kubernetes.io/component=kubeadapt-k8s-pulse --field-selector status.phase=Pending \
+  -o custom-columns=POD:.metadata.name,NODE:.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].values[0],SINCE:.metadata.creationTimestamp
+kubectl -n <namespace> get daemonset <ds> \
+  -o custom-columns=DESIRED:.status.desiredNumberScheduled,UPDATED:.status.updatedNumberScheduled,READY:.status.numberReady
+```
+
+Each line of the first command is a node that is not measured. `UPDATED` below `DESIRED` and not moving means a rollout is held by them. Before turning the network monitor on, this lists the nodes with the most CPU already requested:
+
+```bash
+kubectl get nodes -o name | while read n; do
+  kubectl describe "$n" | awk -v n="$n" '/Allocated resources/{f=1} f && $1=="cpu"{print n, $2, $3; exit}'
+done | sort -k3 -r | head -30
+```
+
+### `DESIRED` Is Lower Than Expected: Nodes Without a Pod
+
+```bash
+comm -23 \
+  <(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort) \
+  <(kubectl -n <namespace> get pods -l app.kubernetes.io/component=kubeadapt-k8s-pulse -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort)
+kubectl get node <node> -o jsonpath='{.spec.taints}{"\n"}{.metadata.labels}{"\n"}'
+```
+
+A node is left out by `nodeRequirements` (operating system, AWS Fargate, virtual-kubelet), by `nodeSelector` or `affinity`, or by a taint that `tolerations` does not cover.
+
+### Checking the Programs
+
+On the **worker node**:
+
 ```bash
 sudo bpftool prog list | grep tc_
 sudo bpftool map list | grep connection_flows
 ```
 
-Via **kubectl**:
+Through **kubectl**:
+
 ```bash
-kubectl logs -n kubeadapt -l app.kubernetes.io/name=kubeadapt-k8s-pulse --tail=50
-kubectl port-forward -n kubeadapt daemonset/kubeadapt-k8s-pulse 9090:9090
-curl http://localhost:9090/metrics | grep kubeadapt
+kubectl -n <namespace> port-forward <pod> 9090:9090
+curl -s http://localhost:9090/metrics | grep kubeadapt
 ```
